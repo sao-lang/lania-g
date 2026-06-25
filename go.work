@@ -1,0 +1,30 @@
+go 1.25.0
+
+use (
+	./cmd
+	./application/v3
+	./integrations/auth/v3
+	./integrations/cache/v3
+	./integrations/config/v3
+	./integrations/es/v3
+	./integrations/events/v3
+	./integrations/grpc/v3
+	./integrations/http/v3
+	./integrations/kafka/v3
+	./integrations/logger/v3
+	./integrations/minio/v3
+	./integrations/mongodb/v3
+	./integrations/otel/v3
+	./integrations/orm/v3
+	./integrations/outbox/v3
+	./integrations/resilience/v3
+	./integrations/swagger/v3
+	./integrations/terminus/v3
+	./kernel/v3
+	./protocol/graphql/v3
+	./protocol/grpc/v3
+	./protocol/http/v3
+	./protocol/mq/v3
+	./protocol/scheduler/v3
+	./protocol/ws/v3
+)

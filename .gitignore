@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+
+# Go build artifacts
+*.test
+*.out
+coverage.out
+cover.out
+dist/
+build/
+bin/
+
+# Go workspace / tool caches
+.coverprofile
+*.coverprofile
+
+# Project local generated stats
+.VSCodeCounter/
