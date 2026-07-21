@@ -9,9 +9,10 @@ package di
 import (
 	"errors"
 	"fmt"
-	"github.com/sao-lang/lania-g/kernel/v3/metadata"
 	"reflect"
 	"sync"
+
+	"github.com/sao-lang/lania-g/kernel/v3/metadata"
 )
 
 // Scope 复用 metadata 中定义的作用域枚举。
@@ -259,7 +260,11 @@ func (c *Container) get(token interface{}, resolving map[interface{}]bool, reque
 func (c *Container) createInstance(provider *Provider, resolving map[interface{}]bool, requester *Container) (interface{}, error) {
 	switch provider.Type {
 	case ProviderTypeValue:
-		return provider.UseValue, nil
+		instance := provider.UseValue
+		if err := c.injectFields(instance, resolving, requester); err != nil {
+			return nil, err
+		}
+		return instance, nil
 
 	case ProviderTypeExisting:
 		if resolving[provider.UseExisting] {
@@ -313,22 +318,44 @@ func (c *Container) construct(typ reflect.Type, resolving map[interface{}]bool, 
 		}
 	}
 
-	if err := c.injectFields(instance, resolving); err != nil {
+	if err := c.injectFields(instance, resolving, requester); err != nil {
 		return nil, err
 	}
 
 	return instance, nil
 }
 
-// injectFields 预留的字段注入钩子。
+// injectFields 对 struct 的 exported 零值字段按类型从容器注入实例。
 //
-// 当前 v3 不依赖基于装饰器/Tag 的字段注入，因此这里默认不做任何事。
-// 真正的注入入口是：
-// - 构造函数注入（callConstructor）
-// - 或 Injectable.Inject(container)
-func (c *Container) injectFields(instance interface{}, resolving map[interface{}]bool) error {
-	// 当前 v3 不依赖装饰器驱动的字段注入；这里保留钩子，
-	// 以便未来扩展或兼容 Injectable/构造函数注入之外的策略。
+// 规则：
+// - 只注入 exported（首字母大写）字段
+// - 只注入零值字段（已有值的字段不覆盖）
+// - 容器中不存在的类型静默跳过（不报错）
+// - 支持 parent 链回溯（child container 可注入 parent 的 provider）
+func (c *Container) injectFields(instance interface{}, resolving map[interface{}]bool, requester *Container) error {
+	rv := reflect.ValueOf(instance)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return nil
+	}
+
+	for i := 0; i < rv.NumField(); i++ {
+		ft := rv.Type().Field(i)
+		fv := rv.Field(i)
+
+		if !ft.IsExported() || !fv.IsZero() {
+			continue
+		}
+
+		dep, err := c.get(ft.Type, resolving, requester)
+		if err != nil {
+			continue
+		}
+
+		fv.Set(reflect.ValueOf(dep))
+	}
 	return nil
 }
 

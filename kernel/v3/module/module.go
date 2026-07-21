@@ -107,25 +107,31 @@ func (m *BaseModule) Init() error {
 	// Controllers/Resolvers 也需要纳入容器管理，
 	// 这样 compiler/runtime 就能按类型解析 receiver 的模块归属，
 	// 而不是依赖 DSL 里传入的裸实例。
+	//
+	// 每个实例先走 tryConstructOwner 尝试依赖注入（字段注入或构造函数注入）：
+	// - 若实例所有字段都是零值 → 走 construct 管线（reflect.New + injectFields / ConstructorFinder）
+	// - 若实例已有非零字段（老写法）→ 保持原实例不变
 	for _, controller := range m.metadata.Controllers {
 		if controller == nil {
 			continue
 		}
-		t := reflect.TypeOf(controller)
+		instance := m.tryInjectOwner(controller)
+		t := reflect.TypeOf(instance)
 		if t.Kind() != reflect.Ptr {
 			t = reflect.PointerTo(t)
 		}
-		m.container.RegisterValue(t, controller)
+		m.container.RegisterValue(t, instance)
 	}
 	for _, resolver := range m.metadata.Resolvers {
 		if resolver == nil {
 			continue
 		}
-		t := reflect.TypeOf(resolver)
+		instance := m.tryInjectOwner(resolver)
+		t := reflect.TypeOf(instance)
 		if t.Kind() != reflect.Ptr {
 			t = reflect.PointerTo(t)
 		}
-		m.container.RegisterValue(t, resolver)
+		m.container.RegisterValue(t, instance)
 	}
 
 	providers := m.container.GetAll()
@@ -148,6 +154,53 @@ func (m *BaseModule) Init() error {
 
 	m.initialized = true
 	return nil
+}
+
+// tryInjectOwner 尝试对 controller/resolver 实例做依赖注入。
+//
+// 检测策略：
+// - 若实例的所有 exported 字段都是零值 → 认为用户没手动赋值，走 Class provider 构造路径
+//   → construct() → 优先 ConstructorFinder（构造函数注入）→ 否则 reflect.New + injectFields
+// - 若有任一 exported 字段非零（老写法手动赋值）→ 保持原实例不变
+//
+// 这样既兼容老代码（&Controller{store: s}），又支持新写法（&Controller{} 自动注入字段）。
+func (m *BaseModule) tryInjectOwner(owner interface{}) interface{} {
+	if owner == nil {
+		return nil
+	}
+
+	// 检查是否所有 exported 字段都是零值
+	rv := reflect.ValueOf(owner)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return owner
+	}
+
+	allZero := true
+	for i := 0; i < rv.NumField(); i++ {
+		if rv.Type().Field(i).IsExported() && !rv.Field(i).IsZero() {
+			allZero = false
+			break
+		}
+	}
+	if !allZero {
+		return owner
+	}
+
+	// 全零值 → 走 Class provider 构造路径
+	provider := &di.Provider{
+		Token:    reflect.TypeOf(owner),
+		Type:     di.ProviderTypeClass,
+		UseClass: reflect.TypeOf(owner),
+		Scope:    di.Singleton,
+	}
+	instance, err := m.container.Get(provider.Token)
+	if err != nil {
+		return owner
+	}
+	return instance
 }
 
 // Destroy 销毁模块（逆序处理 imports），用于应用退出或动态卸载。

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/sao-lang/lania-g/application/v3"
 	swagger "github.com/sao-lang/lania-g/integrations/swagger/v3"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
+	"github.com/sao-lang/lania-g/kernel/v3/di"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
@@ -211,12 +213,12 @@ func (s *memoryStore) deleteUser(id int) error {
 
 // AuthController 演示一个简单的认证相关 Controller（注册/登录）。
 type AuthController struct {
-	store *memoryStore
+	Store *memoryStore // 注入点：由模块 Init 时自动从容器注入
 }
 
 // UserController 演示一个简单的用户管理 Controller（CRUD + 列表）。
 type UserController struct {
-	store *memoryStore
+	Store *memoryStore // 注入点：由模块 Init 时自动从容器注入
 }
 
 type registerRequest struct {
@@ -306,7 +308,7 @@ func (c *AuthController) Register(args registerArgs) (any, error) {
 		return nil, err
 	}
 
-	account, err := c.store.register(args.Body.Value.Username, args.Body.Value.Password)
+	account, err := c.Store.register(args.Body.Value.Username, args.Body.Value.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +324,7 @@ func (c *AuthController) Login(args loginArgs) (any, error) {
 		return nil, err
 	}
 
-	token, account, err := c.store.login(args.Body.Value.Username, args.Body.Value.Password)
+	token, account, err := c.Store.login(args.Body.Value.Username, args.Body.Value.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +346,7 @@ func (c *UserController) List(args listUsersArgs) (any, error) {
 		size = 10
 	}
 
-	items, total := c.store.listUsers(args.Keyword.Value, page, size)
+	items, total := c.Store.listUsers(args.Keyword.Value, page, size)
 	account, _ := currentAccount(args.Ctx)
 	return map[string]any{
 		"list":     items,
@@ -359,7 +361,7 @@ func (c *UserController) List(args listUsersArgs) (any, error) {
 
 // Get 按 id 获取一个用户。
 func (c *UserController) Get(args getUserArgs) (any, error) {
-	item, err := c.store.getUserByID(args.ID.Value)
+	item, err := c.Store.getUserByID(args.ID.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +375,7 @@ func (c *UserController) Get(args getUserArgs) (any, error) {
 // Create 创建一个用户，并在成功时返回 201。
 func (c *UserController) Create(args createUserArgs) (any, error) {
 	req := args.Body.Value
-	item := c.store.createUser(req.Name, req.Email, req.Age)
+	item := c.Store.createUser(req.Name, req.Email, req.Age)
 	args.Ctx.Status(http.StatusCreated)
 	return item, nil
 }
@@ -381,7 +383,7 @@ func (c *UserController) Create(args createUserArgs) (any, error) {
 // Update 按 id 更新一个用户。
 func (c *UserController) Update(args updateUserArgs) (any, error) {
 	req := args.Body.Value
-	item, err := c.store.updateUser(args.ID.Value, req.Name, req.Email, req.Age)
+	item, err := c.Store.updateUser(args.ID.Value, req.Name, req.Email, req.Age)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +393,7 @@ func (c *UserController) Update(args updateUserArgs) (any, error) {
 
 // Delete 按 id 删除一个用户。
 func (c *UserController) Delete(args deleteUserArgs) (any, error) {
-	if err := c.store.deleteUser(args.ID.Value); err != nil {
+	if err := c.Store.deleteUser(args.ID.Value); err != nil {
 		return nil, err
 	}
 
@@ -550,10 +552,35 @@ func currentAccount(ctx httpbinding.Context) (accountView, bool) {
 	return account, ok
 }
 
-func main() {
+// ===== 模块定义：StoreModule =====
+
+var storeToken = reflect.TypeFor[*memoryStore]()
+
+// StoreModule 提供 *memoryStore 实例并导出，供其他模块通过 imports/exports 注入。
+type StoreModule struct {
+	*module.BaseModule
+	store *memoryStore
+}
+
+func NewStoreModule() *StoreModule {
 	store := newMemoryStore()
-	authCtrl := &AuthController{store: store}
-	userCtrl := &UserController{store: store}
+	pStore, _ := di.ProviderFromInstanceWithToken(storeToken, store, di.Singleton)
+	base := module.NewBaseModule(&module.ModuleMetadata{
+		Providers: []*di.Provider{pStore},
+		Exports:   []any{storeToken},
+	})
+	return &StoreModule{BaseModule: base, store: store}
+}
+
+// 新 main：使用 imports/exports + 字段注入
+//
+// Controller 不再手动传 store，改为声明 Store 字段（exported），
+// 由 BaseModule.Init() 中的 tryInjectOwner 自动从容器注入。
+// StoreModule 通过 exports 传播 *memoryStore 到 ControllerModule，
+// controller 作为零值传入，Init 时字段被自动填充。
+func main() {
+	// 1. 创建模块树
+	storeModule := NewStoreModule()
 	swaggerModule, err := swagger.ForRoot(
 		swagger.Config{
 			Title:       "lania-g HTTP Demo API",
@@ -571,10 +598,20 @@ func main() {
 		panic(err)
 	}
 
-	// 这个 demo 整体贴近推荐的 HTTP 接入路径，
-	// 但下面故意保留了更丰富的 AOP 织入，以便集中展示框架能力。
-	root := module.CreateModule([]module.Module{swaggerModule}, nil, []any{authCtrl, userCtrl}, nil, nil)
+	// 2. Controller 传零值即可——字段注入会自动填充 Store
+	//    tryInjectOwner 检测到所有字段为零值 → 走 Class construct 管线
+	//    → reflect.New + injectFields → Store 字段从容器注入
+	authCtrl := &AuthController{} // 零值，Init 时自动注入 Store
+	userCtrl := &UserController{} // 零值，Init 时自动注入 Store
 
+	root := module.CreateModule(
+		[]module.Module{storeModule, swaggerModule},
+		nil,
+		[]any{authCtrl, userCtrl},
+		nil, nil,
+	)
+
+	// 3. 创建应用
 	httpAdapter := httpadapter.New().WithValidatorV10()
 	reg := registry.New()
 	app, err := application.NewWithOptions(root, application.Options{
@@ -585,6 +622,7 @@ func main() {
 		panic(err)
 	}
 
+	// 4. DSL 声明（与改造前完全一致）
 	httpAPI := httpAdapter.API().(*httpadapter.API)
 	httpAPI.Controller("", authCtrl).
 		Get("/", authCtrl.Home).
@@ -652,9 +690,15 @@ func main() {
 		ErrorResponse(http.StatusNotFound, "用户不存在").
 		Build()
 
-	// 这里使用全局 interceptor 来演示响应包装和鉴权。
-	// 如果想看最小业务骨架，优先参考 `cmd/http-app-demo`。
+	// 5. 全局 interceptor
+	//    从模块树获取 store 实例（authInterceptor 仍需要传 store）
+	store, err := module.GetByType[*memoryStore](app.ModuleRef())
+	if err != nil {
+		panic(err)
+	}
 	app.UseGlobalInterceptors(responseEnvelopeInterceptor, authInterceptor(store))
+
+	// 6. Swagger
 	builder, err := module.GetByType[*swagger.Builder](app.ModuleRef())
 	if err != nil {
 		panic(err)
@@ -678,3 +722,12 @@ func main() {
 
 	select {}
 }
+
+// 旧 main — 手动构造模式，已由上方新 main 替代，保留供参考
+//
+// func oldMain() {
+// 	store := newMemoryStore()
+// 	authCtrl := &AuthController{Store: store}
+// 	userCtrl := &UserController{Store: store}
+// 	// ... 其余代码与原 main 相同
+// }
