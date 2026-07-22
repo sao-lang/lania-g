@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/sao-lang/lania-g/application/v3 v3.0.0
+	github.com/sao-lang/lania-g/integrations/swagger/v3 v3.0.0
 	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 	github.com/sao-lang/lania-g/protocol/graphql/v3 v3.0.0
 	github.com/sao-lang/lania-g/protocol/grpc/v3 v3.0.0
@@ -40,5 +41,7 @@ replace github.com/sao-lang/lania-g/protocol/graphql/v3 => ../protocol/graphql/v
 replace github.com/sao-lang/lania-g/protocol/grpc/v3 => ../protocol/grpc/v3
 
 replace github.com/sao-lang/lania-g/protocol/http/v3 => ../protocol/http/v3
+
+replace github.com/sao-lang/lania-g/integrations/swagger/v3 => ../integrations/swagger/v3
 
 replace github.com/sao-lang/lania-g/protocol/ws/v3 => ../protocol/ws/v3

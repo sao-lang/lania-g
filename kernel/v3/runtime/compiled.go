@@ -17,26 +17,19 @@ type ParamPlan struct {
 	BindingName string
 }
 
-// CompiledHTTPRoute 表示一条编译期产出的 HTTP 路由元信息。
-type CompiledHTTPRoute struct {
-	Method   string
-	Path     string
-	RouteKey string
-}
-
-// CompiledHTTPNode 是编译期 HTTP 路由树中的一个节点。
-// 它是安装前的中间结构：先在编译期建树，再由 adapter/http 回放到运行时 matcher。
-type CompiledHTTPNode struct {
-	Static    map[string]*CompiledHTTPNode
-	Param     *CompiledHTTPNode
+// CompiledRouteNode 是编译期路由树中的一个节点。
+// 它是安装前的中间结构：先在编译期建树，再由 adapter 回放到运行时 matcher。
+type CompiledRouteNode struct {
+	Static    map[string]*CompiledRouteNode
+	Param     *CompiledRouteNode
 	ParamName string
 	RouteKey  string
 }
 
-// CompiledHTTPTree 是编译期生成的 HTTP 路由树，用于减少运行时匹配成本。
-type CompiledHTTPTree struct {
-	Methods map[string]*CompiledHTTPNode
-	All     *CompiledHTTPNode
+// CompiledRouteTree 是编译期生成的路由树，用于减少运行时匹配成本。
+type CompiledRouteTree struct {
+	Methods map[string]*CompiledRouteNode
+	All     *CompiledRouteNode
 }
 
 // AOPPlan 是编译期生成的 AOP 计划（按顺序展开后的 middleware/guard/interceptor/pipe/filter）。

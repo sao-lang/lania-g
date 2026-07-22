@@ -78,6 +78,7 @@ type Container struct {
 	instances         map[interface{}]interface{}
 	resolving         map[interface{}]bool
 	mu                sync.RWMutex
+	instancesMu       sync.Mutex
 	parent            *Container
 	constructorFinder ConstructorFinder
 }
@@ -232,20 +233,23 @@ func (c *Container) get(token interface{}, resolving map[interface{}]bool, reque
 		return c.createInstance(provider, resolving, requester)
 	}
 
-	cacheContainer.mu.Lock()
+	cacheContainer.instancesMu.Lock()
 	if instance, ok := cacheContainer.instances[token]; ok {
-		cacheContainer.mu.Unlock()
+		cacheContainer.instancesMu.Unlock()
 		return instance, nil
 	}
+	// 释放锁后再创建实例，避免 createInstance 内递归调用 get/getCached 时死锁。
+	cacheContainer.instancesMu.Unlock()
 
 	instance, err := c.createInstance(provider, resolving, requester)
 	if err != nil {
-		cacheContainer.mu.Unlock()
 		return nil, err
 	}
 
+	// 重新加锁写缓存（可能已被其他 goroutine 写入，覆盖也无妨，相同 token 的实例应是幂等的）。
+	cacheContainer.instancesMu.Lock()
 	cacheContainer.instances[token] = instance
-	cacheContainer.mu.Unlock()
+	cacheContainer.instancesMu.Unlock()
 
 	return instance, nil
 }
@@ -420,8 +424,8 @@ func (c *Container) cacheContainerFor(scope Scope, requester *Container) *Contai
 
 // getCached 从当前容器读取已缓存的实例（线程安全）。
 func (c *Container) getCached(token interface{}) (interface{}, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.instancesMu.Lock()
+	defer c.instancesMu.Unlock()
 	instance, ok := c.instances[token]
 	return instance, ok
 }

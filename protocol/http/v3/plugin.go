@@ -7,13 +7,13 @@ import (
 	"reflect"
 	"strings"
 
-	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 	httpprotocol "github.com/sao-lang/lania-g/protocol/http/v3/protocol"
 )
 
@@ -98,9 +98,9 @@ func (p *Plugin) Compile(scan any, reg *registry.Registry, global registry.Globa
 		return nil, &kerrors.KernelError{Kind: kerrors.KindExecution, Message: "invalid scan result for http plugin", Meta: map[string]any{"stage": "plugin_compile", "plugin": AdapterID}}
 	}
 
-	tree := &runtime.CompiledHTTPTree{
-		Methods: make(map[string]*runtime.CompiledHTTPNode),
-		All:     &runtime.CompiledHTTPNode{Static: make(map[string]*runtime.CompiledHTTPNode)},
+	tree := &runtime.CompiledRouteTree{
+		Methods: make(map[string]*runtime.CompiledRouteNode),
+		All:     &runtime.CompiledRouteNode{Static: make(map[string]*runtime.CompiledRouteNode)},
 	}
 	routes, routeContainers, err := compiler.CompileRouteSet(result.routes, func(owned *routeOwnership) (*compiler.CompiledRoute[*routeOwnership], error) {
 		handler, routeKey, err := compileRoute(owned, global)
@@ -238,17 +238,17 @@ func extractHTTPParamNames(path string) []string {
 
 // insertCompiledRoute 把编译结果写入一棵轻量 HTTP 路由树。
 // 这棵树是“安装前的中间结构”，便于后续统一回放到 radix matcher。
-func insertCompiledRoute(tree *runtime.CompiledHTTPTree, method, path, routeKey string) {
+func insertCompiledRoute(tree *runtime.CompiledRouteTree, method, path, routeKey string) {
 	if tree == nil {
 		return
 	}
-	var root *runtime.CompiledHTTPNode
+	var root *runtime.CompiledRouteNode
 	if method == httpprotocol.AllMethod {
 		root = tree.All
 	} else {
 		root = tree.Methods[method]
 		if root == nil {
-			root = &runtime.CompiledHTTPNode{Static: make(map[string]*runtime.CompiledHTTPNode)}
+			root = &runtime.CompiledRouteNode{Static: make(map[string]*runtime.CompiledRouteNode)}
 			tree.Methods[method] = root
 		}
 	}
@@ -261,17 +261,17 @@ func insertCompiledRoute(tree *runtime.CompiledHTTPTree, method, path, routeKey 
 		if strings.HasPrefix(seg, ":") && len(seg) > 1 {
 			// 动态段统一落在 Param 分支上，静态段优先走 Static 分支。
 			if node.Param == nil {
-				node.Param = &runtime.CompiledHTTPNode{Static: make(map[string]*runtime.CompiledHTTPNode), ParamName: seg[1:]}
+				node.Param = &runtime.CompiledRouteNode{Static: make(map[string]*runtime.CompiledRouteNode), ParamName: seg[1:]}
 			}
 			node = node.Param
 			continue
 		}
 		if node.Static == nil {
-			node.Static = make(map[string]*runtime.CompiledHTTPNode)
+			node.Static = make(map[string]*runtime.CompiledRouteNode)
 		}
 		next := node.Static[seg]
 		if next == nil {
-			next = &runtime.CompiledHTTPNode{Static: make(map[string]*runtime.CompiledHTTPNode)}
+			next = &runtime.CompiledRouteNode{Static: make(map[string]*runtime.CompiledRouteNode)}
 			node.Static[seg] = next
 		}
 		node = next
@@ -281,7 +281,7 @@ func insertCompiledRoute(tree *runtime.CompiledHTTPTree, method, path, routeKey 
 
 // replayCompiledTree 把编译期树重新铺回 matcher。
 // Compile 阶段只关心“有什么路由”；真正依赖具体 matcher API 的安装动作延后到这里。
-func replayCompiledTree(matcher routeMatcher, method, prefix string, node *runtime.CompiledHTTPNode, routes map[string]*runtime.Handler) {
+func replayCompiledTree(matcher routeMatcher, method, prefix string, node *runtime.CompiledRouteNode, routes map[string]*runtime.Handler) {
 	if node == nil {
 		return
 	}
