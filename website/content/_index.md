@@ -32,20 +32,20 @@ toc: false
       <span class="lg-code__dot"></span>
       <span class="lg-code__title">main.go</span>
     </div>
-    <pre><code class="language-go">ctrl := &amp;UserController{}
+    <pre><code class="language-go">// 1. 控制器：路由声明与 handler 放在一起
+func (c *UserController) Declare(r *http.Routes) {
+    r.Prefix("/users").Get("/ping", c.Ping)
+}
 
-root := module.CreateModule(nil, nil, []any{ctrl}, nil, nil)
+// 2. 根模块：唯一的装配入口
+root := module.New(module.Metadata{
+    Imports:     []module.Module{http.Module(http.Config{Addr: ":8080"})},
+    Controllers: []any{&amp;UserController{}},
+})
 
-httpAdapter := httpadapter.New()
-app, _ := application.NewWithOptions(root, application.Options{
-    Registry: application.NewRegistry(),
-}, httpAdapter)
-
-httpAPI := httpAdapter.API().(*httpadapter.API)
-httpAPI.Controller("/users", ctrl).Get("/ping", ctrl.Ping).BuildE()
-
-app.CompileDiagnostics()
-app.Listen(":8080")</code></pre>
+// 3. 启动：New + Run
+app, _ := application.New(root, application.Options{Logger: os.Stdout})
+app.Run()</code></pre>
   </div>
 </section>
 

@@ -12,7 +12,7 @@ next: /docs/integrations
 ```go
 schedAdapter := scheduleradapter.New()
 
-app, _ := application.NewWithOptions(root, opts, httpAdapter, schedAdapter)
+app, _ := application.New(root, opts, httpAdapter, schedAdapter)
 ```
 
 ## 2. 声明任务

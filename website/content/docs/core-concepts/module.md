@@ -10,13 +10,18 @@ next: /docs/core-concepts/di
 ## 1. 模块的四个槽位
 
 ```go
-func CreateModule(
-	imports []Module,          // 子模块
-	providers []*di.Provider,  // 本模块提供的实例
-	controllers []any,         // HTTP / WS / MQ / Scheduler 的 receiver
-	resolvers []any,           // GraphQL resolver
-	exports []any,             // 向 imports 方暴露的 token
-) *BaseModule
+func New(Metadata) *BaseModule
+func AsGlobal(Metadata) *GlobalModule
+
+type Metadata struct {
+	Imports     []Module      // 子模块
+	Providers   []*di.Provider // 本模块提供的实例
+	Controllers []any          // 协议 controller / gateway / consumer / job
+	Resolvers   []any          // GraphQL resolver
+	Exports     []any          // 向 imports 方暴露的 token
+	IsGlobal    bool
+	AOP         AOP            // 模块贡献的全局 AOP（等价 Nest APP_*）
+}
 ```
 
 | 槽位 | 用途 | 典型协议 |
@@ -31,13 +36,10 @@ func CreateModule(
 ```go
 storeModule := NewStoreModule()
 
-root := module.CreateModule(
-	[]module.Module{storeModule}, // imports
-	nil,
-	[]any{authCtrl, userCtrl},
-	nil,
-	nil,
-)
+root := module.New(module.Metadata{
+	Imports:     []module.Module{storeModule},
+	Controllers: []any{authCtrl, userCtrl},
+})
 ```
 
 加载顺序：

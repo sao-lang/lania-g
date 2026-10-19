@@ -32,7 +32,7 @@ foreach ($m in $mods) { Push-Location $m; go build ./...; go test ./...; Pop-Loc
 ## 3. 健康检查
 
 ```go
-mod, _ := terminus.ForRoot(terminus.Config{})
+mod, _ := terminus.Module(terminus.Config{})
 root := module.CreateModule([]module.Module{mod}, nil, []any{ctrl}, nil, nil)
 ```
 
@@ -41,7 +41,7 @@ root := module.CreateModule([]module.Module{mod}, nil, []any{ctrl}, nil, nil)
 ## 4. 优雅关闭
 
 ```go
-app.Listen(addr.HTTP(":8080")) // 阻塞
+app.Run()) // 阻塞
 ```
 
 ```go

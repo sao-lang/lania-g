@@ -103,7 +103,7 @@ func (c *UserController) Create(args createUserArgs) (any, error) {
 ## 6. Swagger
 
 ```go
-swaggerModule, _ := swagger.ForRoot(swagger.Config{
+swaggerModule, _ := swagger.Module(swagger.Config{
 	Title: "Demo API", Version: "1.0.0",
 }, &swagger.UIConfig{
 	SpecURL:    "/docs/openapi.json",
@@ -132,7 +132,7 @@ httpAdapter.MountHandler("/feed", http.HandlerFunc(func(w http.ResponseWriter, r
 
 | 模式 | 启动方式 | 适用 |
 |------|----------|------|
-| 共享监听 | `httpadapter.New()` + `app.Listen(":8080")` | HTTP + WS/GraphQL 同端口 |
+| 共享监听 | `httpadapter.New()` + `app.Run()` | HTTP + WS/GraphQL 同端口 |
 | 独立监听 | `httpadapter.New(":8080")` + `app.Run()` | 单独 HTTP 服务 |
 
 {{< callout type="warning" >}}

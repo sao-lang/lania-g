@@ -13,7 +13,7 @@
 ## 2. 基本接入
 
 ```go
-mongoModule, err := mongodb.ForRoot(mongodb.Config{
+mongoModule, err := mongodb.Module(mongodb.Config{
 	Name:     "analytics",
 	URI:      "mongodb://127.0.0.1:27017",
 	Database: "demo",

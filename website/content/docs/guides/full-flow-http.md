@@ -138,10 +138,7 @@ func main() {
 
 	httpAdapter := httpadapter.New().WithValidatorV10()
 
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        application.NewRegistry(),
-		StartupReporter: os.Stdout,
-	}, httpAdapter)
+	app, err := application.New(root, application.Options{Logger: os.Stdout}, httpAdapter)
 	if err != nil {
 		panic(err)
 	}
@@ -188,7 +185,7 @@ if _, err := app.CompileDiagnostics(); err != nil {
 if _, err := app.StartupReport(); err != nil {
 	panic(err)
 }
-if err := app.Listen(addr.HTTP(":8080")); err != nil {
+if err := app.Run()); err != nil {
 	panic(err)
 }
 ```

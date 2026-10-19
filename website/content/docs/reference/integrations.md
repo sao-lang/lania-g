@@ -8,7 +8,7 @@ next: /docs/reference/errors
 `integrations/*/v3` 是可插拔的基础设施模块，统一约定：
 
 ```go
-mod, err := logger.ForRoot(logger.Config{Level: logger.InfoLevel})
+mod, err := logger.Module(logger.Config{Level: logger.InfoLevel})
 ```
 
 返回的 `module.Module` 放进根模块的 `imports`；框架把它们的导出 token 自动注册进容器。
@@ -38,10 +38,10 @@ mod, err := logger.ForRoot(logger.Config{Level: logger.InfoLevel})
 ## 2. 装配示例
 
 ```go
-loggerMod, _ := logger.ForRoot(logger.Config{Level: logger.InfoLevel})
-cacheMod, _ := cache.ForRoot(cache.Config{Type: cache.Memory})
-eventsMod, _ := events.ForRoot(events.Config{Async: true})
-swaggerMod, _ := swagger.ForRoot(
+loggerMod, _ := logger.Module(logger.Config{Level: logger.InfoLevel})
+cacheMod, _ := cache.Module(cache.Config{Type: cache.Memory})
+eventsMod, _ := events.Module(events.Config{Async: true})
+swaggerMod, _ := swagger.Module(
 	swagger.Config{Title: "Demo API", Version: "1.0.0"},
 	&swagger.UIConfig{Title: "Docs", SwaggerURL: "/docs", SpecURL: "/docs/openapi.json"},
 )
@@ -59,7 +59,7 @@ root := module.CreateModule(
 ### auth
 
 ```go
-authMod, _ := auth.ForRoot(auth.Config{
+authMod, _ := auth.Module(auth.Config{
 	JWTSecret: "change-me",
 	JWTIssuer: "lania",
 	APIKeys:   map[string]auth.Principal{"key-1": {Subject: "svc"}},
@@ -72,7 +72,7 @@ authMod, _ := auth.ForRoot(auth.Config{
 ### orm
 
 ```go
-ormMod, _ := orm.ForRoot(orm.Config{
+ormMod, _ := orm.Module(orm.Config{
 	Dialector: sqlite.Open("file::memory:?cache=shared"),
 	GormConfig: &gorm.Config{},
 	AutoMigrate: []any{&User{}},
@@ -85,7 +85,7 @@ ormMod, _ := orm.ForRoot(orm.Config{
 ### outbox
 
 ```go
-outboxMod, _ := outbox.ForRoot(outbox.Config{
+outboxMod, _ := outbox.Module(outbox.Config{
 	MaxAttempts: 5,
 	Store:       outbox.NewGormStore(db),
 	Dispatcher:  kafkaDispatcher,
@@ -99,7 +99,7 @@ outboxMod, _ := outbox.ForRoot(outbox.Config{
 ### resilience
 
 ```go
-resMod, _ := resilience.ForRoot(resilience.Config{
+resMod, _ := resilience.Module(resilience.Config{
 	RateLimit: resilience.RateLimitConfig{Enabled: true, Limit: 100, Period: time.Second},
 	Timeout:   resilience.TimeoutConfig{Enabled: true, Duration: 3 * time.Second},
 	Retry:     resilience.RetryConfig{Enabled: true, Attempts: 3, Backoff: 100 * time.Millisecond},
@@ -110,7 +110,7 @@ resMod, _ := resilience.ForRoot(resilience.Config{
 ### terminus
 
 ```go
-termMod, _ := terminus.ForRoot(terminus.Config{Version: "1.0.0", ReleaseID: "dev"})
+termMod, _ := terminus.Module(terminus.Config{Version: "1.0.0", ReleaseID: "dev"})
 ```
 
 配合 `terminus` 的 health service 在 `/health` 暴露就绪/存活探针。
@@ -118,7 +118,7 @@ termMod, _ := terminus.ForRoot(terminus.Config{Version: "1.0.0", ReleaseID: "dev
 ### otel
 
 ```go
-otelMod, _ := otel.ForRoot(otel.Config{
+otelMod, _ := otel.Module(otel.Config{
 	ServiceName: "demo",
 	Exporters: []otel.ExporterConfig{
 		{Type: "otlp", Endpoint: "127.0.0.1:4317"},

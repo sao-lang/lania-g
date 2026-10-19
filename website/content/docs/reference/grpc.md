@@ -11,7 +11,7 @@ next: /docs/reference/graphql
 
 ```go
 grpcAdp := grpcadapter.New(":50051").WithServer(grpc.NewServer())
-app, _ := application.NewWithOptions(root, application.Options{
+app, _ := application.New(root, application.Options{
 	Registry: registry.New(),
 }, grpcAdp)
 ```

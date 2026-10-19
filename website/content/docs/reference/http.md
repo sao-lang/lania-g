@@ -35,7 +35,7 @@ func Listen(addr string) *Adapter   // Deprecated
 
 | 模式 | 启动 |
 |------|------|
-| `New()` | `app.Listen(":8080")` |
+| `New()` | `app.Run()` |
 | `New(":8080")` | `app.Run()` |
 
 ## 2. API 与 Builder
@@ -167,7 +167,7 @@ httpAdapter.WithNextHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http
 ## 8. Swagger
 
 ```go
-swaggerModule, _ := swagger.ForRoot(
+swaggerModule, _ := swagger.Module(
 	swagger.Config{Title: "Demo API", Version: "1.0.0"},
 	&swagger.UIConfig{
 		Title: "Docs", SpecURL: "/docs/openapi.json",

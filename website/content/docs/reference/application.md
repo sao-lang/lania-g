@@ -127,15 +127,12 @@ Modules               []ModuleStartupReport
 ## 6. 典型启动序列
 
 ```go
-app, _ := application.NewWithOptions(root, application.Options{
-	Registry:        application.NewRegistry(),
-	StartupReporter: os.Stdout,
-}, httpAdapter)
+app, _ := application.New(root, application.Options{Logger: os.Stdout}, httpAdapter)
 
 // 声明...
 if _, err := app.CompileDiagnostics(); err != nil { panic(err) }
 if _, err := app.StartupReport(); err != nil { panic(err) }
-if err := app.Listen(":8080"); err != nil { panic(err) }
+if err := app.Run(); err != nil { panic(err) }
 ```
 
 ## 7. 兼容语义

@@ -42,7 +42,7 @@ di.Injectable                    // 标记结构体可被字段注入
 ## 2. Application
 
 ```go
-app, err := application.NewWithOptions(root, application.Options{
+app, err := application.New(root, application.Options{
 	Registry: application.NewRegistry(),   // 必填
 	StartupReporter: os.Stdout,            // 可选
 }, adapters...)
@@ -60,7 +60,7 @@ app.StartupReport()
 app.GraphDiagnostics()
 app.HotLoad(module.Module)
 app.Run()                // 阻塞
-app.Listen(":8080")      // 阻塞
+app.Run()      // 阻塞
 app.Stop()
 ```
 
@@ -248,23 +248,23 @@ import (
 	grpcclient "github.com/sao-lang/lania-g/integrations/grpc/v3"
 )
 
-logger.ForRoot(logger.Config{Level: logger.InfoLevel})
-cache.ForRoot(cache.Config{Type: cache.Memory})
-config.ForRoot(config.Config{Files: []string{"config.yaml"}, EnvPrefix: "APP"})
-auth.ForRoot(auth.Config{JWTSecret: "change-me", JWTIssuer: "lania"})
-orm.ForRoot(orm.Config{Dialector: sqlite.Open(dsn), AutoMigrate: []any{&User{}}})
-mongodb.ForRoot(mongodb.Config{URI: "mongodb://...", Database: "app"})
-kafka.ForRoot(kafka.Config{Brokers: []string{"127.0.0.1:9092"}})
-minio.ForRoot(minio.Config{Endpoint: "127.0.0.1:9000", AccessKeyID: "minio", SecretAccessKey: "minio123"})
-es.ForRoot(es.Config{Addresses: []string{"http://127.0.0.1:9200"}})
-otel.ForRoot(otel.Config{ServiceName: "app"})
-outbox.ForRoot(outbox.Config{Store: store, Dispatcher: d, MaxAttempts: 5})
-resilience.ForRoot(resilience.Config{RateLimit: ..., Retry: ..., Circuit: ...})
-events.ForRoot(events.Config{Async: true})
-httpclient.ForRoot(httpclient.Config{BaseURL: "https://api.example.com", Timeout: time.Second})
-grpcclient.ForRoot(grpcclient.Config{Target: "127.0.0.1:50051", Insecure: true})
-swagger.ForRoot(swagger.Config{Title: "API", Version: "1.0.0"}, &swagger.UIConfig{...})
-terminus.ForRoot(terminus.Config{Version: "1.0.0"})
+logger.Module(logger.Config{Level: logger.InfoLevel})
+cache.Module(cache.Config{Type: cache.Memory})
+config.Module(config.Config{Files: []string{"config.yaml"}, EnvPrefix: "APP"})
+auth.Module(auth.Config{JWTSecret: "change-me", JWTIssuer: "lania"})
+orm.Module(orm.Config{Dialector: sqlite.Open(dsn), AutoMigrate: []any{&User{}}})
+mongodb.Module(mongodb.Config{URI: "mongodb://...", Database: "app"})
+kafka.Module(kafka.Config{Brokers: []string{"127.0.0.1:9092"}})
+minio.Module(minio.Config{Endpoint: "127.0.0.1:9000", AccessKeyID: "minio", SecretAccessKey: "minio123"})
+es.Module(es.Config{Addresses: []string{"http://127.0.0.1:9200"}})
+otel.Module(otel.Config{ServiceName: "app"})
+outbox.Module(outbox.Config{Store: store, Dispatcher: d, MaxAttempts: 5})
+resilience.Module(resilience.Config{RateLimit: ..., Retry: ..., Circuit: ...})
+events.Module(events.Config{Async: true})
+httpclient.Module(httpclient.Config{BaseURL: "https://api.example.com", Timeout: time.Second})
+grpcclient.Module(grpcclient.Config{Target: "127.0.0.1:50051", Insecure: true})
+swagger.Module(swagger.Config{Title: "API", Version: "1.0.0"}, &swagger.UIConfig{...})
+terminus.Module(terminus.Config{Version: "1.0.0"})
 ```
 
 ## 12. 常用命令

@@ -93,7 +93,7 @@ NewWithOptions
 ## 6. 优雅关闭
 
 ```go
-if err := app.Listen(addr.HTTP(":8080")); err != nil {
+if err := app.Run()); err != nil {
 	panic(err)
 }
 ```

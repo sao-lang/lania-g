@@ -34,14 +34,14 @@ func (c *UserController) Ping() map[string]string {
 }
 
 func main() {
-	loggerModule, err := loggerintegration.ForRoot(loggerintegration.Config{
+	loggerModule, err := loggerintegration.Module(loggerintegration.Config{
 	ContextKeys: otelintegration.LoggerContextKeys(),
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	otelModuleRaw, err := otelintegration.ForRoot(otelintegration.Config{
+	otelModuleRaw, err := otelintegration.Module(otelintegration.Config{
 		ServiceName: "demo-service",
 	})
 	if err != nil {
@@ -59,10 +59,7 @@ func main() {
 	)
 
 	httpAdapter := httpadapter.New()
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        application.NewRegistry(),
-		StartupReporter: os.Stdout,
-	}, httpAdapter)
+	app, err := application.New(root, application.Options{Logger: os.Stdout}, httpAdapter)
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +73,7 @@ otelintegration.Install(app, otelModule.Telemetry())
 		panic(err)
 	}
 
-	if err := app.Listen(":8080"); err != nil {
+	if err := app.Run(); err != nil {
 		panic(err)
 	}
 }
@@ -142,7 +139,7 @@ lg = lg.With(fields...)
 现在支持多种真实的exporter：
 
 ```go
-otelModuleRaw, err := otelintegration.ForRoot(otelintegration.Config{
+otelModuleRaw, err := otelintegration.Module(otelintegration.Config{
     ServiceName: "demo-service",
     Exporters: []otelintegration.ExporterConfig{
         {
@@ -176,7 +173,7 @@ otelModuleRaw, err := otelintegration.ForRoot(otelintegration.Config{
 配置示例：
 
 ```go
-otelModuleRaw, err := otelintegration.ForRoot(otelintegration.Config{
+otelModuleRaw, err := otelintegration.Module(otelintegration.Config{
     ServiceName: "demo-service",
     Metrics: otelintegration.MetricConfig{
         RequestDurationName: "lania.request.duration",

@@ -13,7 +13,7 @@
 ## 2. 基本接入
 
 ```go
-resilienceModule, err := resilience.ForRoot(resilience.Config{})
+resilienceModule, err := resilience.Module(resilience.Config{})
 if err != nil {
 	panic(err)
 }
@@ -64,7 +64,7 @@ func (r *RedisStore) Exists(key string) (bool, error) {
 }
 
 // 配置分布式限流
-resilienceModule, err := resilience.ForRoot(resilience.Config{
+resilienceModule, err := resilience.Module(resilience.Config{
     DistributedStore: &RedisStore{client: redisClient},
     RateLimit: resilience.RateLimitConfig{
         Enabled: true,
@@ -79,7 +79,7 @@ resilienceModule, err := resilience.ForRoot(resilience.Config{
 现在支持熔断状态的持久化，通过分布式存储实现：
 
 ```go
-resilienceModule, err := resilience.ForRoot(resilience.Config{
+resilienceModule, err := resilience.Module(resilience.Config{
     DistributedStore: &RedisStore{client: redisClient},
     Circuit: resilience.CircuitBreakerConfig{
         Enabled:          true,
@@ -94,7 +94,7 @@ resilienceModule, err := resilience.ForRoot(resilience.Config{
 现在支持基于路由的细粒度策略配置：
 
 ```go
-resilienceModule, err := resilience.ForRoot(resilience.Config{
+resilienceModule, err := resilience.Module(resilience.Config{
     Strategy: resilience.StrategyConfig{
         RateLimit: map[string]resilience.RateLimitConfig{
             "user:create": {
@@ -141,7 +141,7 @@ resilienceModule, err := resilience.ForRoot(resilience.Config{
 完整的配置示例：
 
 ```go
-resilienceModule, err := resilience.ForRoot(resilience.Config{
+resilienceModule, err := resilience.Module(resilience.Config{
     Name:        "default",
     RateLimit: resilience.RateLimitConfig{
         Enabled: true,

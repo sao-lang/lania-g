@@ -12,7 +12,7 @@ next: /docs/reference/integrations
 ```go
 schedAdp := scheduleradapter.New()
 
-app, _ := application.NewWithOptions(root, application.Options{
+app, _ := application.New(root, application.Options{
 	Registry: registry.New(),
 }, httpAdp, schedAdp)
 ```

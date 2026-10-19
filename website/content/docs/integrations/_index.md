@@ -9,7 +9,7 @@ toc: false
 `integrations/*/v3` 是可插拔的基础设施模块，全部遵循同一套约定：
 
 ```go
-mod, err := logger.ForRoot(logger.Config{Level: "info"})
+mod, err := logger.Module(logger.Config{Level: "info"})
 ```
 
 返回的 `module.Module` 直接放进根模块的 `imports` 即可。
@@ -39,9 +39,9 @@ mod, err := logger.ForRoot(logger.Config{Level: "info"})
 ## 装配示例
 
 ```go
-loggerModule, _ := logger.ForRoot(logger.Config{Level: logger.InfoLevel})
-swaggerModule, _ := swagger.ForRoot(swagger.Config{Title: "Demo API", Version: "1.0.0"}, nil)
-cacheModule, _ := cache.ForRoot(cache.Config{Type: cache.Memory})
+loggerModule, _ := logger.Module(logger.Config{Level: logger.InfoLevel})
+swaggerModule, _ := swagger.Module(swagger.Config{Title: "Demo API", Version: "1.0.0"}, nil)
+cacheModule, _ := cache.Module(cache.Config{Type: cache.Memory})
 
 root := module.CreateModule(
 	[]module.Module{loggerModule, cacheModule, swaggerModule},

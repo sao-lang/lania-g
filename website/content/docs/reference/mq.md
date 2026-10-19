@@ -51,7 +51,7 @@ mqAdp := mqadapter.New(mqkafka.New(mqkafka.Config{
 	Brokers: []string{"127.0.0.1:9092"},
 }))
 
-app, _ := application.NewWithOptions(root, application.Options{
+app, _ := application.New(root, application.Options{
 	Registry: registry.New(),
 }, mqAdp)
 ```

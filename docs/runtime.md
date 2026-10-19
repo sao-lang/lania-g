@@ -89,7 +89,7 @@ Pipeline 对外表现为一组 AOP 能力的统一承载，语义顺序建议按
 除 runtime 执行链上的 fallback 外，当前还保留一组与 `registry.Global()` 相关的 fallback inventory，也会在 `CompileDiagnostics` / `StartupReport` 中以 `registryFallbacks` 输出：
 
 - `compat`
-  - `application_global_compat`：`application.New(...)` / `application.NewCompat(...)` 仍会从 `registry.Global()` 构建应用；新代码应优先使用 `application.NewWithOptions(..., Options{Registry: application.NewRegistry()})`
+  - `application_global_compat`：`application.New(...)` / `application.NewCompat(...)` 仍会从 `registry.Global()` 构建应用；新代码应优先使用 `application.New(..., Options{Registry: application.NewRegistry()})`
   - `compile_registry_global_compat`：`compiler.CompileCompat(...)` 仍会从 `registry.Global()` 读取声明；新代码应优先使用 `compiler.Compile(moduleRef, reg, ...)`
 - `read-fallback`
   - `graphql_schema_global_read`：`adapter/graphql.buildCompiledSchemaCompat(...)` 会从 `registry.Global()` 读取 schema/config/resolver 声明

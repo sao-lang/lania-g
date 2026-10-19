@@ -14,7 +14,7 @@
 ## 2. 基本接入
 
 ```go
-authModule, err := auth.ForRoot(auth.Config{
+authModule, err := auth.Module(auth.Config{
 	JWTSecret: "secret",
 	APIKeys: map[string]auth.Principal{
 		"internal-key": {Subject: "internal", Roles: []string{"admin"}},
@@ -25,7 +25,7 @@ if err != nil {
 }
 
 root := module.CreateModule([]module.Module{authModule}, nil, []any{controller}, nil, nil)
-app, _ := application.NewWithOptions(root, application.Options{Registry: application.NewRegistry()}, httpAdapter)
+app, _ := application.New(root, application.Options{Registry: application.NewRegistry()}, httpAdapter)
 authModuleValue := authModule.(*auth.Module)
 auth.Install(app, authModuleValue.Service())
 ```
@@ -53,7 +53,7 @@ auth.Install(app, authModuleValue.Service())
 现在支持自定义 claims 校验器：
 
 ```go
-authModule, err := auth.ForRoot(auth.Config{
+authModule, err := auth.Module(auth.Config{
     JWTSecret: "secret",
     ClaimsValidators: map[string]auth.ClaimsValidator{
         "age": func(claims map[string]any) error {
@@ -80,7 +80,7 @@ authModule, err := auth.ForRoot(auth.Config{
 
 ```go
 validators := auth.ClaimsValidators()
-authModule, err := auth.ForRoot(auth.Config{
+authModule, err := auth.Module(auth.Config{
     JWTSecret:        "secret",
     ClaimsValidators: validators,
 })

@@ -44,7 +44,7 @@ gqlAdapter := graphqladapter.New().WithPlayground(true)
 wsAdapter := wsadapter.New()
 grpcAdapter := grpcadapter.New(addr.GRPC(":50051"))
 
-app, err := application.NewWithOptions(root, application.Options{
+app, err := application.New(root, application.Options{
 	Registry: application.NewRegistry(),
 }, httpAdapter, gqlAdapter, wsAdapter, grpcAdapter)
 ```
@@ -136,7 +136,7 @@ PORT=18080 GRPC_ADDR=:19051 go run ./cmd/all-in-one
 
 | 现象 | 原因 |
 |------|------|
-| `shared listener adapters present; use app.Listen(addr)` | 调用了 `app.Run()`，但存在共享监听 adapter |
+| `shared listener adapters present; use app.Run()` | 调用了 `app.Run()`，但存在共享监听 adapter |
 | `multiple adapters require shared listener address` | 有两个 adapter 都想当 listener |
 | WS 连接失败 | 客户端不是 `socket.io-client@4` |
 | GraphQL 字段找不到 | `.Returns(...)` 的类型与 Go 模型不一致 |

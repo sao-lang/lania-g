@@ -61,7 +61,7 @@ func main() {
 	root := buildRootModule()
 	httpAdapter := adapterhttp.New()
 
-	app, err := application.NewWithOptions(
+	app, err := application.New(
 		root,
 		application.Options{
 			Registry: application.NewRegistry(),
@@ -72,7 +72,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := app.Listen(":8080"); err != nil {
+	if err := app.Run(); err != nil {
 		panic(err)
 	}
 }
@@ -92,7 +92,7 @@ func main() {
 若应用中同时存在共享监听与独立监听 adapter，推荐使用：
 
 ```go
-app.Listen(":8080")
+app.Run()
 ```
 
 由 `Application` 统一协调。
@@ -158,7 +158,7 @@ analyticsDB, err := ormFactory.GetOrCreate("analytics", cfg)
 ### 4.1 创建应用
 
 ```go
-app, err := application.NewWithOptions(rootModule, application.Options{
+app, err := application.New(rootModule, application.Options{
 	Registry:        application.NewRegistry(),
 	StartupReporter: os.Stdout, // 可选：启动时输出 startup report
 }, adapters...)
@@ -338,7 +338,7 @@ _ = report
 }
 ```
 
-若在 `application.Options` 中配置 `StartupReporter`，则 `app.Run()` / `app.Listen(addr)` 会在实际启动 adapter 前自动输出 startup report。
+若在 `application.Options` 中配置 `StartupReporter`，则 `app.Run()` / `app.Run()` 会在实际启动 adapter 前自动输出 startup report。
 
 ### 4.4 Registry 隔离
 
@@ -1133,7 +1133,7 @@ func HandleAnalytics(db orm.DataSourceRef[AnalyticsDB]) error {
 多数据源初始化：
 
 ```go
-ormModule, err := orm.ForRoots(
+ormModule, err := orm.Module(
 	orm.Config{Name: "default", DB: mainDB},
 	orm.Config{Name: "analytics", DB: analyticsDB},
 )
@@ -1249,7 +1249,7 @@ func registerEventHandlers(h *UserEventHandler) {
 - 暴露 `/swagger` 与 `/swagger.json`
 
 ```go
-swaggerModule, err := swagger.ForRoot(swagger.Config{
+swaggerModule, err := swagger.Module(swagger.Config{
 	Title:   "lania-g Demo API",
 	Version: "1.0.0",
 })
@@ -1273,7 +1273,7 @@ swagger.ServeHTTPBridge(app)
 - 输出版本与发布信息
 
 ```go
-terminusModule, err := terminus.ForRoot(terminus.Config{
+terminusModule, err := terminus.Module(terminus.Config{
 	Version:   "1.0.0",
 	ReleaseID: "20250411",
 })
@@ -1322,7 +1322,7 @@ func (c *UserController) GetUser(
 }
 
 func buildRootModule() (module.Module, *UserController, error) {
-	configModule, err := config.ForRoot(config.Config{
+	configModule, err := config.Module(config.Config{
 		Data: map[string]any{
 			"app": map[string]any{
 				"name": "lania-g-demo",
@@ -1334,7 +1334,7 @@ func buildRootModule() (module.Module, *UserController, error) {
 		return nil, nil, err
 	}
 
-	loggerModule, err := logger.ForRoot(logger.Config{
+	loggerModule, err := logger.Module(logger.Config{
 		Name:  "default",
 		Level: logger.InfoLevel,
 	})
@@ -1342,7 +1342,7 @@ func buildRootModule() (module.Module, *UserController, error) {
 		return nil, nil, err
 	}
 
-	cacheModule, err := cache.ForRoot(cache.Config{
+	cacheModule, err := cache.Module(cache.Config{
 		Type: cache.Memory,
 		Name: "default",
 	})
@@ -1350,7 +1350,7 @@ func buildRootModule() (module.Module, *UserController, error) {
 		return nil, nil, err
 	}
 
-	swaggerModule, err := swagger.ForRoot(swagger.Config{
+	swaggerModule, err := swagger.Module(swagger.Config{
 		Title:   "lania-g Demo API",
 		Version: "1.0.0",
 	})
@@ -1358,7 +1358,7 @@ func buildRootModule() (module.Module, *UserController, error) {
 		return nil, nil, err
 	}
 
-	terminusModule, err := terminus.ForRoot(terminus.Config{
+	terminusModule, err := terminus.Module(terminus.Config{
 		Version:   "1.0.0",
 		ReleaseID: time.Now().Format("20060102150405"),
 	})
@@ -1391,7 +1391,7 @@ func main() {
 
 	httpAdapter := adapterhttp.New()
 
-	app, err := application.NewWithOptions(
+	app, err := application.New(
 		root,
 		application.Options{
 			Registry: application.NewRegistry(),
@@ -1417,7 +1417,7 @@ func main() {
 	swagger.ServeHTTPBridge(app)
 	terminus.ServeHTTPBridge(app, "/health")
 
-	if err := app.Listen(":8080"); err != nil {
+	if err := app.Run(); err != nil {
 		panic(err)
 	}
 }
@@ -1453,7 +1453,7 @@ func main() {
 
 面向业务应用接入时，建议遵守以下约束：
 
-- 优先通过 `application.NewWithOptions(...)` + `application.NewRegistry()` 创建应用实例。
+- 优先通过 `application.New(...)` + `application.NewRegistry()` 创建应用实例。
 - 优先通过协议模块的实例 API 注册声明，而不是直接依赖旧 compat 入口。
 - 不混用全局 `registry.Global()` 与实例级 `application.NewRegistry()`。
 - 不把 `kernel/v3/compiler`、`kernel/v3/runtime`、`kernel/v3/registry` 当作常规业务依赖。

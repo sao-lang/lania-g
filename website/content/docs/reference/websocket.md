@@ -30,10 +30,10 @@ next: /docs/reference/mq
 httpAdp := httpadapter.New()
 wsAdp := wsadapter.New()   // 共享监听
 
-app, _ := application.NewWithOptions(root, application.Options{
+app, _ := application.New(root, application.Options{
 	Registry: registry.New(),
 }, httpAdp, wsAdp)
-app.Listen(":8080")
+app.Run()
 ```
 
 ## 2. 网关 DSL

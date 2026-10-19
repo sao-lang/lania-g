@@ -11,7 +11,7 @@ next: /docs/reference/websocket
 
 ```go
 gqlAdp := graphqladapter.New().WithPlayground(true)   // 共享监听
-app, _ := application.NewWithOptions(root, application.Options{
+app, _ := application.New(root, application.Options{
 	Registry: registry.New(),
 }, gqlAdp)
 ```

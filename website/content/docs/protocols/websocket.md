@@ -18,8 +18,8 @@ wsAdapter := wsadapter.New()
 // 独立监听：自己起一个 HTTP 服务
 wsAdapter := wsadapter.New(":3000")
 
-app, _ := application.NewWithOptions(root, opts, httpAdapter, wsAdapter)
-app.Listen(":8080")
+app, _ := application.New(root, opts, httpAdapter, wsAdapter)
+app.Run()
 ```
 
 ## 2. 声明网关

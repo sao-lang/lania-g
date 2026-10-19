@@ -7,30 +7,30 @@ next: /docs/core-concepts
 
 本章把快速开始的示例扩展成一个可用的 REST 服务：
 
-- 模块拆分（Store 模块 + Controller 模块）
+- 模块拆分（Store 模块 + Controller）
 - 依赖注入（Controller 自动拿到 Store）
 - 请求体校验（`validate` tag）
-- 全局鉴权拦截器
+- 全局鉴权（Guard + Interceptor）
 - Swagger 文档
 
 ## 1. 拆分模块
 
 ```go
-var storeToken = reflect.TypeFor[*MemoryStore]()
-
 type StoreModule struct {
 	*module.BaseModule
-	store *MemoryStore
+	store *Store
 }
 
-func NewStoreModule() *StoreModule {
-	store := NewMemoryStore()
-	pStore, _ := di.ProviderFromInstanceWithToken(storeToken, store, di.Singleton)
-	base := module.NewBaseModule(&module.ModuleMetadata{
-		Providers: []*di.Provider{pStore},
-		Exports:   []any{storeToken}, // 只有导出的 token 才能被 imports 方注入
-	})
-	return &StoreModule{BaseModule: base, store: store}
+func NewStoreModule(store *Store) *StoreModule {
+	token := reflect.TypeFor[*Store]()
+	provider, _ := di.ProviderFromInstanceWithToken(token, store, di.Singleton)
+	return &StoreModule{
+		BaseModule: module.New(module.Metadata{
+			Providers: []*di.Provider{provider},
+			Exports:   []any{token}, // 只有导出的 token 才能被导入方注入
+		}),
+		store: store,
+	}
 }
 ```
 
@@ -38,7 +38,7 @@ func NewStoreModule() *StoreModule {
 
 ```go
 type UserController struct {
-	Store *MemoryStore // 由 BaseModule.Init() 自动从容器注入
+	Store *Store // 由 BaseModule.Init() 自动从容器注入
 }
 
 type createUserArgs struct {
@@ -49,12 +49,11 @@ type createUserArgs struct {
 type createUserRequest struct {
 	Name  string `json:"name" validate:"required"`
 	Email string `json:"email" validate:"required,email"`
-	Age   int    `json:"age" validate:"gt=0"`
+	Age   int    `json:"age" validate:"gte=0"`
 }
 
 func (c *UserController) Create(args createUserArgs) (any, error) {
-	req := args.Body.Value
-	item := c.Store.CreateUser(req.Name, req.Email, req.Age)
+	item := c.Store.CreateUser(args.Body.Value)
 	args.Ctx.Status(http.StatusCreated)
 	return item, nil
 }
@@ -62,106 +61,121 @@ func (c *UserController) Create(args createUserArgs) (any, error) {
 
 > Controller 以**零值**传入模块即可，`Init` 阶段会走 `Class` 构造管线填充字段。
 
-## 3. 装配模块树
+## 3. 在控制器内声明路由与鉴权
 
 ```go
-storeModule := NewStoreModule()
-authCtrl := &AuthController{}
-userCtrl := &UserController{}
-
-root := module.CreateModule(
-	[]module.Module{storeModule}, // imports
-	nil,                          // providers
-	[]any{authCtrl, userCtrl},    // controllers
-	nil, nil,
-)
-
-app, err := application.NewWithOptions(root, application.Options{
-	Registry:        registry.New(),
-	StartupReporter: os.Stdout,
-}, httpAdapter)
-```
-
-## 4. 声明路由与校验
-
-```go
-httpAPI := httpAdapter.API().(*httpadapter.API)
-
-httpAPI.Controller("/users", userCtrl).
-	Get("", userCtrl.List).Security("bearerAuth").Build()
-
-httpAPI.Controller("/users", userCtrl).
-	Post("", userCtrl.Create).
-	Summary("Create User").
-	Tags("users").
-	Security("bearerAuth").
-	ResponseEnvelope(apiEnvelope{}, "data").
-	StatusCode(http.StatusCreated).
-	Build()
-```
-
-```go
-httpAdapter := httpadapter.New().WithValidatorV10()
-```
-
-`WithValidatorV10()` 会校验 `validate:"..."` 标签，并把错误归一化为 `KernelError{Kind: Validation}`。
-
-## 5. 全局鉴权拦截器
-
-```go
-func authInterceptor(store *MemoryStore) aop.InterceptorFunc {
-	return func(ctx *aop.ExecutionContext, next aop.CallHandler) (any, error) {
-		if isPublicRoute(ctx.RouteKey) {
-			return next.Handle()
-		}
-		hc, _ := ctx.HandlerContext.(*runtime.HandlerContext)
-		token, err := extractBearerToken(hc.Request.Headers["Authorization"])
-		if err != nil {
-			return nil, err
-		}
-		account, ok := store.FindAccountByToken(token)
-		if !ok {
-			return nil, aop.UnauthorizedException("登录已失效")
-		}
-		hc.Set("demo.auth.account", account)
-		return next.Handle()
-	}
+func (c *UserController) Declare(r *httpadapter.Routes) {
+	r.Prefix("/users").
+		UseGuards(auth.RequireAuthenticated()).
+		Get("", c.List).
+			Summary("List Users").
+			Tags("users").
+			Security("bearerAuth").
+			ResponseEnvelope(apiEnvelope{}, "data").
+		Post("", c.Create).
+			Summary("Create User").
+			Tags("users").
+			Security("bearerAuth").
+			Status(http.StatusCreated).
+			ErrorResponse(http.StatusBadRequest, "参数错误")
 }
+```
 
-app.UseGlobalInterceptors(authInterceptor(store))
+规则只有三条：`Prefix/Use*` 在第一个动词前作用于整个控制器；动词开始一条新路由；其余修饰作用于当前路由。
+
+## 4. 装配模块树
+
+```go
+httpModule := httpadapter.Module(httpadapter.Config{
+	Addr:      ":8080",
+	Validator: true, // 启用 validate tag 校验
+})
+
+root := module.New(module.Metadata{
+	Imports: []module.Module{
+		httpModule,
+		swaggerModule,
+		NewStoreModule(store),
+	},
+	Controllers: []any{&AuthController{}, &UserController{}},
+})
+
+app, err := application.New(root, application.Options{Logger: os.Stdout})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+## 5. 全局拦截器
+
+```go
+app.UseGlobalInterceptors(func(ctx *aop.ExecutionContext, next aop.CallHandler) (any, error) {
+	result, err := next.Handle()
+	if err != nil {
+		return nil, err
+	}
+	return apiEnvelope{Code: 200, Msg: "ok", Data: result, Success: true}, nil
+})
+```
+
+需要模块级 AOP（等价于 Nest 的 `APP_GUARD`/`APP_INTERCEPTOR`）时，
+模块在 `Init` 里声明：
+
+```go
+func (m *MyModule) Init() error {
+	if err := m.BaseModule.Init(); err != nil {
+		return err
+	}
+	m.Context().Use(module.AOP{Middlewares: []aop.MiddlewareFunc{...}})
+	return nil
+}
 ```
 
 ## 6. 接入 Swagger
 
 ```go
-swaggerModule, _ := swagger.ForRoot(swagger.Config{
-	Title: "Demo API", Version: "1.0.0",
-}, &swagger.UIConfig{
-	SpecURL: "/docs/openapi.json",
-	SwaggerURL: "/docs",
-})
-
-builder, _ := module.GetByType[*swagger.Builder](app.ModuleRef())
-builder.AddBearerAuth("bearerAuth")
-if _, err := swagger.BuildFromHTTPRegistry(builder, reg); err != nil {
-	panic(err)
-}
-swagger.ServeHTTPBridge(app)
+swaggerModule := swagger.Module(
+	swagger.Config{
+		Title:       "Demo API",
+		Version:     "1.0.0",
+		BearerAuth:  []string{"bearerAuth"},
+		DefaultErrorResponse: "请求失败",
+	},
+	&swagger.UIConfig{
+		SpecURL:    "/docs/openapi.json",
+		SwaggerURL: "/docs",
+		RedocURL:   "/redoc",
+	},
+)
 ```
+
+把 `swaggerModule` 放进根模块的 `Imports` 即可，无需再手工调用
+`BuildFromHTTPRegistry` 或 `ServeHTTPBridge`。
 
 启动后：
 
 - `GET /docs` → Swagger UI
 - `GET /docs/openapi.json` → OpenAPI 3.0.3 描述
+- `GET /redoc` → ReDoc
 
-## 7. 验证清单
+## 7. 启动
+
+```go
+if err := app.Run(); err != nil {
+	log.Fatal(err)
+}
+```
+
+`Run` 内部依次完成：声明（Declare）→ 编译 → 启动适配器 → 阻塞。
+
+## 8. 验证清单
 
 | 场景 | 期望 |
 |------|------|
-| `POST /auth/register` 弱密码 | `400` + `kind=Validation` |
-| `POST /auth/register` 正常 | `201` |
+| `POST /auth/login` 参数缺失 | `400` + `kind=Validation` |
+| `POST /auth/login` 正常 | `200` + token |
 | 未带 token 访问 `/users` | `401` |
-| 带 token 分页查询 | `200` + 列表 |
-| 访问不存在的用户 | `404` |
+| 带 token 查询 | `200` + 列表 |
+| `GET /docs` | `200` Swagger UI |
 
 完整可运行版本见 `cmd/http-demo`。

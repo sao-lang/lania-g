@@ -12,10 +12,10 @@
 ## 2. 基本接入
 
 ```go
-busModule, _ := events.ForRoot(events.Config{})
+busModule, _ := events.Module(events.Config{})
 bus := busModule.(*events.Module).Bus()
 
-outboxModule, err := outbox.ForRoot(outbox.Config{
+outboxModule, err := outbox.Module(outbox.Config{
 	Dispatcher: outbox.NewEventDispatcher(bus),
 })
 if err != nil {
@@ -53,7 +53,7 @@ mongoDB := client.Database("outbox")
 mongoStore := outbox.NewMongoDBStore(mongoDB, "messages")
 
 // 配置 Outbox
-outboxModule, err := outbox.ForRoot(outbox.Config{
+outboxModule, err := outbox.Module(outbox.Config{
     Store:      mongoStore,
     Dispatcher: outbox.NewEventDispatcher(bus),
 })
@@ -66,7 +66,7 @@ outboxModule, err := outbox.ForRoot(outbox.Config{
 sqlStore := outbox.NewSQLStore(db)
 
 // 配置 Outbox
-outboxModule, err := outbox.ForRoot(outbox.Config{
+outboxModule, err := outbox.Module(outbox.Config{
     Store:      sqlStore,
     Dispatcher: outbox.NewEventDispatcher(bus),
 })
@@ -77,7 +77,7 @@ outboxModule, err := outbox.ForRoot(outbox.Config{
 现在支持自动调度器，定期处理待发送的消息：
 
 ```go
-outboxModule, err := outbox.ForRoot(outbox.Config{
+outboxModule, err := outbox.Module(outbox.Config{
     Store:      mongoStore,
     Dispatcher: outbox.NewEventDispatcher(bus),
     Scheduler: outbox.SchedulerConfig{
@@ -105,7 +105,7 @@ outboxModule, err := outbox.ForRoot(outbox.Config{
 deadLetterDispatcher := outbox.NewEventDispatcher(deadLetterBus)
 
 // 配置 Outbox
-outboxModule, err := outbox.ForRoot(outbox.Config{
+outboxModule, err := outbox.Module(outbox.Config{
     Store:      mongoStore,
     Dispatcher: outbox.NewEventDispatcher(bus),
     DeadLetter: deadLetterDispatcher,
@@ -121,7 +121,7 @@ outboxModule, err := outbox.ForRoot(outbox.Config{
 ### 5.6 完整配置示例
 
 ```go
-outboxModule, err := outbox.ForRoot(outbox.Config{
+outboxModule, err := outbox.Module(outbox.Config{
     Name:        "default",
     MaxAttempts: 3,
     Store:       mongoStore,
@@ -140,7 +140,7 @@ outboxModule, err := outbox.ForRoot(outbox.Config{
 
 ```go
 // 创建 MongoDB 存储
-mongoModule, _ := mongodb.ForRoot(mongodb.Config{
+mongoModule, _ := mongodb.Module(mongodb.Config{
     URI:      "mongodb://localhost:27017",
     Database: "outbox",
 })
@@ -148,7 +148,7 @@ mongoDB := mongoModule.(*mongodb.Module).DB()
 mongoStore := outbox.NewMongoDBStore(mongoDB, "messages")
 
 // 配置 Outbox
-outboxModule, err := outbox.ForRoot(outbox.Config{
+outboxModule, err := outbox.Module(outbox.Config{
     Store:      mongoStore,
     Dispatcher: outbox.NewEventDispatcher(bus),
 })
@@ -158,14 +158,14 @@ outboxModule, err := outbox.ForRoot(outbox.Config{
 
 ```go
 // 创建 SQL 存储
-ormModule, _ := orm.ForRoot(orm.Config{
+ormModule, _ := orm.Module(orm.Config{
     DSN: "mysql://user:pass@localhost:3306/outbox",
 })
 db := ormModule.(*orm.Module).DB()
 sqlStore := outbox.NewSQLStore(db)
 
 // 配置 Outbox
-outboxModule, err := outbox.ForRoot(outbox.Config{
+outboxModule, err := outbox.Module(outbox.Config{
     Store:      sqlStore,
     Dispatcher: outbox.NewEventDispatcher(bus),
 })
