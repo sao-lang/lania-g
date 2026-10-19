@@ -8,25 +8,28 @@ next: /docs/core-concepts/aop
 `lania-g` 的核心价值在于**把声明与执行拆开**：
 
 ```text
-声明（DSL）  →  Registry  →  Compiler  →  Runtime  →  Handler
+Declare（Controller）→ Registry → Compiler → Runtime → Handler
 ```
 
 ## 1. 声明阶段
 
-协议 DSL 只做一件事：把声明写进 Registry。
+控制器实现协议包的 `Declare(*Routes)`，声明被写入 Registry。这条链路完全由模块树驱动：
+`Application` 遍历根模块的所有模块，对每个实现了 `module.Declarer` 的控制器调用 `Declare`。
 
 ```go
-httpAPI.Controller("/users", ctrl).
-	Get("/:id", ctrl.Get).
-	UseGuards(authGuard).
-	Build()
+func (c *UserController) Declare(r *httpadapter.Routes) {
+	r.Prefix("/users").
+		UseGuards(authGuard).
+		Get("/:id", c.Get)
+}
 ```
 
 此时还没有任何反射调用，也没有生成 handler。
+每个协议模块在声明前会 `ClearDecl`，因此热重载可以安全地重复声明。
 
 ## 2. 编译阶段
 
-`CompileDiagnostics()` 触发编译：
+`app.Run()` 内部先执行声明阶段，然后触发编译（也可以直接调用 `app.Diagnostics()` 观察）：
 
 1. **扫描** Registry 中的声明（routes、AOP、bindings、integrations）
 2. **校验** 冲突与非法声明（例如同一 routeKey 重复声明）
@@ -34,10 +37,11 @@ httpAPI.Controller("/users", ctrl).
 4. **产物** 一份 `CompiledApp`，可安装到 Runtime
 
 ```go
-diag, err := app.CompileDiagnostics()
-if err != nil {
+if err := app.Run(); err != nil {
 	panic(err)
 }
+
+diag := app.Diagnostics()
 _ = diag
 ```
 

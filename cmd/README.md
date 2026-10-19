@@ -34,8 +34,8 @@ $env:GRPC_ADDR=':19051'; go run ./grpc-demo
 
 1. 先阅读 `../docs/标准接入模板.md`
 2. 运行或参考 `cmd/http-app-demo` / `cmd/graphql-app-demo` / `cmd/ws-app-demo` / `cmd/grpc-app-demo`
-3. 使用 `application.New(...)` + `application.NewRegistry()`
-4. 通过 mounted adapter 的 `adapter.API()` 注册协议声明
+3. 使用 `module.New(...)` 组装根模块，再 `application.New(root, Options{})`
+4. 控制器实现 `Declare(*Routes)`，声明随模块树自动收集
 5. 将 `cmd/*-demo` 作为能力参考，而不是边界规范
 
 ## gRPC Demo 调试

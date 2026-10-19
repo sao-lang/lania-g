@@ -9,212 +9,122 @@ toc: false
 ## 1. 模块与 DI
 
 ```go
-// 模块
-module.CreateModule(imports, providers, controllers, resolvers, exports)
-module.CreateGlobalModule(imports, providers, controllers, resolvers, exports)
-module.CreateAutoModule(imports, exports)
-module.CreateAsyncModule(imports, factory)
-module.NewBaseModule(&module.ModuleMetadata{Imports: ..., Controllers: ...})
-module.NewGlobalModule(&module.ModuleMetadata{...})
-module.ModuleDecorator(&module.ModuleMetadata{...})   // 函数式装饰
-module.ForwardRef(func() module.Module { ... })       // 打破循环引用
-module.ForwardRefType(reflect.TypeFor[T]())
+// 模块（全仓只有两个构造入口）
+module.New(module.Metadata{Imports, Providers, Controllers, Resolvers, Exports, AOP})
+module.AsGlobal(module.Metadata{...})
+module.ForwardRef(func() module.Module { ... })   // 打破循环引用
 
 // Provider
 di.ProviderFromInstance(instance)
 di.ProviderFromInstanceWithToken(reflect.TypeFor[T](), instance, di.Singleton)
-di.ProviderFromFactory(func(c *di.Container) (T, error) { ... })
-di.ProviderFromType(reflect.TypeFor[T](), factory)
-di.ProviderFromTypeWithToken(token, reflect.TypeFor[T](), factory, di.Transient)
+di.ProviderFromFactory(token, func() (T, error) { ... }, di.Singleton)
 
 // 作用域
-di.Singleton   // 容器内唯一
-di.Transient   // 每次新建
-di.Request     // 请求级（HTTP/gRPC 各自上下文）
+di.Singleton / di.Transient / di.Request
 
 // 取值
 container.Get(reflect.TypeFor[T]())
 di.GetByType[T](container)
-module.GetByType[T](modRef)      // 在模块树中按类型查找导出
-di.Injectable                    // 标记结构体可被字段注入
+module.GetByType[T](modRef)
 ```
 
 ## 2. Application
 
 ```go
-app, err := application.New(root, application.Options{
-	Registry: application.NewRegistry(),   // 必填
-	StartupReporter: os.Stdout,            // 可选
-}, adapters...)
-application.New(root, adapters...)
-application.NewCompat(root, adapters...)
-
-app.UseGlobalMiddlewares(aop.MiddlewareFunc(...))
-app.UseGlobalGuards(aop.GuardFunc(...))
-app.UseGlobalInterceptors(interceptor)
-app.UseGlobalPipes(aop.PipeFunc(...))
-app.UseGlobalFilters(aop.ExceptionFilterFunc(...))
-
-app.CompileDiagnostics()
-app.StartupReport()
-app.GraphDiagnostics()
-app.HotLoad(module.Module)
-app.Run()                // 阻塞
-app.Run()      // 阻塞
+app, err := application.New(root, application.Options{Logger: os.Stdout})
+app.UseGlobalMiddlewares(...)
+app.UseGlobalGuards(...)
+app.UseGlobalInterceptors(...)
+app.UseGlobalPipes(...)
+app.UseGlobalFilters(...)
+app.Run()      // 声明 → 编译 → 启动 → 阻塞
 app.Stop()
+app.Diagnostics()
+app.HotLoad(module.Module)
 ```
 
 ## 3. AOP 五类增强
 
 ```go
-// Middleware：包裹整个执行过程
-func(ctx *aop.ExecutionContext, next aop.MiddlewareHandler) (any, error)
+// Middleware
+aop.MiddlewareFunc(func(ctx *aop.ExecutionContext, next func() error) error { return next() })
 
 // Guard：返回是否放行
-aop.GuardFunc(func(ctx *aop.ExecutionContext) (bool, error) { ... })
+aop.GuardFunc(func(ctx *aop.ExecutionContext) (bool, error) { return true, nil })
 
 // Interceptor：包裹 handler 调用
 aop.InterceptorFunc(func(ctx *aop.ExecutionContext, next aop.CallHandler) (any, error) {
 	return next.Handle()
 })
 
-// Pipe：入参/返回值变换
-aop.PipeFunc(func(value any, metadata any) (any, error) { ... })
-
-// ExceptionFilter：消费异常
-aop.ExceptionFilterFunc(func(exception any, ctx *aop.ExecutionContext) error { ... })
-
-// 异常
-aop.BadRequestException(msg) / UnauthorizedException / ForbiddenException
-aop.NotFoundException / ConflictException / InternalServerErrorException
+// Pipe / ExceptionFilter
+aop.PipeFunc(func(value any, metadata any) (any, error) { return value, nil })
+aop.ExceptionFilterFunc(func(err any, ctx *aop.ExecutionContext) error { return nil })
 ```
 
 ## 4. HTTP
 
 ```go
-adp := httpadapter.New()               // 共享监听
-adp := httpadapter.New(":8080")        // 独立监听
-adp.WithBasePath("/api").WithMaxBodyBytes(1<<20).
-	WithValidatorV10().EnableCors(nil).EnableHelmet(nil).
-	ServeStatic("/assets", "./public").
-	MountHandler("/metrics", h).
-	WithNextHandler(fallback).
-	UseAfter(mw...)
+http.Module(http.Config{Addr: ":8080", Validator: true})
 
-api := adp.API().(*httpadapter.API)
-api.Controller("/users", ctrl).
-	UseMiddlewares(...).UseGuards(...).UseInterceptors(...).
-	UsePipes(...).UseFilters(...).UseParamPipes(0, pipe).
-	Get("/", ctrl.List).Summary("列表").Tags("users").
-	Post("/", ctrl.Create).
-	Get("/:id", ctrl.Get).ResponseBody(userView{}).
-	Put("/:id", ctrl.Update).
-	Patch("/:id", ctrl.Patch).
-	Delete("/:id", ctrl.Delete).
-	Head("/:id", ctrl.Head).
-	Options("/:id", ctrl.Options).
-	All("/any", ctrl.Any).
-	Get("/old", ctrl.Old).Redirect("/new", 301).
-	Get("/page", ctrl.Page).Render("page.html").
-	Get("/hidden", ctrl.H).HideFromDocs().
-	BuildE()
-
-api.MountHandler("/debug", debugHandler)
+func (c *X) Declare(r *http.Routes) {
+	r.Prefix("/users").
+		UseGuards(...).
+		Get("/:id", c.Get).Summary("...").Tags("users").Security("bearerAuth").
+		Post("", c.Create).Status(201)
+}
 ```
 
 ## 5. gRPC
 
 ```go
-adp := grpcadapter.New(":50051").WithServer(grpc.NewServer()).
-	WithServerOptions(grpc.UnaryInterceptor(i))
-api := adp.API().(*grpcadapter.API)
+grpc.Module(grpc.Config{Addr: ":50051", Server: srv})
 
-api.Service("UserService", svc).
-	UseGuards(...).UseInterceptors(...).UsePipes(...).UseFilters(...).
-	Method("Get", svc.Get).
-	Method("Create", svc.Create).WithReqType((*structpb.Struct)(nil)).
-	ServerStreamMethod("Watch", svc.Watch).
-	ClientStreamMethod("Upload", svc.Upload).
-	BidiStreamMethod("Chat", svc.Chat).
-	BuildE()
+func (s *X) Declare(r *grpc.Routes) {
+	r.Service("UserService").
+		Method("Get", s.Get).
+		ServerStreamMethod("Watch", s.Watch)
+}
 ```
 
 ## 6. GraphQL
 
 ```go
-adp := graphqladapter.New().WithPlayground(true).WithPath("/graphql").
-	WithValidatorV10().WithErrorFormatter(fn).WithMaxBodyBytes(1<<20)
-api := adp.API().(*graphqladapter.API)
+graphql.Module(graphql.Config{Addr: ":8082"})   // resolver 放 Resolvers 槽位
 
-api.UseComplexityLimit(200)
-api.DisableIntrospection()
-api.UseExtensions(ext)
-api.UseSchema(schema)
-
-api.Resolver("Query", r).
-	Query("users", r.Users).Arg("page").Arg("size").Returns("UserListResult").
-	Object("detail", r.Detail).Mutation("create", r.Create).
-	Description("...").Deprecation("...").CacheControl("private").
-	Complexity(5).RateLimit(20, 1000).Timeout(5000).
-	RequirePermission("user:create").
-	UseGuards(...).UseInterceptors(...).UsePipes(...).UseFilters(...).
-	BuildE()
-
-// ArgOption
-graphqladapter.WithRequired(true) / WithDescription("...") / WithDefault(v)
+func (q *X) Declare(r *graphql.Routes) {
+	r.Resolver("Query").Query("user", q.User).Arg("id").Returns("UserResult")
+}
 ```
 
 ## 7. WebSocket
 
 ```go
-adp := wsadapter.New().WithSocketPath("/socket.io/").
-	WithResponseEventSuffix("Response").WithErrorEventSuffix("Error")
-api := adp.API().(*wsadapter.API)
+ws.Module(ws.Config{Addr: ":8081"})
 
-api.Gateway("/ws/chat", gw).
-	UseMiddlewares(...).UseGuards(...).UsePipes(...).UseFilters(...).
-	On("event", gw.Handle).
-		UseGuards(...).UseInterceptors(...).
-	On("other", gw.Other).
-	BuildE()
-
-adp.BroadcastToRoom("/ws/chat", "r1", "msg", payload)
-adp.BroadcastToNamespace("/ws/chat", "msg", payload)
-adp.RoomLen("/ws/chat", "r1")
+func (g *X) Declare(r *ws.Routes) {
+	r.Gateway("/ws/chat").On("ping", g.Ping)
+}
 ```
 
 ## 8. MQ
 
 ```go
-adp := mqadapter.New(mqkafka.New(mqkafka.Config{Brokers: []string{...}}))
-api := adp.API().(*mqadapter.API)
+mq.Module(mq.Config{Driver: driver})
 
-api.Consumer("order", consumer).
-	Group("order-group").Concurrency(4).
-	On("order.created", consumer.OnCreated).BindParam(2, "X-Trace-Id").
-	On("order.paid", consumer.OnPaid).
-	BuildE()
+func (c *X) Declare(r *mq.Routes) {
+	r.Consumer("default").Group("g1").On("topic", c.Handle).BindParam(1, "X-Trace-Id")
+}
 ```
 
 ## 9. Scheduler
 
 ```go
-adp := scheduleradapter.New()
-api := adp.API().(*scheduleradapter.API)
+scheduler.Module(scheduler.Config{})
 
-api.Job("name", worker).
-	Cron("0 3 * * *", worker.Run).   // 或 Every(d, fn) / After(d, fn)
-	Retry(3, 5*time.Second).
-	MaxConcurrency(1).
-	Unique("name").
-	WithTimeout(30*time.Second).
-	Misfire(scheduleradapter.MisfireSkip).   // 或 MisfireQueue
-	BindParam(1, "job").
-	BuildE()
-
-adp.SetUniqueLocker(locker)
-adp.SetHistoryLimit(50)
-scheduleradapter.MountHTTPBridge(app, adp, "/scheduler/status")
+func (w *X) Declare(r *scheduler.Routes) {
+	r.Job("cleanup").Cron("0 3 * * *", w.Cleanup).Retry(3, time.Second)
+}
 ```
 
 ## 10. Binding wrapper 一览

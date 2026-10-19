@@ -19,5 +19,5 @@ toc: false
 - [WebSocket](websocket)：网关 DSL、事件、房间、广播
 - [MQ](mq)：消费者 DSL、Driver、ack/nack
 - [Scheduler](scheduler)：任务 DSL、触发、重试、快照
-- [Integrations](integrations)：18 个集成的 `ForRoot` 与配置字段
+- [Integrations](integrations)：18 个集成的 `Module(cfg)` 与配置字段
 - [错误模型](errors)：KernelError、异常、协议映射

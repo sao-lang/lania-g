@@ -7,44 +7,53 @@ next: /docs/reference/graphql
 
 包：`github.com/sao-lang/lania-g/protocol/grpc/v3`
 
-## 1. Adapter
+## 1. 模块入口
 
 ```go
-grpcAdp := grpcadapter.New(":50051").WithServer(grpc.NewServer())
-app, _ := application.New(root, application.Options{
-	Registry: registry.New(),
-}, grpcAdp)
+func Module(cfg Config) module.Module
 ```
 
-| 方法 | 说明 |
-|------|------|
-| `New(addr...)` | 无参=共享监听（由 `app.Listen` 驱动） |
-| `WithAddr(addr)` | 运行时改地址 |
-| `WithServer(*grpc.Server)` | 注入自定义 server（可装 reflection、拦截器） |
-| `WithServerOptions(...grpc.ServerOption)` | 追加 server option |
-| `Server()` | 取出底层 `*grpc.Server` |
-| `API()` | 取出 DSL 上下文 |
+| Config 字段 | 说明 |
+|-------------|------|
+| `Addr` | 监听地址，例如 `":50051"` |
+| `Server` | 可注入预配置的 `*grpc.Server`（如启用 reflection） |
+
+```go
+server := grpc.NewServer()
+reflection.Register(server)
+
+root := module.New(module.Metadata{
+	Imports:     []module.Module{grpcadapter.Module(grpcadapter.Config{Addr: ":50051", Server: server})},
+	Controllers: []any{&UserService{}},
+})
+```
 
 > 想在本地用 `grpcurl` 调试，务必 `reflection.Register(server)`。
 
-## 2. DSL
+## 2. Service 声明
 
 ```go
-grpcAPI := grpcAdp.API().(*grpcadapter.API)
-
-grpcAPI.Service("UserService", userSvc).
-	Method("Get", userSvc.Get).
-	Method("Create", userSvc.Create).WithReqType((*structpb.Struct)(nil)).
-	Build()
+type Controller interface {
+	Declare(*Routes)
+}
 ```
 
-| Builder | 方法 |
-|---------|------|
-| `API` | `Service(name, receiver)` |
+```go
+func (s *UserService) Declare(r *grpc.Routes) {
+	r.Service("UserService").
+		Method("Get", s.Get).
+		Method("Create", s.Create).WithReqType((*structpb.Struct)(nil)).
+		ServerStreamMethod("Watch", s.Watch)
+}
+```
+
+| 类型 | 方法 |
+|------|------|
+| `Routes` | `Service(name) *ServiceBuilder` |
 | `ServiceBuilder` | `Method` / `ServerStreamMethod` / `ClientStreamMethod` / `BidiStreamMethod` |
 | | `UseMiddlewares` / `UseGuards` / `UseInterceptors` / `UsePipes` / `UseFilters` / `UseParamPipes` |
-| | `Build` / `BuildE` / `Register` / `Err` |
-| `MethodBuilder` | `WithReqType(msg)` / `WithRespType(msg)` / `Summary` / `Description` / 各类 AOP |
+| | `Err()`（声明结束时会自动 seal） |
+| `MethodBuilder` | `WithReqType(msg)` / `WithRespType(msg)` / `BindParam(index, name)` / 各类 AOP |
 
 服务名与 RPC 全路径 = `/<service>/<method>`。
 

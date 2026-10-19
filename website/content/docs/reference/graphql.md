@@ -7,52 +7,61 @@ next: /docs/reference/websocket
 
 包：`github.com/sao-lang/lania-g/protocol/graphql/v3`
 
-## 1. Adapter
+## 1. 模块入口
 
 ```go
-gqlAdp := graphqladapter.New().WithPlayground(true)   // 共享监听
-app, _ := application.New(root, application.Options{
-	Registry: registry.New(),
-}, gqlAdp)
+func Module(cfg Config) module.Module
 ```
 
-| 方法 | 说明 |
+| Config 字段 | 说明 |
+|-------------|------|
+| `Addr` | 监听地址（默认端点路径 `/graphql`） |
+
+```go
+root := module.New(module.Metadata{
+	Imports:   []module.Module{graphqladapter.Module(graphqladapter.Config{Addr: ":8082"})},
+	Resolvers: []any{&QueryResolver{}, &MutationResolver{}},
+})
+```
+
+> GraphQL resolver 放在模块的 `Resolvers` 槽位，而不是 `Controllers`。
+
+## 2. Resolver 声明
+
+```go
+type Controller interface {
+	Declare(*Routes)
+}
+```
+
+```go
+func (q *QueryResolver) Declare(r *graphql.Routes) {
+	r.UseComplexityLimit(200)
+	r.Resolver("Query").
+		Query("user", q.UserWithStore).
+			Arg("id").Returns("UserResult").
+			Description("按 ID 查询用户").
+			CacheControl("private, max-age=0").
+			UseGuards(graphqlAuthGuard(q.Store)).
+		Query("users", q.Users).
+			Arg("page").Arg("size").Arg("keyword").
+			Returns("UserListResult").
+			RateLimit(20, 1000)
+}
+
+func (u *UserResolver) Declare(r *graphql.Routes) {
+	r.Resolver("User").Object("displayName", u.DisplayName)
+}
+```
+
+### Routes
+
+| 方法 | 作用 |
 |------|------|
-| `New(addr...)` | 无参=共享监听；带参=独立监听（默认路径 `/graphql`） |
-| `WithPath(path)` | 修改端点路径 |
-| `WithAddr(addr)` | 修改监听地址 |
-| `AsStandalone(addr)` | 转为独立监听 |
-| `WithSchema(*Schema)` | 注入手写 schema |
-| `WithPlayground(bool)` / `MountPlayground(path)` | Playground 开关与路径 |
-| `WithMaxBodyBytes(n)` | 请求体上限 |
-| `WithErrorFormatter(fn)` | 自定义错误序列化 |
-| `WithValidator(v)` / `WithValidatorV10()` | 参数校验 |
-| `WithContextFactory(fn)` | 自定义 `GraphQLContext` 构造 |
-| `API()` / `Handler()` | DSL 上下文 / `http.Handler` |
-
-## 2. DSL
-
-```go
-gqlAPI := gqlAdp.API().(*graphqladapter.API)
-
-gqlAPI.UseComplexityLimit(200)
-
-gqlAPI.Resolver("Query", query).
-	Query("user", query.UserWithStore).
-		Arg("id").Returns("UserResult").
-		Description("按 ID 查询用户").
-		CacheControl("private, max-age=0").
-		UseGuards(graphqlAuthGuard(store)).
-	Query("users", query.Users).
-		Arg("page").Arg("size").Arg("keyword").
-		Returns("UserListResult").
-		RateLimit(20, 1000).
-	Build()
-
-gqlAPI.Resolver("User", user).
-	Object("displayName", user.DisplayName).
-	Build()
-```
+| `Resolver(name) *ResolverBuilder` | 开始声明一个 resolver |
+| `UseSchema(*Schema)` / `DisableIntrospection()` | schema 配置 |
+| `UseExtensions(...)` / `UseComplexityLimit(n)` | 扩展与复杂度限制 |
+| `Err()` | 结束声明（内部自动 seal） |
 
 ### ResolverBuilder
 
@@ -61,7 +70,6 @@ gqlAPI.Resolver("User", user).
 | `Query/Mutation/Object/Subscription(name, handler)` | 声明字段（`Subscription` 暂不支持编译） |
 | `UseMiddlewares/UseGuards/UseInterceptors/UsePipes/UseFilters` | resolver 级 AOP |
 | `UseParamPipes(index, ...)` | 参数级 Pipe |
-| `Build()/BuildE()/Err()` | 收尾 |
 
 ### FieldBuilder
 
@@ -77,7 +85,6 @@ gqlAPI.Resolver("User", user).
 | `Complexity(n)` | 复杂度权重 |
 | `RateLimit(limit, period)` | 限流元数据 |
 | `UseGuards/UseInterceptors/UsePipes/UseFilters` | 字段级 AOP |
-| `Build()/BuildE()` | `Build` 会结束整个 resolver 的链式声明 |
 
 ### ArgOption
 

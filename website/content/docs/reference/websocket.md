@@ -9,55 +9,63 @@ next: /docs/reference/mq
 
 底层：`github.com/zishang520/socket.io`（**Socket.IO v4 / Engine.IO v4**）。
 
-## 1. Adapter
+## 1. 模块入口
 
-| 方法 | 说明 |
+```go
+func Module(cfg Config) module.Module
+```
+
+| Config 字段 | 说明 |
+|-------------|------|
+| `Addr` | 监听地址，例如 `":8081"` |
+
+```go
+root := module.New(module.Metadata{
+	Imports:     []module.Module{ws.Module(ws.Config{Addr: ":8081"})},
+	Controllers: []any{&ChatGateway{}},
+})
+```
+
+底层为 `github.com/zishang520/socket.io`（**Socket.IO v4 / Engine.IO v4**）。
+
+## 2. 网关声明
+
+```go
+type Controller interface {
+	Declare(*Routes)
+}
+```
+
+```go
+func (g *ChatGateway) Declare(r *ws.Routes) {
+	r.Gateway("/ws/chat"). // namespace
+		On("users_list", g.UsersList).
+		On("room_join", g.RoomJoin).
+		On("room_broadcast", g.RoomBroadcast)
+}
+```
+
+| 类型 | 方法 |
 |------|------|
-| `New()` | 共享监听，挂到 HTTP 适配器的 `/socket.io/` |
-| `New(":3000")` | 独立监听 |
-| `WithAddr(addr)` | 运行时改地址 |
-| `AsStandalone(addr)` | 转为独立监听 |
-| `WithSocketPath(path)` | 改 socket 路径 |
-| `WithResponseEventSuffix(s)` | 成功事件后缀（默认 `Response`） |
-| `WithErrorEventSuffix(s)` | 错误事件后缀（默认 `Error`） |
-| `Handler()` | 取出 `http.Handler` |
-| `API()` | 取出 DSL 上下文 |
-| `BroadcastToRoom(ns, room, event, args...)` | 房间广播 |
-| `BroadcastToNamespace(ns, event, args...)` | 命名空间广播 |
-| `RoomLen(ns, room)` | 房间人数 |
-
-```go
-httpAdp := httpadapter.New()
-wsAdp := wsadapter.New()   // 共享监听
-
-app, _ := application.New(root, application.Options{
-	Registry: registry.New(),
-}, httpAdp, wsAdp)
-app.Run()
-```
-
-## 2. 网关 DSL
-
-```go
-wsAPI := wsAdp.API().(*wsadapter.API)
-
-wsAPI.Gateway("/ws/chat", gateway).      // 第一个参数是 namespace
-	On("users_list", gateway.UsersList).
-	On("room_join", gateway.RoomJoin).
-	On("room_broadcast", gateway.RoomBroadcast).
-	BuildE()
-```
-
-| Builder | 方法 |
-|---------|------|
-| `API` | `Gateway(namespace, receiver)` |
+| `Routes` | `Gateway(namespace) *GatewayBuilder` |
 | `GatewayBuilder` | `On(event, handler)` |
 | | `UseMiddlewares/UseGuards/UseInterceptors/UsePipes/UseFilters` |
 | | `UseParamPipes(index, ...)` |
-| | `Build()/BuildE()/Err()` |
+| | `Group(...)` / `Err()` |
 | `HandlerBuilder` | 事件级 AOP：`UseGuards/UseInterceptors/UsePipes/UseFilters` |
 
-> Gateway 必须放进模块的 `controllers` 槽位（`module.CreateModule(nil, providers, []any{gw}, nil, nil)`），否则 DI 拿不到 receiver。
+{{< callout type="info" >}}
+Gateway 必须放进模块的 `Controllers` 槽位；声明阶段由模块树收集，
+不需要 `Build()`，也不需要手动拿 `API()`。
+{{< /callout >}}
+
+## 2.1 房间与广播
+
+| 方法 | 说明 |
+|------|------|
+| `BroadcastToRoom(ns, room, event, args...)` | 房间广播 |
+| `BroadcastToNamespace(ns, event, args...)` | 命名空间广播 |
+| `RoomLen(ns, room)` | 房间人数 |
 
 ## 3. 连接钩子
 

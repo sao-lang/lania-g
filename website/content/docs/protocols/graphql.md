@@ -7,25 +7,36 @@ next: /docs/protocols/websocket
 
 包：`github.com/sao-lang/lania-g/protocol/graphql/v3`
 
+## 0. 装配 Config
+
+```go
+graphqladapter.Module(graphqladapter.Config{
+	Addr:           ":8082",
+	Path:           "/graphql",   // 端点路径
+	Playground:     true,         // 挂载 GraphQL Playground
+	PlaygroundPath: "/playground",
+	MaxBodyBytes:   4 << 20,
+	Validator:      true,
+})
+```
+
 ## 1. 声明 schema
 
 ```go
-gqlAdapter := graphqladapter.New().WithPlayground(true)
-gqlAPI := gqlAdapter.API().(*graphqladapter.API)
+func (q *QueryResolver) Declare(r *graphqladapter.Routes) {
+	r.Resolver("Query").
+		Query("users", q.Users).
+		Arg("page").Arg("size").Arg("keyword").
+		Returns("UserListResult").
+		RateLimit(20, 1000)
+}
 
-gqlAPI.Resolver("Query", query).
-	Query("users", query.Users).
-	Arg("page").Arg("size").Arg("keyword").
-	Returns("UserListResult").
-	UseGuards(authGuard).
-	RateLimit(20, 1000).
-	BuildE()
-
-gqlAPI.Resolver("Mutation", mutation).
-	Mutation("login", mutation.Login).
-	Arg("username").Arg("password").
-	Returns("LoginResult").
-	BuildE()
+func (m *MutationResolver) Declare(r *graphqladapter.Routes) {
+	r.Resolver("Mutation").
+		Mutation("login", m.Login).
+		Arg("username").Arg("password").
+		Returns("LoginResult")
+}
 ```
 
 ## 2. 返回类型与嵌套选择集

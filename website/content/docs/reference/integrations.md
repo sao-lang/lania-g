@@ -38,19 +38,37 @@ mod, err := logger.Module(logger.Config{Level: logger.InfoLevel})
 ## 2. 装配示例
 
 ```go
-loggerMod, _ := logger.Module(logger.Config{Level: logger.InfoLevel})
-cacheMod, _ := cache.Module(cache.Config{Type: cache.Memory})
-eventsMod, _ := events.Module(events.Config{Async: true})
-swaggerMod, _ := swagger.Module(
-	swagger.Config{Title: "Demo API", Version: "1.0.0"},
-	&swagger.UIConfig{Title: "Docs", SwaggerURL: "/docs", SpecURL: "/docs/openapi.json"},
-)
+root := module.New(module.Metadata{
+	Imports: []module.Module{
+		// 协议模块
+		http.Module(http.Config{Addr: ":8080", Validator: true}),
+		// 基础设施
+		logger.Module(logger.Config{Level: logger.InfoLevel}),
+		cache.Module(cache.Config{Type: cache.Memory}),
+		events.Module(events.Config{Async: true}),
+		swagger.Module(
+			swagger.Config{Title: "Demo API", Version: "1.0.0"},
+			&swagger.UIConfig{Title: "Docs", SwaggerURL: "/docs", SpecURL: "/docs/openapi.json"},
+		),
+		// 业务模块
+		users.Module(),
+	},
+	Controllers: []any{&UserController{}},
+})
 
-root := module.CreateModule(
-	[]module.Module{loggerMod, cacheMod, eventsMod, swaggerMod},
-	providers,
-	[]any{ctrl},
-	nil, nil,
+app, err := application.New(root, application.Options{Logger: os.Stdout})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+`Module` 不返回 error：配置/客户端创建失败会在 `application.New` / `app.Run`
+阶段统一返回。多实例集成用同名参数区分：
+
+```go
+logger.Module(
+	logger.Config{Name: "default"},
+	logger.Config{Name: "audit", Level: logger.WarnLevel},
 )
 ```
 
@@ -59,7 +77,7 @@ root := module.CreateModule(
 ### auth
 
 ```go
-authMod, _ := auth.Module(auth.Config{
+authMod := auth.Module(auth.Config{
 	JWTSecret: "change-me",
 	JWTIssuer: "lania",
 	APIKeys:   map[string]auth.Principal{"key-1": {Subject: "svc"}},
@@ -72,7 +90,7 @@ authMod, _ := auth.Module(auth.Config{
 ### orm
 
 ```go
-ormMod, _ := orm.Module(orm.Config{
+ormMod := orm.Module(orm.Config{
 	Dialector: sqlite.Open("file::memory:?cache=shared"),
 	GormConfig: &gorm.Config{},
 	AutoMigrate: []any{&User{}},
@@ -85,7 +103,7 @@ ormMod, _ := orm.Module(orm.Config{
 ### outbox
 
 ```go
-outboxMod, _ := outbox.Module(outbox.Config{
+outboxMod := outbox.Module(outbox.Config{
 	MaxAttempts: 5,
 	Store:       outbox.NewGormStore(db),
 	Dispatcher:  kafkaDispatcher,
@@ -99,7 +117,7 @@ outboxMod, _ := outbox.Module(outbox.Config{
 ### resilience
 
 ```go
-resMod, _ := resilience.Module(resilience.Config{
+resMod := resilience.Module(resilience.Config{
 	RateLimit: resilience.RateLimitConfig{Enabled: true, Limit: 100, Period: time.Second},
 	Timeout:   resilience.TimeoutConfig{Enabled: true, Duration: 3 * time.Second},
 	Retry:     resilience.RetryConfig{Enabled: true, Attempts: 3, Backoff: 100 * time.Millisecond},
@@ -110,7 +128,7 @@ resMod, _ := resilience.Module(resilience.Config{
 ### terminus
 
 ```go
-termMod, _ := terminus.Module(terminus.Config{Version: "1.0.0", ReleaseID: "dev"})
+termMod := terminus.Module(terminus.Config{Version: "1.0.0", ReleaseID: "dev"})
 ```
 
 配合 `terminus` 的 health service 在 `/health` 暴露就绪/存活探针。
@@ -118,7 +136,7 @@ termMod, _ := terminus.Module(terminus.Config{Version: "1.0.0", ReleaseID: "dev"
 ### otel
 
 ```go
-otelMod, _ := otel.Module(otel.Config{
+otelMod := otel.Module(otel.Config{
 	ServiceName: "demo",
 	Exporters: []otel.ExporterConfig{
 		{Type: "otlp", Endpoint: "127.0.0.1:4317"},
@@ -130,7 +148,7 @@ otelMod, _ := otel.Module(otel.Config{
 
 ## 4. 约定
 
-1. 所有集成通过 `ForRoot(cfg)` 返回 `module.Module`
+1. 所有集成通过 `Module(cfg...)` 返回 `module.Module`
 2. 导出 token 统一用 `reflect.TypeFor[T]()` 表达
 3. 集成只依赖 `kernel` 抽象，不依赖具体协议
 4. 需要外部服务的集成在没有环境时（Kafka / MongoDB / ES / MinIO / OTel）应显式标注「未验证（需环境）」

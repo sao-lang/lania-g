@@ -77,10 +77,11 @@ func errorFilter(ctx *aop.ExecutionContext, err error) (any, error) {
 ## 5. 生命周期
 
 ```text
-NewWithOptions
-  → 模块加载 / 容器构建
+application.New(root, Options)
+  → 模块加载 / 容器构建（含 Init 中的注册与绑定）
   → OnModuleInit
-  → adapter.Mount
+  → Declare（遍历模块，收集各协议声明）
+  → Mount（集成模块挂载 handler，如 swagger / terminus）
   → Compile / Install
   → OnApplicationBootstrap
   → adapter.Start（开始监听）
@@ -93,12 +94,12 @@ NewWithOptions
 ## 6. 优雅关闭
 
 ```go
-if err := app.Run()); err != nil {
+if err := app.Run(); err != nil {
 	panic(err)
 }
 ```
 
-`Listen` 会阻塞，直到：
+`Run()` 会阻塞，直到收到退出信号或：
 
 ```go
 if err := app.Stop(); err != nil {
@@ -111,12 +112,10 @@ if err := app.Stop(); err != nil {
 ## 7. 启动前自检建议
 
 ```go
-if _, err := app.CompileDiagnostics(); err != nil {
+if err := app.Run(); err != nil {
 	panic(err) // 声明冲突、owner 缺失、签名非法
-}
-if _, err := app.StartupReport(); err != nil {
-	panic(err)
 }
 ```
 
-`StartupReport` 会输出模块数、路由数、binding 数、兼容回退项，非常适合排查"为什么路由没生效"。
+启动报告（`app.StartupReport()`）会输出模块数、路由数、binding 数，
+非常适合排查"为什么路由没生效"。

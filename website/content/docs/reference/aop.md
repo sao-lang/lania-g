@@ -70,8 +70,8 @@ ExceptionFilter 捕获整条链路的错误
 | 级别 | 方式 |
 |------|------|
 | 全局 | `app.UseGlobalInterceptors(...)` 等 |
-| 控制器 | `builder.UseGuards(...)`（HTTP/gRPC/WS/…） |
-| 路由/字段 | `routeBuilder.UseInterceptors(...)` |
+| 控制器 | `r.UseGuards(...)`（`Routes` 作用域，HTTP/gRPC/WS/…） |
+| 路由/字段 | 链式 `Get(...).UseInterceptors(...)` |
 | 参数级 Pipe | `UseParamPipes(index, pipes...)` |
 
 ## 4. 内置 Pipe

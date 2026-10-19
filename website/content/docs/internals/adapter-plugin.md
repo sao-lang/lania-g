@@ -5,14 +5,14 @@ prev: /docs/internals/request-flow
 next: /docs/internals/diagnostics
 ---
 
-新增一种协议 = 实现一个 Adapter + 一个 ProtocolPlugin。核心执行链无需改动。
+新增一种协议 = 实现一个 Adapter + 一个 ProtocolPlugin + 一个 `Module(cfg)`。
+核心执行链无需改动。
 
 ## 1. Adapter 契约
 
 ```go
 type Adapter interface {
 	ID() string
-	API() any
 	Mount(host Host) error
 	Start() error
 	Stop() error
@@ -20,12 +20,16 @@ type Adapter interface {
 }
 ```
 
+没有 `API()`：声明不再从 adapter 反查 builder，而是由控制器自己的
+`Declare(*Routes)` 完成，声明入口随模块树走。
+
 可选能力：
 
 | 接口 | 作用 |
 |------|------|
-| `SharedListenerConfigurator` | 与 HTTP 共用监听端口 |
-| `HTTPMountHost`（host 侧） | 允许挂载原生 `http.Handler` |
+| `ModuleAdapter` | 让 `application.New` 从根模块里发现并注册适配器 |
+| `HTTPMounterProvider` | 挂载原生 `http.Handler`（swagger / terminus 用）|
+| `Mounter`（host 侧） | 提供 `Handle` / `Static` 给集成模块使用 |
 
 ## 2. Plugin 契约
 
@@ -49,21 +53,49 @@ type ProtocolPlugin interface {
 const AdapterID = "demo"
 
 type Adapter struct {
-	host adapter.Host
-	api  *API
+	host   adapter.Host
+	config Config
 }
 
-func (a *Adapter) ID() string   { return AdapterID }
-func (a *Adapter) API() any     { return a.api }
+func (a *Adapter) ID() string { return AdapterID }
 
 func (a *Adapter) Mount(host adapter.Host) error {
 	a.host = host
-	a.api = NewAPI(host.Registry())
 	return nil
 }
 
 func (a *Adapter) Plugins() []compiler.ProtocolPlugin {
 	return []compiler.ProtocolPlugin{NewPlugin()}
+}
+
+// 协议模块：把 adapter 注册进应用，并在声明阶段收集控制器
+type demoModule struct {
+	*module.BaseModule
+	adapter *Adapter
+}
+
+func Module(cfg Config) module.Module {
+	a := &Adapter{config: cfg}
+	return &demoModule{BaseModule: module.New(module.Metadata{}), adapter: a}
+}
+
+func (m *demoModule) Adapter() adapter.Adapter { return m.adapter }
+
+func (m *demoModule) Declare(ref *module.ModuleRef) error {
+	reg := m.Context().Registry()
+	reg.ClearDecl(AdapterID, "routes")
+	return module.WalkModules(ref, func(mod module.Module) error {
+		for _, ctrl := range mod.Metadata().Controllers {
+			if c, ok := ctrl.(Controller); ok {
+				r := newRoutes(reg, mod, c)
+				c.Declare(r)
+				if err := r.err(); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
 }
 ```
 

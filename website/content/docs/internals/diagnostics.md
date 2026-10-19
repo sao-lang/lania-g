@@ -5,15 +5,16 @@ prev: /docs/internals/adapter-plugin
 next: /docs/best-practices
 ---
 
-框架提供三层诊断，建议在启动前全部执行一次。
+框架提供三层诊断。编译诊断与声明冲突会在 `app.Run()` 阶段直接以 `error` 返回。
 
 ## 1. 编译诊断
 
 ```go
-diag, err := app.CompileDiagnostics()
-if err != nil {
-	panic(err)
+if err := app.Run(); err != nil {
+	panic(err) // 声明冲突、owner 缺失、签名非法
 }
+
+diag := app.Diagnostics()
 ```
 
 能提前发现：
@@ -26,9 +27,11 @@ if err != nil {
 ## 2. 启动报告
 
 ```go
-if _, err := app.StartupReport(); err != nil {
+report, err := app.StartupReport()
+if err != nil {
 	panic(err)
 }
+fmt.Println(report)
 ```
 
 输出示例：
@@ -36,11 +39,10 @@ if _, err := app.StartupReport(); err != nil {
 ```text
 startup report:
   modules=2 adapters=2 protocols=2 routes=9 bindings=46
-  registry=instance
   globalAOP middleware=0 guard=0 interceptor=2 pipe=0 filter=0
   adapters:
-    - http (shared-listener)
-    - ws (shared-listener)
+    - http addr=:8080
+    - ws addr=:8081
   protocols:
     - http plugin=http declarations=6 routes=6 containers=6
     - ws plugin=ws declarations=9 routes=9 containers=9
@@ -52,10 +54,9 @@ startup report:
 
 | 字段 | 含义 |
 |------|------|
-| `registry=instance` | 使用实例级 registry（推荐） |
-| `registryFallbacks` | 是否走了全局兼容回退，新代码应避免 |
-| `runtimeFallbacks` | 运行期回退项（如 binding→DI） |
-| `routes=0` | 声明确实没写进去 |
+| `routes=0` | 声明确实没写进去（检查控制器是否实现了 `Declare` 且在模块槽位里） |
+| `globalAOP` | 全局 AOP 数量（`app.UseGlobal*` + 模块 `Metadata.AOP` / `Context.Use`） |
+| `modules` | 每个模块的 imports / providers / controllers 数量 |
 
 ## 3. 依赖图
 
@@ -81,9 +82,9 @@ gd := app.GraphDiagnostics()
 ## 5. 排查顺序建议
 
 ```text
-1. CompileDiagnostics  → 声明是否合法
+1. app.Run() 的 error  → 声明是否合法（含循环依赖 / owner 缺失）
 2. StartupReport       → 声明是否真的装进 Runtime
 3. 单测 Execute        → Runtime 链路是否通
 4. 端到端请求          → 传输层是否通
-5. 观察 fallbacks      → 是否走了兼容路径
+5. GraphDiagnostics    → 模块依赖是否与预期一致
 ```

@@ -39,23 +39,22 @@ mod, err := logger.Module(logger.Config{Level: "info"})
 ## 装配示例
 
 ```go
-loggerModule, _ := logger.Module(logger.Config{Level: logger.InfoLevel})
-swaggerModule, _ := swagger.Module(swagger.Config{Title: "Demo API", Version: "1.0.0"}, nil)
-cacheModule, _ := cache.Module(cache.Config{Type: cache.Memory})
-
-root := module.CreateModule(
-	[]module.Module{loggerModule, cacheModule, swaggerModule},
-	nil,
-	[]any{ctrl},
-	nil, nil,
-)
+root := module.New(module.Metadata{
+	Imports: []module.Module{
+		logger.Module(logger.Config{Level: logger.InfoLevel}),
+		cache.Module(cache.Config{Type: cache.Memory}),
+		swagger.Module(swagger.Config{Title: "Demo API", Version: "1.0.0"}),
+	},
+	Controllers: []any{ctrl},
+})
 ```
 
 ## 约定
 
-1. 所有集成通过 `ForRoot(cfg)` 返回 `module.Module`
+1. 所有集成通过 `X.Module(cfg)` 返回 `module.Module`，直接放进根模块的 `Imports`
 2. 导出的 token 统一使用 `reflect.TypeFor[T]()`
 3. 需要外部服务的集成在无环境时应显式标注"未验证（需环境）"
 4. 集成内部不直接依赖具体协议，只依赖 `kernel` 抽象
+5. 需要注入服务时从请求容器取（`serviceOf(ctx)`），不在构造期传入
 
 详细接入步骤见仓库 `docs/` 下的专项文档（auth / mongodb / otel / outbox / resilience）。

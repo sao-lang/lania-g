@@ -20,34 +20,40 @@ func TestUserService_Create(t *testing.T) {
 }
 ```
 
-## 2. 编译 + 执行测试（推荐主线）
+## 2. 声明 + 编译测试（推荐主线）
 
-这类测试覆盖「声明 → 编译 → install → Execute」全链路，不需要网络：
+只验证「控制器声明是否合法、路由是否装进 Runtime」：把 `app.Run()` 的 `error` 当断言。
+声明冲突、owner 缺失、签名非法都会在这一步暴露。
 
 ```go
-func TestUsersRoute(t *testing.T) {
-	ctrl := &UserController{}
-	p, _ := di.ProviderFromInstance(ctrl, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{p}, []any{ctrl}, nil, nil)
-	if err := root.Init(); err != nil { t.Fatal(err) }
-	ref := module.NewModuleRef(root)
+func TestRouteDeclaration(t *testing.T) {
+	root := module.New(module.Metadata{
+		Imports:     []module.Module{httpadapter.Module(httpadapter.Config{Addr: ":0", Validator: true})},
+		Controllers: []any{NewUserController(fakeStore{})},
+	})
 
-	reg := registry.New()
-	NewAPI(reg).Controller("/users", ctrl).Get("", ctrl.List).Build()
+	app, err := application.New(root, application.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	compiled, err := compiler.Compile(ref, reg, NewPlugin())
-	if err != nil { t.Fatal(err) }
-
-	rt := runtime.NewRuntime()
-	if err := compiled.Install(rt); err != nil { t.Fatal(err) }
-
-	ctx := runtime.NewHandlerContext(protocol.Protocol)
-	ctx.RouteKey = runtime.BuildRouteKey(protocol.Protocol, http.MethodGet, "/users")
-	if _, err := rt.Execute(ctx); err != nil { t.Fatal(err) }
+	report, err := app.StartupReport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.RouteCount == 0 {
+		t.Fatal("expected routes declared")
+	}
 }
 ```
 
-优点：不依赖端口、不依赖外部服务，失败点清晰。
+{{< callout type="info" >}}
+`StartupReport()` 返回模块数 / 适配器数 / 路由数 / binding 数的结构化快照，
+拿它做断言比解析日志稳定。
+{{< /callout >}}
+
+协议内部的参数解析、AOP 计划生成属于包内细节，测试放在协议包内（`package http`），
+这样可以直接使用未导出的 `newRoutes`，避免为测试扩大公开 API。
 
 ## 3. 端到端测试（最后一道）
 

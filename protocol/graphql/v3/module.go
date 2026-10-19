@@ -5,19 +5,59 @@ package graphql
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
+	gqlbinding "github.com/sao-lang/lania-g/protocol/graphql/v3/binding"
 )
 
 // Config 描述 GraphQL 协议的装配参数。
 type Config struct {
 	// Addr 是监听地址，例如 ":8082"。
 	Addr string
+	// Path 是 GraphQL 端点路径，默认 /graphql。
+	Path string
+	// Playground 为 true 时挂载 GraphQL Playground。
+	Playground bool
+	// PlaygroundPath 是 Playground 路径，默认 /playground。
+	PlaygroundPath string
+	// MaxBodyBytes 限制请求体大小，0 表示默认 4MB。
+	MaxBodyBytes int64
+	// Validator 为 true 时启用 go-playground/validator v10。
+	Validator bool
+	// ValidatorImpl 可注入自定义校验器（优先级高于 Validator）。
+	ValidatorImpl gqlbinding.Validator
+	// ErrorFormatter 自定义错误输出形态。
+	ErrorFormatter func(error) any
+	// ContextFactory 自定义每次请求的 GraphQLContext 构造方式。
+	ContextFactory func(*http.Request) *gqlbinding.GraphQLContext
 }
 
 // Module 创建 GraphQL 协议模块。
 func Module(cfg Config) module.Module {
 	a := New(cfg.Addr)
+	if strings.TrimSpace(cfg.Path) != "" {
+		a = a.WithPath(cfg.Path)
+	}
+	if cfg.Playground {
+		a = a.MountPlayground(cfg.PlaygroundPath)
+	}
+	if cfg.MaxBodyBytes > 0 {
+		a = a.WithMaxBodyBytes(cfg.MaxBodyBytes)
+	}
+	if cfg.ValidatorImpl != nil {
+		a = a.WithValidator(cfg.ValidatorImpl)
+	} else if cfg.Validator {
+		a = a.WithValidatorV10()
+	}
+	if cfg.ErrorFormatter != nil {
+		a = a.WithErrorFormatter(cfg.ErrorFormatter)
+	}
+	if cfg.ContextFactory != nil {
+		a = a.WithContextFactory(cfg.ContextFactory)
+	}
 	m := &protocolModule{BaseModule: module.New(module.Metadata{})}
 	m.adapter = a
 	return m

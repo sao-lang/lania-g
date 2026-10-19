@@ -44,16 +44,25 @@ type Message struct {
 
 实现 `Driver` 即可接入任意消息系统（RocketMQ / NATS / Redis Stream / 内存驱动）。
 
-## 2. Adapter
+## 2. 模块入口
 
 ```go
-mqAdp := mqadapter.New(mqkafka.New(mqkafka.Config{
-	Brokers: []string{"127.0.0.1:9092"},
-}))
+func Module(cfg Config) module.Module
 
-app, _ := application.New(root, application.Options{
-	Registry: registry.New(),
-}, mqAdp)
+type Config struct {
+	Driver Driver  // 例如 mqkafka.New(...)
+}
+```
+
+```go
+root := module.New(module.Metadata{
+	Imports: []module.Module{
+		mqadapter.Module(mqadapter.Config{
+			Driver: mqkafka.New(mqkafka.Config{Brokers: []string{"127.0.0.1:9092"}}),
+		}),
+	},
+	Controllers: []any{&Consumer{}},
+})
 ```
 
 启动流程：
@@ -67,26 +76,33 @@ collectConsumerConfigs(registry)   // consumers + subscriptions 合并成 topic 
       → 成功 ack / 失败 nack
 ```
 
-## 3. 消费者 DSL
+## 3. 消费者声明
 
 ```go
-mqAPI := mqAdp.API().(*mqadapter.API)
-
-mqAPI.Consumer("default", consumer).
-	Group("order-group").
-	Concurrency(4).
-	On("order.created", consumer.OnOrder).
-		BindParam(3, "X-Trace-Id").
-	On("order.paid", consumer.OnPaid).
-	BuildE()
+type Controller interface {
+	Declare(*Routes)
+}
 ```
 
-| Builder | 方法 |
-|---------|------|
-| `API` | `Consumer(name, receiver)` |
+```go
+func (c *Consumer) Declare(r *mq.Routes) {
+	r.Consumer("default").
+		Group("order-group").
+		Concurrency(4).
+		On("order.created", c.OnOrder).
+			BindParam(3, "X-Trace-Id").
+		On("order.paid", c.OnPaid)
+}
+```
+
+| 类型 | 方法 |
+|------|------|
+| `Routes` | `Consumer(name) *ConsumerBuilder` |
 | `ConsumerBuilder` | `Group(string)` / `Concurrency(n)` |
-| | `On(topic, handler)` / `Build() / BuildE() / Err()` |
+| | `On(topic, handler)` / `Err()`（自动 seal） |
 | `SubscriptionBuilder` | `BindParam(index, name)`（`Header[T]` 必需） |
+
+消费者放进模块的 `Controllers` 槽位，声明阶段自动收集。
 
 > `Concurrency` 只写入声明，**当前版本的 adapter 每个 consumer 只跑一个 consumeLoop**，并发由 driver 实现决定（例如 kafka-go 的 reader 批量拉取）。
 

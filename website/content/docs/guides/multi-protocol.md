@@ -28,61 +28,64 @@ HTTP、WebSocket、GraphQL 可以共享同一个监听端口；gRPC 单独监听
 
 - HTTP 用 `httpadapter.New()`（共享监听）
 - GraphQL 用 `graphqladapter.New()`（共享监听，自动挂到 HTTP）
-- WebSocket 用 `wsadapter.New()`（共享监听，挂到 `/socket.io/`）
-- gRPC 用 `grpcadapter.New(":50051")`（独立监听）
+- 每个协议用 `X.Module(X.Config{Addr: ...})` 声明自己的监听地址
+- `app.Run()` 会依次启动全部适配器
 
-{{< callout type="warning" >}}
-一个应用里**只能有一个** adapter 要求共享监听地址。HTTP 是唯一提供 listener 的角色，
-GraphQL / WS 只是挂载 handler，因此组合是安全的。
+{{< callout type="info" >}}
+一个应用里可以有多个协议适配器；它们各自监听自己的地址，互不冲突。
 {{< /callout >}}
 
 ## 2. 装配
 
-```go
-httpAdapter := httpadapter.New().WithValidatorV10()
-gqlAdapter := graphqladapter.New().WithPlayground(true)
-wsAdapter := wsadapter.New()
-grpcAdapter := grpcadapter.New(addr.GRPC(":50051"))
+多协议 = 多个协议模块放进同一个根模块：
 
-app, err := application.New(root, application.Options{
-	Registry: application.NewRegistry(),
-}, httpAdapter, gqlAdapter, wsAdapter, grpcAdapter)
+```go
+root := module.New(module.Metadata{
+	Imports: []module.Module{
+		httpadapter.Module(httpadapter.Config{Addr: ":8080", Validator: true}),
+		graphqladapter.Module(graphqladapter.Config{Addr: ":8082"}),
+		wsadapter.Module(wsadapter.Config{Addr: ":8081"}),
+		grpcadapter.Module(grpcadapter.Config{Addr: addr.GRPC(":50051")}),
+	},
+	Controllers: []any{userCtrl, gateway, userSvc},
+	Resolvers:   []any{query},
+})
+
+app, err := application.New(root, application.Options{Logger: os.Stdout})
 ```
+
+每个协议模块声明自己的监听地址，`app.Run()` 统一启动全部适配器。
 
 ## 3. 声明
 
-### HTTP
+每个协议都由控制器自己的 `Declare` 方法声明，互不干扰：
 
 ```go
-httpAPI := httpAdapter.API().(*httpadapter.API)
-httpAPI.Controller("/users", userCtrl).Get("", userCtrl.List).BuildE()
+// HTTP
+func (c *UserController) Declare(r *httpadapter.Routes) {
+	r.Prefix("/users").Get("", c.List)
+}
+
+// GraphQL（resolver 放在 Resolvers 槽位）
+func (q *QueryResolver) Declare(r *graphqladapter.Routes) {
+	r.Resolver("Query").Query("users", q.Users).Arg("page").Arg("size").Returns("UserListResult")
+}
+
+// WebSocket
+func (g *ChatGateway) Declare(r *wsadapter.Routes) {
+	r.Gateway("/ws/chat").On("users_list", g.UsersList)
+}
+
+// gRPC
+func (s *UserService) Declare(r *grpcadapter.Routes) {
+	r.Service("UserService").Method("List", s.List)
+}
 ```
 
-### GraphQL
-
-```go
-gqlAPI := gqlAdapter.API().(*graphqladapter.API)
-gqlAPI.Resolver("Query", query).
-	Query("users", query.Users).Arg("page").Arg("size").Returns("UserListResult").BuildE()
-```
-
-### WebSocket
-
-```go
-wsAPI := wsAdapter.API().(*wsadapter.API)
-wsAPI.Gateway("/ws/chat", gateway).
-	On("users_list", gateway.UsersList).
-	BuildE()
-```
-
-### gRPC
-
-```go
-grpcAPI := grpcAdapter.API().(*grpcadapter.API)
-grpcAPI.Service("UserService", userSvc).
-	Method("List", userSvc.List).
-	BuildE()
-```
+{{< callout type="info" >}}
+同一个 struct 可以同时实现多个协议的 `Declare` 方法（例如既暴露 HTTP 又暴露 gRPC），
+因为它会被多个模块的 `Controllers` 槽位引用；声明阶段按协议分别收集。
+{{< /callout >}}
 
 ## 4. 跨协议共享 DI
 

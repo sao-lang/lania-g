@@ -11,45 +11,44 @@ next: /docs/reference/registry-compiler-runtime
 
 ```go
 type Module interface {
-	Metadata() *ModuleMetadata
+	Metadata() *Metadata
 	Container() *di.Container
 	Init() error
 	Destroy() error
 }
 ```
 
-### ModuleMetadata
+### Metadata
 
 ```go
-type ModuleMetadata struct {
+type Metadata struct {
 	Imports     []Module
+	Providers   []*di.Provider
 	Controllers []any
 	Resolvers   []any
-	Providers   []*di.Provider
 	Exports     []any
 	IsGlobal    bool
+	AOP         AOP // Middlewares / Guards / Interceptors / Pipes / Filters
 }
 ```
 
 ## 2. 创建模块
 
 ```go
-func CreateModule(imports []Module, providers []*di.Provider,
-	controllers []any, resolvers []any, exports []any) Module
-
-func CreateGlobalModule(...) Module
-func CreateAutoModule(imports []Module, exports []any) (Module, error)
-func SimpleModule() (Module, error)
-func NewBaseModule(metadata *ModuleMetadata) *BaseModule
+func New(metadata Metadata) *BaseModule
+func AsGlobal(metadata Metadata) *GlobalModule
 ```
 
 | 函数 | 用途 |
 |------|------|
-| `CreateModule` | 标准模块 |
-| `CreateGlobalModule` | 全局模块（provider 对所有模块可见） |
-| `CreateAutoModule` | 只声明 imports/exports，自动推导 |
-| `SimpleModule` | 空模块 |
-| `NewBaseModule` | 自定义模块时嵌入基础实现 |
+| `module.New` | 唯一的模块构造函数 |
+| `module.AsGlobal` | 全局模块（provider 对所有模块可见） |
+
+{{< callout type="info" >}}
+不存在 `CreateModule` / `CreateAutoModule` / `SimpleModule` 等第二套构造函数。
+自定义模块时，通过 `module.New` 创建实例并在 `Init()` 里使用 `m.Context()`；
+需要暴露额外能力时实现 `module.Declarer`（`Declare(*Routes)`）即可。
+{{< /callout >}}
 
 ## 3. 模块引用树
 
@@ -95,22 +94,23 @@ func (l *ModuleLoader) IsLoaded(moduleType any) bool
 ### 全局模块
 
 ```go
-func NewGlobalModule(metadata *ModuleMetadata) *GlobalModule
+func AsGlobal(metadata Metadata) *GlobalModule
 ```
 
-### 动态模块
+等价于 `module.New(metadata)` 并置 `IsGlobal: true`，provider 对所有模块可见。
+
+### 带配置的模块
+
+集成包统一用 `X.Module(cfg)` 表达"带配置的模块"，返回值仍是 `module.Module`：
 
 ```go
-type DynamicModule interface {
-	ForRoot(options any) (Module, error)
-	ForRootAsync(options AsyncOptions) (Module, error)
-	ForFeature(options any) (Module, error)
-	Register(options any) (Module, error)
-	RegisterAsync(options AsyncOptions) (Module, error)
-}
-
-func NewDynamicModule(factory any) *DynamicModuleBase
+httpadapter.Module(httpadapter.Config{Addr: ":8080", Validator: true})
+auth.Module(auth.Config{Secret: "..."})
+swagger.Module(swagger.Config{Title: "API"})
 ```
+
+配置校验失败不会让 `Module()` 返回 `error`，而是生成一个"失败模块"，
+在 `application.New` 阶段报出具体错误——保持装配代码无需逐层处理错误。
 
 ### 循环引用
 
@@ -120,12 +120,28 @@ func NewForwardRef(fn func() Module) ForwardRef
 
 用于 A ↔ B 互相 import 的场景。
 
-### 装饰器风格
+### 模块作用域（Module Context）
 
 ```go
-func ModuleDecorator(metadata *ModuleMetadata) func(any) Module
-func Global() func(any) Module
+func (c *Context) Module() Module
+func (c *Context) Key() string
+func (c *Context) Container() *di.Container
+func (c *Context) Registry() *registry.Registry
+func (c *Context) Bind(name string, tokens ...any) error
+func (c *Context) Use(aop module.AOP)
+func (c *Context) AOP() module.AOP
+func (c *Context) RegisterDecl(protocol string, kind string, items ...any)
 ```
+
+`Init()` 里通过 `m.Context()` 拿到自己这一份上下文：
+
+- `Bind(name, tokens...)` —— 把 provider 以命名 token 绑定到本模块容器（替代旧的 `SetRegistry`）
+- `Use(aop)` —— 在模块级别追加中间件/守卫/拦截器，等价于 `Metadata.AOP`
+
+{{< callout type="warning" >}}
+模块身份按**实例**而非 `reflect.Type` 识别。`module.New` 对所有模块返回同一个
+`*module.BaseModule` 具体类型，因此图校验与 `ModuleRef` 都用实例指针做 key。
+{{< /callout >}}
 
 ## 6. DI 容器
 

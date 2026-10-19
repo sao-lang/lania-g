@@ -7,30 +7,37 @@ next: /docs/integrations
 
 包：`github.com/sao-lang/lania-g/protocol/scheduler/v3`
 
+## 0. 装配 Config
+
+```go
+scheduleradapter.Module(scheduleradapter.Config{
+	UniqueLocker: myRedisLocker, // Unique() 任务的分布式锁
+	HistoryLimit: 20,            // 每个任务保留的历史运行记录
+})
+```
+
 ## 1. 创建 adapter
 
 ```go
-schedAdapter := scheduleradapter.New()
-
-app, _ := application.New(root, opts, httpAdapter, schedAdapter)
+root := module.New(module.Metadata{
+	Imports: []module.Module{scheduleradapter.Module(scheduleradapter.Config{})},
+	Controllers: []any{worker},
+})
 ```
 
 ## 2. 声明任务
 
 ```go
-schedAPI := schedAdapter.API().(*scheduleradapter.API)
+func (w *Worker) Declare(r *scheduleradapter.Routes) {
+	r.Job("tick").Every(100*time.Millisecond, w.Tick)
 
-schedAPI.Job("tick", worker).
-	Every(100 * time.Millisecond, worker.Tick).
-	BuildE()
-
-schedAPI.Job("cleanup", worker).
-	Cron("0 3 * * *", worker.Cleanup). // 每天 03:00
-	Retry(3, 5*time.Second).
-	MaxConcurrency(1).
-	Unique().
-	Misfire(scheduleradapter.MisfireSkip).
-	BuildE()
+	r.Job("cleanup").
+		Cron("0 3 * * *", w.Cleanup). // 每天 03:00
+		Retry(3, 5*time.Second).
+		MaxConcurrency(1).
+		Unique().
+		Misfire(scheduleradapter.MisfireSkip)
+}
 ```
 
 | 触发方式 | 说明 |
@@ -55,10 +62,9 @@ func (w *Worker) Tick(
 ## 4. 重试与并发
 
 ```go
-Job("retry-job", worker).
-	After(10*time.Millisecond, worker.Run).
-	Retry(2, 5*time.Millisecond).
-	BuildE()
+r.Job("retry-job").
+	After(10*time.Millisecond, w.Run).
+	Retry(2, 5*time.Millisecond)
 ```
 
 | 配置 | 作用 |

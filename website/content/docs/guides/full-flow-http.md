@@ -114,13 +114,10 @@ func (c *UserController) Create(args createUserArgs) (any, error) {
 ```go
 // module/root.go
 func NewRootModule(authCtrl, userCtrl any) module.Module {
-	return module.CreateModule(
-		[]module.Module{NewStoreModule()}, // imports
-		nil,                               // providers
-		[]any{authCtrl, userCtrl},         // controllers
-		nil,                               // resolvers
-		nil,                               // exports
-	)
+	return module.New(module.Metadata{
+		Imports:     []module.Module{NewStoreModule()},
+		Controllers: []any{authCtrl, userCtrl},
+	})
 }
 ```
 
@@ -131,14 +128,16 @@ func main() {
 	storeModule := NewStoreModule()
 	authCtrl := &AuthController{}
 	userCtrl := &UserController{}
-	root := module.CreateModule(
-		[]module.Module{storeModule}, nil,
-		[]any{authCtrl, userCtrl}, nil, nil,
-	)
+	root := module.New(module.Metadata{
+		Imports: []module.Module{
+			httpadapter.Module(httpadapter.Config{Addr: ":8080", Validator: true}),
+			swagger.Module(swagger.Config{Title: "Demo API", Version: "1.0.0"}),
+			storeModule,
+		},
+		Controllers: []any{authCtrl, userCtrl},
+	})
 
-	httpAdapter := httpadapter.New().WithValidatorV10()
-
-	app, err := application.New(root, application.Options{Logger: os.Stdout}, httpAdapter)
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
 		panic(err)
 	}
@@ -146,26 +145,29 @@ func main() {
 }
 ```
 
-**为什么**：`NewWithOptions` 会完成三件事：加载模块树、构建容器、挂载 adapter。
-传入实例级 Registry 可以避免全局状态污染。
+**为什么**：`application.New` 会完成三件事：加载模块树、构建容器、从模块树发现并挂载 adapter。
+适配器不再是参数，而是根模块的 `Imports`；每个应用都有独立的声明仓库，不存在全局状态。
 
 ## 6. 声明路由
 
+路由声明写在控制器内部，随控制器一起进入模块树：
+
 ```go
-httpAPI := httpAdapter.API().(*httpadapter.API)
+func (c *AuthController) Declare(r *httpadapter.Routes) {
+	r.Prefix("/auth").
+		Post("/register", c.Register).Status(201).
+		Post("/login", c.Login)
+}
 
-httpAPI.Controller("", authCtrl).
-	Post("/auth/register", authCtrl.Register).StatusCode(201).Build().
-	Post("/auth/login", authCtrl.Login).Build()
-
-httpAPI.Controller("/users", userCtrl).
-	Get("", userCtrl.List).Security("bearerAuth").
-	Summary("List Users").Tags("users").Build().
-	Post("", userCtrl.Create).StatusCode(201).Security("bearerAuth").Build().
-	Get("/:id", userCtrl.Get).Security("bearerAuth").Build()
+func (c *UserController) Declare(r *httpadapter.Routes) {
+	r.Prefix("/users").
+		Get("", c.List).Summary("List Users").Tags("users").Security("bearerAuth").
+		Post("", c.Create).Status(201).Security("bearerAuth").
+		Get("/:id", c.Get).Security("bearerAuth")
+}
 ```
 
-**为什么**：DSL 只写声明，不执行任何反射；真正的 handler 在编译期生成。
+**为什么**：DSL 只写声明；真正的 handler 在编译期生成，路由归属由模块树直接决定。
 
 ## 7. 全局 AOP
 
@@ -179,16 +181,13 @@ app.UseGlobalInterceptors(responseEnvelopeInterceptor, authInterceptor(store))
 ## 8. 编译 + 安装 + 启动
 
 ```go
-if _, err := app.CompileDiagnostics(); err != nil {
-	panic(err) // 声明冲突 / owner 缺失 / 签名非法
-}
-if _, err := app.StartupReport(); err != nil {
-	panic(err)
-}
-if err := app.Run()); err != nil {
-	panic(err)
+if err := app.Run(); err != nil {
+	panic(err) // 声明冲突 / 签名非法 / 端口占用
 }
 ```
+
+`Run` 内部顺序：声明（`Declare`）→ 编译（冲突检测）→ 启动适配器 → 阻塞。
+需要诊断信息时调用 `app.Diagnostics()`。
 
 启动报告里应看到：
 
@@ -224,7 +223,7 @@ curl http://127.0.0.1:8080/users?page=1\&size=10 \
 |------|----------|------|
 | 模块加载 | `provider not found` | 检查 `Exports` |
 | Controller 注入 | 字段仍为零值 | 检查字段是否 exported、是否为零值 |
-| DSL 声明 | `BuildE` 报错 | 检查路径/方法名/重复声明 |
+| DSL 声明 | `application.New` 返回错误 | 检查路径/方法名/重复声明 |
 | 编译 | `module owner not found` | controller 是否放进 `controllers` |
 | 启动 | `address already in use` | 用 `PORT` 覆盖 |
 | 请求 | `401/404` | 检查 routeKey、鉴权拦截器、basePath |

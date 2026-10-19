@@ -10,44 +10,43 @@ next: /docs/reference/integrations
 ## 1. Adapter
 
 ```go
-schedAdp := scheduleradapter.New()
-
-app, _ := application.New(root, application.Options{
-	Registry: registry.New(),
-}, httpAdp, schedAdp)
+root := module.New(module.Metadata{
+	Imports:     []module.Module{scheduleradapter.Module(scheduleradapter.Config{})},
+	Controllers: []any{&Worker{}},
+})
 ```
 
 | 方法 | 说明 |
 |------|------|
-| `New()` | 创建 adapter |
-| `API()` | DSL 上下文 |
+| `Module(Config)` | 唯一装配入口 |
 | `Snapshot()` | `map[string]JobSnapshot` 运行快照 |
 | `SetUniqueLocker(locker)` | 替换唯一执行锁（默认进程内） |
 | `SetHistoryLimit(n)` | 保留的最近运行记录条数 |
-| `MountHTTPBridge(host, adp, pattern)` | 暴露 HTTP 观测端点 |
 
-## 2. 任务 DSL
+## 2. 任务声明
 
 ```go
-schedAPI := schedAdp.API().(*scheduleradapter.API)
-
-schedAPI.Job("cleanup", worker).
-	Cron("0 3 * * *", worker.Cleanup).   // 每天 03:00
-	Retry(3, 5*time.Second).
-	MaxConcurrency(1).
-	Unique("cleanup").
-	WithTimeout(30 * time.Second).
-	Misfire(scheduleradapter.MisfireSkip).
-	BuildE()
-
-schedAPI.Job("tick", worker).
-	Every(100 * time.Millisecond, worker.Tick).
-	BuildE()
+type Controller interface {
+	Declare(*Routes)
+}
 ```
 
-| Builder | 方法 | 说明 |
-|---------|------|------|
-| `API` | `Job(name, receiver)` | 开始声明 |
+```go
+func (w *Worker) Declare(r *scheduler.Routes) {
+	r.Job("cleanup").
+		Cron("0 3 * * *", w.Cleanup).   // 每天 03:00
+		Retry(3, 5*time.Second).
+		MaxConcurrency(1).
+		Unique("cleanup").
+		WithTimeout(30 * time.Second).
+		Misfire(scheduler.MisfireSkip)
+	r.Job("tick").Every(100*time.Millisecond, w.Tick)
+}
+```
+
+| 类型 | 方法 | 说明 |
+|------|------|------|
+| `Routes` | `Job(name) *JobBuilder` | 开始声明 |
 | `JobBuilder` | `Cron(expr, handler)` | cron 触发 |
 | | `Every(d, handler)` | 固定间隔重复 |
 | | `After(d, handler)` | 延迟一次 |
@@ -57,7 +56,6 @@ schedAPI.Job("tick", worker).
 | | `WithTimeout(d)` | 单次执行超时 |
 | | `Misfire(policy)` | 错过触发点策略（`MisfireQueue` / `MisfireSkip`） |
 | | `BindParam(index, name)` | 参数绑定名 |
-| | `Build()/BuildE()/Err()` | 收尾 |
 
 `JobDefinition` 关键字段：
 

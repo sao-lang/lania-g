@@ -7,18 +7,32 @@ next: /docs/protocols/graphql
 
 包：`github.com/sao-lang/lania-g/protocol/grpc/v3`
 
+## 0. 装配 Config
+
+```go
+grpcadapter.Module(grpcadapter.Config{
+	Addr:          ":50051",
+	ServerOptions: []grpc.ServerOption{grpc.Creds(creds)},
+	// Server:    预配置的 *grpc.Server（优先级高于 ServerOptions）
+})
+```
+
 ## 1. 声明服务与方法
 
 ```go
-grpcAdapter := grpcadapter.New(addr.GRPC(":50051"))
+func (s *UserService) Declare(r *grpcadapter.Routes) {
+	r.Service("UserService").
+		Method("Ping", s.Ping).
+		ServerStreamMethod("Watch", s.Watch).
+		ClientStreamMethod("Upload", s.Upload).
+		BidiStreamMethod("Chat", s.Chat)
+}
 
-grpcAPI := grpcAdapter.API().(*grpcadapter.API)
-grpcAPI.Service("UserService", svc).
-	Method("Ping", svc.Ping).
-	ServerStreamMethod("Watch", svc.Watch).
-	ClientStreamMethod("Upload", svc.Upload).
-	BidiStreamMethod("Chat", svc.Chat).
-	BuildE()
+// 模块装配
+root := module.New(module.Metadata{
+	Imports:     []module.Module{grpcadapter.Module(grpcadapter.Config{Addr: ":50051"})},
+	Controllers: []any{svc},
+})
 ```
 
 ## 2. 四种模式

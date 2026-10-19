@@ -9,29 +9,38 @@ next: /docs/protocols/mq
 
 底层使用 `github.com/zishang520/socket.io`（Socket.IO v4 / Engine.IO v4）。
 
+## 0. 装配 Config
+
+```go
+wsadapter.Module(wsadapter.Config{
+	Addr:                ":3000",
+	SocketPath:          "/socket.io/", // Socket.IO 挂载路径
+	ResponseEventSuffix: ":ack",
+	ErrorEventSuffix:    ":error",
+})
+```
+
 ## 1. 创建与挂载
 
 ```go
-// 共享监听：与 HTTP 同端口，挂载到 /socket.io/
-wsAdapter := wsadapter.New()
+root := module.New(module.Metadata{
+	Imports:     []module.Module{wsadapter.Module(wsadapter.Config{Addr: ":3000"})},
+	Controllers: []any{gateway},
+})
 
-// 独立监听：自己起一个 HTTP 服务
-wsAdapter := wsadapter.New(":3000")
-
-app, _ := application.New(root, opts, httpAdapter, wsAdapter)
+app, err := application.New(root, application.Options{})
 app.Run()
 ```
 
 ## 2. 声明网关
 
 ```go
-wsAPI := wsAdapter.API().(*wsadapter.API)
-
-wsAPI.Gateway("/ws/chat", gateway).
-	On("users_list", gateway.UsersList).
-	On("room_join", gateway.RoomJoin).
-	On("room_broadcast", gateway.RoomBroadcast).
-	BuildE()
+func (g *ChatGateway) Declare(r *wsadapter.Routes) {
+	r.Gateway("/ws/chat").
+		On("users_list", g.UsersList).
+		On("room_join", g.RoomJoin).
+		On("room_broadcast", g.RoomBroadcast)
+}
 ```
 
 - 第一个参数是 **namespace**（不是 URL path 前缀）

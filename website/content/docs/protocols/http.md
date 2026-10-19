@@ -7,55 +7,58 @@ next: /docs/protocols/grpc
 
 包：`github.com/sao-lang/lania-g/protocol/http/v3`
 
-## 1. 创建 adapter
+## 1. 创建协议模块
 
 ```go
-httpAdapter := httpadapter.New()             // 共享监听（跟随 app.Listen）
-httpAdapter := httpadapter.New(":8080")      // 独立监听（跟随 app.Run）
-
-httpAdapter := httpadapter.New().
-	WithBasePath("/api").
-	WithMaxBodyBytes(10 << 20).
-	WithValidatorV10()
+httpModule := http.Module(http.Config{
+	Addr:         ":8080",
+	BasePath:     "/api",
+	MaxBodyBytes: 10 << 20,
+	Validator:    true,
+})
 ```
 
 常用配置：
 
-| 方法 | 作用 |
+| 字段 | 作用 |
 |------|------|
-| `WithBasePath(prefix)` | 统一路由前缀 |
-| `WithMaxBodyBytes(n)` | 请求体大小限制 |
-| `WithValidator(v)` | 自定义校验器 |
-| `WithValidatorV10()` | 启用 `validate:"..."` 校验 |
-| `EnableCors(cfg)` | 内建 CORS |
-| `EnableHelmet(cfg)` | 安全响应头 |
-| `ServeStatic(prefix, root)` | 静态资源 |
-| `MountHandler(pattern, h)` | 挂载原生 `http.Handler` |
-| `WithNextHandler(h)` | 未命中路由的兜底 handler |
+| `Addr` | 监听地址（必填） |
+| `BasePath` | 统一路由前缀 |
+| `MaxBodyBytes` | 请求体大小限制 |
+| `Validator` / `ValidatorImpl` | 启用 `validate:"..."` 校验 |
+| `CORS` / `Helmet` | 内建 CORS / 安全响应头 |
+| `Middlewares` | adapter 层中间件 |
+| `NotFound` | 未命中路由的兜底 handler |
 
-## 2. 路由 DSL
+把模块放进根模块的 `Imports` 即可；适配器由应用在装配阶段自动发现。
+
+## 2. 路由声明
 
 ```go
-httpAPI := httpAdapter.API().(*httpadapter.API)
-
-httpAPI.Controller("/users", ctrl).
-	Get("", ctrl.List).
-	Summary("List Users").
-	Description("分页查询用户列表").
-	Tags("users").
-	Security("bearerAuth").
-	ResponseEnvelope(apiEnvelope{}, "data").
-	ErrorResponse(401, "未登录").
-	Get("/:id", ctrl.Get).
-	Post("", ctrl.Create).
-	StatusCode(201).
-	Put("/:id", ctrl.Update).
-	Delete("/:id", ctrl.Delete).
-	BuildE()
+func (c *UserController) Declare(r *http.Routes) {
+	r.Prefix("/users").
+		UseGuards(auth.RequireAuthenticated()).
+		Get("", c.List).
+			Summary("List Users").
+			Description("分页查询用户列表").
+			Tags("users").
+			Security("bearerAuth").
+			ResponseEnvelope(apiEnvelope{}, "data").
+			ErrorResponse(401, "未登录").
+		Get("/:id", c.Get).
+		Post("", c.Create).
+			Status(201).
+		Put("/:id", c.Update).
+		Delete("/:id", c.Delete)
+}
 ```
 
-- `Build()`：忽略错误（兼容写法）
-- `BuildE()`：声明非法时返回错误（推荐）
+规则：
+
+- 第一个动词之前的 `Prefix` / `Use*` 作用于整个控制器
+- 动词方法开始一条新路由
+- 其余修饰方法作用于当前路由
+- 不需要 `Build()`：声明阶段由模块树自动收集
 
 ## 3. 参数绑定
 
@@ -71,7 +74,7 @@ type getUserArgs struct {
 ## 4. 校验
 
 ```go
-httpAdapter := httpadapter.New().WithValidatorV10()
+httpModule := http.Module(http.Config{Addr: ":8080", Validator: true})
 
 type createUserRequest struct {
 	Name  string `json:"name" validate:"required"`
@@ -103,38 +106,42 @@ func (c *UserController) Create(args createUserArgs) (any, error) {
 ## 6. Swagger
 
 ```go
-swaggerModule, _ := swagger.Module(swagger.Config{
-	Title: "Demo API", Version: "1.0.0",
+swaggerModule := swagger.Module(swagger.Config{
+	Title:                "Demo API",
+	Version:              "1.0.0",
+	BearerAuth:           []string{"bearerAuth"},
+	DefaultErrorResponse: "请求失败",
 }, &swagger.UIConfig{
 	SpecURL:    "/docs/openapi.json",
 	SwaggerURL: "/docs",
 	RedocURL:   "/redoc",
 })
-
-builder, _ := module.GetByType[*swagger.Builder](app.ModuleRef())
-builder.AddBearerAuth("bearerAuth")
-swagger.BuildFromHTTPRegistry(builder, reg)
-swagger.ServeHTTPBridge(app)
 ```
+
+把 `swaggerModule` 放进根模块的 `Imports` 即可：OpenAPI 在声明阶段之后生成，
+UI/spec 端点由模块自己挂载，不需要手动调用 `BuildFromHTTPRegistry` / `ServeHTTPBridge`。
 
 ## 7. 静态资源与 SSE
 
 ```go
-httpAdapter.ServeStatic("/assets", "./public")
-
-httpAdapter.MountHandler("/feed", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	// 持续写入 event-stream
-}))
+// 模块实现 adapter.HTTPMounterProvider 即可挂载原生 handler
+func (m *MyModule) MountHTTP(req adapter.HTTPMountRequest) error {
+	req.Mounter.Static("/assets", "./public")
+	req.Mounter.Handle("/feed", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		// 持续写入 event-stream
+	}))
+	return nil
+}
 ```
 
-## 8. 共享监听与独立监听
+## 8. 监听地址
 
-| 模式 | 启动方式 | 适用 |
-|------|----------|------|
-| 共享监听 | `httpadapter.New()` + `app.Run()` | HTTP + WS/GraphQL 同端口 |
-| 独立监听 | `httpadapter.New(":8080")` + `app.Run()` | 单独 HTTP 服务 |
+监听地址只来自 `http.Config{Addr}`：
 
-{{< callout type="warning" >}}
-同一个应用里最多只能有一个 adapter 要求共享监听地址；否则 `Listen` 会报错。
-{{< /callout >}}
+```go
+http.Module(http.Config{Addr: ":8080"})
+```
+
+多协议同进程时，每个协议模块各自声明自己的地址（例如 HTTP `:8080`、
+WebSocket `:8081`、gRPC `:50051`），由 `app.Run()` 统一启动。

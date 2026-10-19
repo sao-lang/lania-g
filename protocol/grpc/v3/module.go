@@ -17,6 +17,8 @@ type Config struct {
 	Addr string
 	// Server 可注入预配置的 grpc.Server（例如启用了 reflection）。
 	Server *grpc.Server
+	// ServerOptions 传给内部新建的 grpc.Server；与 Server 同时给出时以 Server 为准。
+	ServerOptions []grpc.ServerOption
 }
 
 // Module 创建 gRPC 协议模块。
@@ -24,6 +26,8 @@ func Module(cfg Config) module.Module {
 	a := New(cfg.Addr)
 	if cfg.Server != nil {
 		a = a.WithServer(cfg.Server)
+	} else if len(cfg.ServerOptions) > 0 {
+		a = a.WithServerOptions(cfg.ServerOptions...)
 	}
 	m := &protocolModule{BaseModule: module.New(module.Metadata{})}
 	m.adapter = a

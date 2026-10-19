@@ -11,8 +11,8 @@ toc: false
 | 特性 | 说明 | 章节 |
 |------|------|------|
 | 模块树 | `imports/providers/controllers/resolvers/exports` 五槽位 | [Module](core-concepts/module) |
-| 全局模块 | `NewGlobalModule` / `CreateGlobalModule` | [参考：Module & DI](reference/module-di) |
-| 动态模块 | `DynamicModule` / `ForRoot` / `ForFeature` / `Register` / `Async` | [参考：Module & DI](reference/module-di) |
+| 唯一构造入口 | `module.New(Metadata)` / `module.AsGlobal(Metadata)` | [参考：Module & DI](reference/module-di) |
+| 带配置模块 | 集成与协议统一 `X.Module(cfg)` | [参考：Module & DI](reference/module-di) |
 | 循环引用 | `ForwardRef` 延迟解析 | [参考：Module & DI](reference/module-di) |
 | 依赖注入 | 父子容器、三种作用域、字段/构造/Injectable 注入 | [依赖注入](core-concepts/di) |
 | 类型化取值 | `di.GetByType` / `module.GetByType` | [依赖注入](core-concepts/di) |
@@ -41,7 +41,7 @@ toc: false
 
 ### HTTP
 
-路由 DSL（GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS/ALL）、path 参数、query、header、cookie、form、multipart、JSON body、validator v10、CORS、Helmet、静态资源、mounted handler、basePath、body 大小限制、SSE、renderer、redirect、Swagger 注解、`BuildE` 校验。
+`Routes` 链（GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS/ALL）、path 参数、query、header、cookie、form、multipart、JSON body、validator v10、CORS、Helmet、静态资源、mounted handler、basePath、body 大小限制、SSE、renderer、redirect、Swagger 注解、声明期错误累积（由 `app.Run()` 报出）。
 
 → [HTTP 指南](protocols/http) · [HTTP 参考](reference/http)
 
@@ -86,8 +86,8 @@ auth（JWT/API Key/Session/多租户/身份提供方）、cache（内存/Redis�
 | 特性 | 说明 |
 |------|------|
 | 多模块工作区 | 每个子模块独立 `go.mod`、独立发布 |
-| 兼容入口 | `*Compat` API 显式标注全局 registry 回退 |
-| 启动诊断 | `CompileDiagnostics` / `StartupReport` / `GraphDiagnostics` |
+| 单一入口 | 每个能力只有一个公开 API，历史 `*Compat` 已移除 |
+| 启动诊断 | `app.Diagnostics()` / `app.StartupReport()` / `app.GraphDiagnostics()` |
 | 示例端口可配置 | `PORT` / `APP_ADDR` / `GRPC_ADDR` |
 | 测试三层 | 单元 / 编译+执行 / 端到端 |
 | 文档站 | Hugo + Hextra，搜索与 Mermaid 本地化 |

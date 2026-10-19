@@ -44,20 +44,37 @@ app.UseGlobalPipes(trimPipe)
 app.UseGlobalFilters(errorFilter)
 ```
 
-### 协议声明层
+### 模块级
+
+模块的 `Metadata.AOP` 或 `Init()` 里的 `Context.Use` 都会并入全局 AOP 链：
 
 ```go
-httpAPI.Controller("/users", ctrl).
-	UseGuards(authGuard).
-	UseInterceptors(traceInterceptor).
-	Get("/:id", ctrl.Get).
-	Build()
+root := module.New(module.Metadata{
+	Imports: []module.Module{auth.Module(auth.Config{...})},
+	AOP: module.AOP{
+		Guards:       []aop.GuardFunc{permGuard},
+		Interceptors: []aop.InterceptorFunc{traceInterceptor},
+	},
+})
 ```
 
-### 单路由
+集成包（`auth` / `resilience` / `otel`）在模块 `Init()` 内部调用 `Context.Use(...)`，
+所以引入模块即生效，无需手工注册。
+
+### 控制器 / 路由级
+
+控制器在 `Declare` 中声明，`Prefix`/`Use*` 在第一条路由之前是**控制器作用域**，
+之后的 `Use*` 只作用于当前路由：
 
 ```go
-builder.Get("/admin", ctrl.Admin).UseGuards(adminGuard)
+func (c *UserController) Declare(r *httpadapter.Routes) {
+	r.Prefix("/users").
+		UseGuards(authGuard).          // 控制器级
+		UseInterceptors(traceInterceptor)
+
+	r.Get("", c.List)
+	r.Get("/:id", c.Get).UseGuards(adminGuard) // 只作用于这一条
+}
 ```
 
 ## 4. 写一个 Interceptor

@@ -25,8 +25,8 @@
 
 ### 4. 编译期冲突检测与诊断
 - 跨协议 routeKey 冲突检测，避免静默覆盖
-- `CompileDiagnostics()` / `StartupReport()` 显式诊断入口
-- **面试话术**：*"我们在编译阶段做 routeKey 冲突检测，跨协议的路由冲突直接报错，而不是运行时静默覆盖。并且提供了 CompileDiagnostics 和 StartupReport 两个显式诊断入口，启动前就能发现配置问题。"*
+- `app.Diagnostics()` 显式诊断入口（声明/编译在 `Run` 内完成）
+- **面试话术**：*"我们在编译阶段做 routeKey 冲突检测，跨协议的路由冲突直接报错，而不是运行时静默覆盖。并且把声明与编译都收拢到 application.New / Run，启动前就能发现配置问题。"*
 
 ### 5. 实例级 Registry 隔离
 - 每个应用实例可持有独立 Registry，避免全局状态污染
@@ -34,9 +34,9 @@
 - **面试话术**：*"我们提供了实例级 Registry，多个应用实例可以跑在同一个进程里互不干扰，测试之间也不会串数据。"*
 
 ### 6. Integrations 统一模式
-- 所有基础设施集成遵循统一 API 模式：`ForRoot()` / `Factory` / `InjectXxx` / `XxxRef`
+- 所有基础设施集成遵循统一 API 模式：`Module(cfg)` / `Factory` / `InjectXxx` / `XxxRef`
 - 默认实例 + 命名实例统一建模
-- **面试话术**：*"所有基础设施集成（日志、ORM、缓存、Kafka 等）都遵循同一套接入模式——ForRoot 初始化、Factory 手动获取、InjectXxx 默认注入、XxxRef 命名实例。学习成本很低。"*
+- **面试话术**：*"所有基础设施集成（日志、ORM、缓存、Kafka 等）都遵循同一套接入模式——Module(cfg) 装配、Factory 手动获取、InjectXxx 默认注入、XxxRef 命名实例。学习成本很低。"*
 
 ---
 
@@ -66,7 +66,7 @@
 
 **Q5：你们的"声明→编译→执行"三段式架构具体是怎么实现的？**
 
-> 三段式的核心是职责分离：① DSL 声明阶段：开发者在 Controller/Service 上写路由声明（如 `builder.Get("/ping", ctrl.Ping)`），这些声明只写入 Registry，不直接注册到 HTTP 路由。② 编译阶段：Compiler 读取 Registry 中的声明，调用各协议的 ProtocolPlugin 进行扫描和编译，生成 CompiledApp。编译过程会检测跨协议 routeKey 冲突、owner 归属、AOP 合并等。③ 执行阶段：CompiledApp.Install(runtime) 把编译产物安装到 Runtime，包括路由表、BindingRegistry、RouteContainers。请求到来时，Runtime 统一走 match→bind→pipeline→invoke 链路。
+> 三段式的核心是职责分离：① 声明阶段：开发者在控制器的 Declare 方法里写路由声明（如 `r.Get("/ping", ctrl.Ping)`），声明由模块树收集进 Registry，不直接注册到 HTTP 路由。② 编译阶段：Compiler 读取 Registry 中的声明，调用各协议的 ProtocolPlugin 进行扫描和编译，生成 CompiledApp。编译过程会检测跨协议 routeKey 冲突、owner 归属、AOP 合并等。③ 执行阶段：CompiledApp.Install(runtime) 把编译产物安装到 Runtime，包括路由表、BindingRegistry、RouteContainers。请求到来时，Runtime 统一走 match→bind→pipeline→invoke 链路。
 
 **Q6：统一 Runtime 如何处理不同协议的差异？**
 
@@ -98,7 +98,7 @@
 
 **Q12：Configuration 和 Integration 的管理策略是什么？**
 
-> 每个 Integration 模块遵循统一模式：`ForRoot(options)` 初始化，内部创建一个 Factory（如 `LoggerFactory`），Factory 持有配置并在容器中注册默认实例。模块还提供 `InjectXxx` 和 `XxxRef[Named]` 两种注入方式，分别对应默认实例和命名实例。配置管理通过 `integrations/config` 模块统一处理，支持多数据源（文件、环境变量、远程配置中心），通过 DI 容器注入到各模块。
+> 每个 Integration 模块遵循统一模式：`Module(cfg)` 装配，内部创建一个 Factory（如 `LoggerFactory`），Factory 持有配置并在容器中注册默认实例。模块还提供 `InjectXxx` 和 `XxxRef[Named]` 两种注入方式，分别对应默认实例和命名实例。配置管理通过 `integrations/config` 模块统一处理，支持多数据源（文件、环境变量、远程配置中心），通过 DI 容器注入到各模块。
 
 **Q13：多模块工作区（go.work）在这个项目里起到了什么作用？**
 
@@ -110,7 +110,7 @@
 
 **Q14：这个项目最大的技术挑战是什么？你是怎么解决的？**
 
-> 最大的挑战是 **全局状态治理**。项目早期大量使用全局 Registry，导致多应用实例共用同一份声明池、测试间状态污染、声明不生效排查困难。我们的解决思路是三步走：① 首先让问题可见化，在 CompileDiagnostics 和 StartupReport 中输出 RegistrySource，让"是否用了全局"成为显式诊断信息。② 然后收紧默认行为，新增 application.NewWithOptions 要求显式传入实例级 registry，包级 DSL 和新 API 都走实例级。③ 最后建立兼容层并逐步削弱，把旧的全局入口标记为 compat，但推荐路径全部走实例级隔离。这个过程花了三个迭代周期，从文档收敛到行为收敛到内核收敛。
+> 最大的挑战是 **全局状态治理**。项目早期大量使用全局 Registry，导致多应用实例共用同一份声明池、测试间状态污染、声明不生效排查困难。我们的解决思路是三步走：① 先让问题可见化（在诊断中输出 registry 来源）。② 再收紧默认行为（应用必须使用实例级 registry）。③ 最后彻底删除全局单例与兼容入口：`registry.Global()`、`*Compat`、`NewWithOptions` 全部移除，收敛到 `module.New` + `X.Module(cfg)` + `application.New/Run`。
 
 **Q15：如果让你重新设计这个框架，你会做什么不同的选择？**
 
@@ -122,7 +122,7 @@
 
 **Q17：你怎么保证框架的稳定性？有没有遇到过线上事故？**
 
-> 稳定性的核心手段有三个：① **编译期防御**：routeKey 冲突检测、编译诊断、StartupReport 都放在启动前，问题暴露在线上之前。② **测试覆盖**：每个子模块（application、protocol/*、integrations/*）都有独立的测试套件，核心链路有集成测试。③ **渐进式收敛**：对于风险较高的全局状态、fallback 路径等问题，我们采用"先文档→再诊断→后收紧"的策略，逐步缩小出问题的可能性。目前还未出现因框架本身引起的线上事故，但通过 CompileDiagnostics 我们确实发现并预防了一些配置错误。
+> 稳定性的核心手段有三个：① **编译期防御**：routeKey 冲突检测、编译诊断、StartupReport 都放在启动前，问题暴露在线上之前。② **测试覆盖**：每个子模块（application、protocol/*、integrations/*）都有独立的测试套件，核心链路有集成测试。③ **渐进式收敛**：对于风险较高的全局状态、fallback 路径等问题，我们采用"先文档→再诊断→后收紧"的策略，逐步缩小出问题的可能性。目前还未出现因框架本身引起的线上事故，但通过编译期诊断我们确实发现并预防了一些配置错误。
 
 ---
 
@@ -203,7 +203,7 @@
 | Pipeline | AOP 执行链 | `kernel/v3/runtime/pipeline.go` |
 | Adapter | 协议 DSL + Transport + Plugin | `protocol/*/v3/` |
 | Integrations | 基础设施模块化接入 | `integrations/*/v3/` |
-| CompileDiagnostics | 编译诊断快照 | `application/v3/` |
+| app.Diagnostics | 编译诊断快照 | `application/v3/` |
 | StartupReport | 启动报告输出 | `application/v3/` |
 
 ---
@@ -219,7 +219,7 @@
 7. **依赖注入**：自研 DI 容器，支持父子容器、作用域、token/type 双模式
 8. **编译时检查 vs 运行时检查**：routeKey 冲突编译期报错，避免运行时静默覆盖
 9. **插件模式**：ProtocolPlugin 接口允许动态扩展协议支持
-10. **模块化设计**：integration 模块统一 API 模式（ForRoot / Factory / InjectXxx）
+10. **模块化设计**：integration 模块统一 API 模式（Module / Factory / InjectXxx）
 
 ---
 

@@ -5,6 +5,8 @@ package ws
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 )
@@ -13,11 +15,26 @@ import (
 type Config struct {
 	// Addr 是监听地址，例如 ":8081"。
 	Addr string
+	// SocketPath 是 Socket.IO 的挂载路径，默认 /socket.io/。
+	SocketPath string
+	// ResponseEventSuffix 是成功响应的事件后缀。
+	ResponseEventSuffix string
+	// ErrorEventSuffix 是错误响应的事件后缀。
+	ErrorEventSuffix string
 }
 
 // Module 创建 WebSocket 协议模块。
 func Module(cfg Config) module.Module {
 	a := New(cfg.Addr)
+	if strings.TrimSpace(cfg.SocketPath) != "" {
+		a = a.WithSocketPath(cfg.SocketPath)
+	}
+	if cfg.ResponseEventSuffix != "" {
+		a = a.WithResponseEventSuffix(cfg.ResponseEventSuffix)
+	}
+	if cfg.ErrorEventSuffix != "" {
+		a = a.WithErrorEventSuffix(cfg.ErrorEventSuffix)
+	}
 	m := &protocolModule{BaseModule: module.New(module.Metadata{})}
 	m.adapter = a
 	return m

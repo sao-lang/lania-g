@@ -11,11 +11,21 @@ import (
 
 // Config 描述 Scheduler 协议的装配参数。
 type Config struct {
+	// UniqueLocker 为 Unique() 任务提供分布式唯一锁；为空时退化为进程内锁。
+	UniqueLocker UniqueLocker
+	// HistoryLimit 是每个任务保留的历史运行记录条数，0 表示默认值。
+	HistoryLimit int
 }
 
 // Module 创建 Scheduler 协议模块。
 func Module(cfg Config) module.Module {
 	a := New()
+	if cfg.UniqueLocker != nil {
+		a.SetUniqueLocker(cfg.UniqueLocker)
+	}
+	if cfg.HistoryLimit > 0 {
+		a.SetHistoryLimit(cfg.HistoryLimit)
+	}
 	m := &protocolModule{BaseModule: module.New(module.Metadata{})}
 	m.adapter = a
 	return m

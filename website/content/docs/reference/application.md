@@ -12,37 +12,45 @@ next: /docs/reference/module-di
 ## 1. 创建
 
 ```go
-func New(root module.Module, adapters ...adapter.Adapter) (*Application, error)
-func NewCompat(root module.Module, adapters ...adapter.Adapter) (*Application, error)
-func NewWithOptions(root module.Module, opts Options, adapters ...adapter.Adapter) (*Application, error)
+func New(root module.Module, opts Options) (*Application, error)
 ```
 
-| 入口 | Registry | 用途 |
-|------|----------|------|
-| `NewWithOptions` | 必须显式传入 | **推荐** |
-| `New` | `registry.Global()` | 兼容旧代码 |
-| `NewCompat` | `registry.Global()`，显式标记兼容 | 迁移期 |
+`New` 是唯一构造入口，流程固定：
+
+```text
+加载模块树 → 各模块 Init → 发现并挂载适配器 → 合并模块贡献的全局 AOP
+```
 
 ### Options
 
 ```go
 type Options struct {
-	Registry        *Registry   // 实例级 registry（必填）
-	StartupReporter io.Writer   // 启动报告输出目标（可选）
+	Logger io.Writer   // 非空时输出启动报告
 }
 ```
 
-`NewRegistry()` 是 `registry.New()` 的别名。
-
 ## 2. 装配
+
+适配器不再作为参数传入，而是**以模块形式**出现在根模块的 `Imports` 里：
+
+```go
+root := module.New(module.Metadata{
+	Imports: []module.Module{
+		http.Module(http.Config{Addr: ":8080"}),
+		swagger.Module(swagger.Config{Title: "API", Version: "1.0.0"}),
+		users.Module(),
+	},
+	Controllers: []any{&UserController{}},
+})
+```
 
 | 方法 | 说明 |
 |------|------|
-| `UseAdapter(adp adapter.Adapter) error` | 挂载 adapter（会调用 `Mount` 并收集 Plugin） |
-| `RegisterPlugin(plugins ...compiler.ProtocolPlugin)` | 注册自定义协议插件 |
-| `API(adapterID string) (any, bool)` | 取已挂载 adapter 的 DSL API |
-| `SetGlobalPrefix(prefix string)` | 为支持前缀的 adapter 设置全局前缀 |
-| `MountHTTP(pattern string, handler http.Handler) error` | 以宿主身份挂载原生 handler（实现 `HTTPMountHost`） |
+| `Adapter(id string) (adapter.Adapter, bool)` | 取已挂载的适配器 |
+| `RegisterPlugin(plugins ...compiler.ProtocolPlugin)` | 追加自定义协议插件 |
+| `Handle(pattern string, h http.Handler)` | 以宿主身份挂载原生 handler |
+| `Static(prefix, root string)` | 挂载静态目录 |
+| `MountHTTP(pattern string, h http.Handler) error` | `HTTPMountHost` 实现 |
 
 ## 3. 全局 AOP
 
@@ -54,34 +62,35 @@ func (a *Application) UseGlobalPipes(ps ...aop.PipeFunc)
 func (a *Application) UseGlobalFilters(fs ...aop.ExceptionFilterFunc)
 ```
 
-语义与执行顺序见 [AOP](aop)。
+模块也可以在 `Init` 阶段贡献全局 AOP（等价 NestJS 的 `APP_*` 提供者）：
+
+```go
+m.Context().Use(module.AOP{Interceptors: []aop.InterceptorFunc{...}})
+```
+
+两种来源在 `New` 阶段合并，顺序为：模块加载顺序 → `UseGlobal*` 调用顺序。
 
 ## 4. 启动
 
 ```go
-func (a *Application) Start() error   // = Run()
-func (a *Application) Run() error     // 使用各 adapter 自己的地址
-func (a *Application) Listen(addr string) error // 为共享监听 adapter 注入地址
-func (a *Application) WaitStop()      // 阻塞直到 Stop
-func (a *Application) Stop() error    // 逆序停止 adapter + shutdown 钩子
+func (a *Application) Run() error   // 声明 → 编译 → 启动适配器 → 阻塞
+func (a *Application) Stop() error  // 逆序停止适配器 + shutdown 钩子
 ```
 
-- `Run()`：所有 adapter 都必须能自行监听；存在共享监听 adapter 时报错
-- `Listen(addr)`：把一个共享监听地址分发给唯一需要它的 adapter
-- `Run/Listen` 会阻塞到 `Stop()`，符合长驻服务语义
+监听地址属于协议配置（`http.Config{Addr}`），不存在 `app.Listen`。
 
 ## 5. 诊断
 
 | 方法 | 说明 |
 |------|------|
-| `CompileDiagnostics() (*compiler.CompileDiagnostics, error)` | 触发（或复用）编译并返回诊断 |
-| `LastCompileDiagnostics() *compiler.CompileDiagnostics` | 最近一次编译诊断快照 |
-| `StartupReport() (*StartupReport, error)` | 启动汇总（模块/路由/binding/回退） |
+| `Diagnostics() *compiler.CompileDiagnostics` | 最近一次编译诊断快照 |
+| `LastCompileDiagnostics() *compiler.CompileDiagnostics` | 同上 |
+| `StartupReport() (*StartupReport, error)` | 启动汇总（模块/路由/binding） |
 | `GraphDiagnostics() *graph.Diagnostics` | 模块依赖图诊断 |
 | `Runtime() *runtime.Runtime` | 运行时（Router/Executor） |
-| `Registry() *Registry` | 当前 registry |
+| `Registry() *registry.Registry` | 当前声明仓库 |
 | `ModuleRef() *module.ModuleRef` | 模块引用树 |
-| `HotLoad(mod module.Module) error` | 动态加载模块 |
+| `HotLoad(mod module.Module) error` | 动态加载模块并重新声明/编译 |
 
 ### CompileDiagnostics 字段
 
@@ -122,21 +131,19 @@ Integrations          []string
 Modules               []ModuleStartupReport
 ```
 
-`String()` 输出便于人读的文本；`HasCompatFallbacks()` 判断是否走了全局回退。
+`String()` 输出便于人读的文本。
 
 ## 6. 典型启动序列
 
 ```go
-app, _ := application.New(root, application.Options{Logger: os.Stdout}, httpAdapter)
-
-// 声明...
-if _, err := app.CompileDiagnostics(); err != nil { panic(err) }
-if _, err := app.StartupReport(); err != nil { panic(err) }
-if err := app.Run(); err != nil { panic(err) }
+app, err := application.New(root, application.Options{Logger: os.Stdout})
+if err != nil {
+	log.Fatal(err)
+}
+if err := app.Run(); err != nil {
+	log.Fatal(err)
+}
 ```
 
-## 7. 兼容语义
-
-- `New` / `NewCompat` 使用 `registry.Global()`，适用于迁移期
-- 所有协议 integration 都提供对应的 `*Compat` 入口
-- 启动报告会列出 `registryFallbacks` / `runtimeFallbacks`，便于识别仍在走回退的代码
+声明（`Declare`）与编译都在 `Run` 内部完成，不需要手工调用
+`CompileDiagnostics` / `StartupReport`。

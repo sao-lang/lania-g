@@ -27,14 +27,17 @@ type Session interface {
 ## 2. 声明消费者
 
 ```go
-mqAdapter := mqadapter.New(driver)
+root := module.New(module.Metadata{
+	Imports:     []module.Module{mqadapter.Module(mqadapter.Config{Driver: driver})},
+	Controllers: []any{consumer},
+})
 
-mqAPI := mqAdapter.API().(*mqadapter.API)
-mqAPI.Consumer("default", consumer).
-	Group("g1").
-	On("order.created", consumer.OnOrder).
-	BindParam(3, "X-Trace-Id"). // Header[T] 需要绑定名
-	BuildE()
+func (c *OrderConsumer) Declare(r *mqadapter.Routes) {
+	r.Consumer("default").
+		Group("g1").
+		On("order.created", c.OnOrder).
+		BindParam(3, "X-Trace-Id") // Header[T] 需要绑定名
+}
 ```
 
 ## 3. 处理器

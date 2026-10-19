@@ -32,8 +32,12 @@ foreach ($m in $mods) { Push-Location $m; go build ./...; go test ./...; Pop-Loc
 ## 3. 健康检查
 
 ```go
-mod, _ := terminus.Module(terminus.Config{})
-root := module.CreateModule([]module.Module{mod}, nil, []any{ctrl}, nil, nil)
+root := module.New(module.Metadata{
+	Imports: []module.Module{
+		terminus.Module(terminus.Config{Path: "/health"}),
+	},
+	Controllers: []any{ctrl},
+})
 ```
 
 按集成配置暴露 `/health`（或自定义路径），供负载均衡与 K8s 探针使用。
@@ -41,7 +45,9 @@ root := module.CreateModule([]module.Module{mod}, nil, []any{ctrl}, nil, nil)
 ## 4. 优雅关闭
 
 ```go
-app.Run()) // 阻塞
+if err := app.Run(); err != nil { // 阻塞，直到收到退出信号
+	log.Fatal(err)
+}
 ```
 
 ```go
@@ -66,7 +72,7 @@ go func() {
 | 链路追踪 / 指标 | `integrations/otel` |
 | 健康检查 | `integrations/terminus` |
 | 调度快照 | `scheduler.MountHTTPBridge(app, adp, "/scheduler/status")` |
-| 启动诊断 | `CompileDiagnostics` + `StartupReport` |
+| 启动诊断 | `app.StartupReport()` / `app.GraphDiagnostics()` |
 
 ## 6. 容器化要点
 
@@ -92,9 +98,9 @@ ENTRYPOINT ["/app"]
 ## 7. 上线前检查清单
 
 ```text
-- [ ] CompileDiagnostics 无错误
-- [ ] StartupReport 中 routes 数量符合预期
-- [ ] 没有使用 registry.Global()
+- [ ] 启动日志中 StartupReport 无 warning
+- [ ] StartupReport 中 routeCount 数量符合预期
+- [ ] 没有依赖已移除的全局 registry / *Compat 入口
 - [ ] 所有外部集成都有超时与重试
 - [ ] 健康检查与优雅关闭已验证
 - [ ] 关键路径有端到端测试

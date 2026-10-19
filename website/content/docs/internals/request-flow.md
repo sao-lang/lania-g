@@ -10,23 +10,26 @@ next: /docs/internals/adapter-plugin
 ## 1. 启动期
 
 ```text
-Application.NewWithOptions
+application.New(root, Options{})
   └─ ModuleLoader.LoadMultiple(root)
        ├─ 递归 imports（深度优先）
-       ├─ 每个模块创建 Container
+       ├─ 每个模块创建 Container 并 Init()
+       ├─ attachContext（Context.Bind / Context.Use）
        └─ 构建 ModuleRef 树
-  └─ app.UseAdapter(adapter...)
-       ├─ adapter.Mount(host)       # 绑定 Registry / mount 能力
-       └─ 收集 Plugins()
-  └─ Compile
-       ├─ plugin.Scan(moduleRef, reg)   # 声明写入
-       ├─ 冲突检测 / owner 解析
-       └─ CompiledApp
-  └─ compiled.Install(rt)
-       ├─ Router 注册 routeKey → Handler
-       ├─ BindingRegistry 注册 resolver
-       └─ RouteContainers 绑定模块容器
-  └─ adapter.Start()
+  └─ 发现适配器：实现 ModuleAdapter 的模块贡献 adapter
+       └─ adapter.Mount(host)          # 绑定 Registry / mount 能力
+  └─ app.Run()
+       ├─ prepare：遍历模块调用 Declare(*Routes)（先 ClearDecl）
+       ├─ Mount：集成模块挂载原生 handler（swagger / terminus）
+       ├─ Compile
+       │    ├─ plugin.Scan(moduleRef, reg)
+       │    ├─ 冲突检测 / owner 解析
+       │    └─ CompiledApp
+       ├─ compiled.Install(rt)
+       │    ├─ Router 注册 routeKey → Handler
+       │    ├─ BindingRegistry 注册 resolver
+       │    └─ RouteContainers 绑定模块容器
+       └─ adapter.Start()
 ```
 
 ## 2. 请求期
