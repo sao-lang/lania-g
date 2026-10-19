@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	coreintegration "github.com/sao-lang/lania-g/kernel/v3/integration"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
@@ -92,6 +93,8 @@ func (m *integrationModule) Init() error {
 		coreintegration.NewBindingEntry("AuthFactory", reflect.TypeFor[Factory]()),
 	)
 	registerBindings(reg)
+	// 认证中间件作为模块级全局 AOP 贡献给应用。
+	m.Context().Use(module.AOP{Middlewares: []aop.MiddlewareFunc{Middleware()}})
 	return nil
 }
 

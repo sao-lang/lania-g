@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	coreintegration "github.com/sao-lang/lania-g/kernel/v3/integration"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
@@ -142,6 +143,10 @@ func (m *integrationModule) Init() error {
 		coreintegration.NewBindingEntry("OTelPropagator", reflect.TypeFor[propagation.TextMapPropagator]()),
 	)
 	registerBindings(reg)
+	m.Context().Use(module.AOP{
+		Middlewares:  []aop.MiddlewareFunc{m.telemetry.Middleware()},
+		Interceptors: []aop.InterceptorFunc{m.telemetry.Interceptor()},
+	})
 	return nil
 }
 

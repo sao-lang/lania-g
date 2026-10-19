@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	coreintegration "github.com/sao-lang/lania-g/kernel/v3/integration"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
@@ -89,6 +90,10 @@ func (m *integrationModule) Init() error {
 		coreintegration.NewBindingEntry("ResilienceConfigPtr", reflect.TypeFor[*Config]()),
 		coreintegration.NewBindingEntry("ResilienceFactory", reflect.TypeFor[Factory]()),
 	)
+	m.Context().Use(module.AOP{
+		Middlewares:  []aop.MiddlewareFunc{Middleware()},
+		Interceptors: []aop.InterceptorFunc{Interceptor()},
+	})
 	return nil
 }
 

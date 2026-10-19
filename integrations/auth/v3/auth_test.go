@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"github.com/sao-lang/lania-g/kernel/v3/di"
+	"reflect"
 	"testing"
 
 
@@ -33,23 +35,24 @@ func TestAPIKeySessionAndGuards(t *testing.T) {
 	if _, authErr := service.Authenticate(sessionCtx); authErr != nil {
 		t.Fatalf("session auth: %v", authErr)
 	}
-	Middleware(service)(&aop.ExecutionContext{HandlerContext: sessionCtx}, func() error { return nil })
+	container := testAuthContainer(service)
+	Middleware()(&aop.ExecutionContext{HandlerContext: sessionCtx, Container: container}, func() error { return nil })
 
-	guard := RequireRoles(service, "reader")
-	ok, err := guard(&aop.ExecutionContext{HandlerContext: sessionCtx})
+	guard := RequireRoles("reader")
+	ok, err := guard(&aop.ExecutionContext{HandlerContext: sessionCtx, Container: container})
 	if err != nil || !ok {
 		t.Fatalf("guard result=%v err=%v", ok, err)
 	}
-	tenantGuard := RequireTenant(service)
-	ok, err = tenantGuard(&aop.ExecutionContext{HandlerContext: sessionCtx})
+	tenantGuard := RequireTenant()
+	ok, err = tenantGuard(&aop.ExecutionContext{HandlerContext: sessionCtx, Container: container})
 	if err != nil || !ok {
 		t.Fatalf("tenant guard result=%v err=%v", ok, err)
 	}
 }
 
-type installTarget struct{ middlewares int }
-
-func (t *installTarget) UseGlobalMiddlewares(items ...aop.MiddlewareFunc) {
-	t.middlewares += len(items)
+// testAuthContainer 构造一个只包含 auth Service 的请求容器。
+func testAuthContainer(service *Service) *di.Container {
+	container := di.NewContainer()
+	container.RegisterValue(reflect.TypeFor[*Service](), service)
+	return container
 }
-

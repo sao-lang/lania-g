@@ -1,6 +1,8 @@
 package resilience
 
 import (
+	"github.com/sao-lang/lania-g/kernel/v3/di"
+	"reflect"
 	"fmt"
 	"strings"
 	"testing"
@@ -55,8 +57,9 @@ func TestRetryAndCircuitBreaker(t *testing.T) {
 	h1.Meta.Protocol = "http"
 
 	rt := runtime.NewRuntime()
+	rt.GetExecutor().SetRootContainer(testServiceContainer(svc))
 	rt.GetRouter().Register(h1.Meta.RouteKey, h1)
-	rt.UseGlobalInterceptors(Interceptor(svc))
+	rt.UseGlobalInterceptors(Interceptor())
 
 	ctx := runtime.NewHandlerContext("http")
 	ctx.Request.Method = "GET"
@@ -82,8 +85,9 @@ func TestRetryAndCircuitBreaker(t *testing.T) {
 	h2.Meta.RouteKey = runtime.BuildRouteKey("http", "GET", "/fail")
 	h2.Meta.Protocol = "http"
 	rt2 := runtime.NewRuntime()
+	rt2.GetExecutor().SetRootContainer(testServiceContainer(failSvc))
 	rt2.GetRouter().Register(h2.Meta.RouteKey, h2)
-	rt2.UseGlobalInterceptors(Interceptor(failSvc))
+	rt2.UseGlobalInterceptors(Interceptor())
 
 	ctx2 := runtime.NewHandlerContext("http")
 	ctx2.Request.Method = "GET"
@@ -113,9 +117,10 @@ func TestRateLimitAndIdempotency(t *testing.T) {
 	h.Meta.RouteKey = runtime.BuildRouteKey("http", "POST", "/create")
 	h.Meta.Protocol = "http"
 	rt := runtime.NewRuntime()
+	rt.GetExecutor().SetRootContainer(testServiceContainer(svc))
 	rt.GetRouter().Register(h.Meta.RouteKey, h)
-	rt.UseGlobalMiddleware(Middleware(svc))
-	rt.UseGlobalInterceptors(Interceptor(svc))
+	rt.UseGlobalMiddleware(Middleware())
+	rt.UseGlobalInterceptors(Interceptor())
 
 	first := runtime.NewHandlerContext("http")
 	first.Request.Method = "POST"
@@ -152,4 +157,11 @@ func TestRateLimitAndIdempotency(t *testing.T) {
 	if _, err := rt.Execute(limited2); err == nil || !strings.Contains(err.Error(), "rate limit exceeded") {
 		t.Fatalf("rate limit err=%v", err)
 	}
+}
+
+// testServiceContainer 构造一个只包含 resilience Service 的容器。
+func testServiceContainer(service *Service) *di.Container {
+	container := di.NewContainer()
+	container.RegisterValue(reflect.TypeFor[*Service](), service)
+	return container
 }

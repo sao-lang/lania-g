@@ -4,16 +4,23 @@ package auth
 import (
 	"strings"
 
+	"github.com/sao-lang/lania-g/kernel/v3/di"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 )
 
-// Middleware 创建一个会在请求开始阶段执行认证的中间件。
-func Middleware(service *Service) aop.MiddlewareFunc {
+// Middleware 创建一个在请求开始阶段执行认证的中间件。
+//
+// 它不需要外部传入 Service：Service 从请求容器解析。
+func Middleware() aop.MiddlewareFunc {
 	return func(execCtx *aop.ExecutionContext, next func() error) error {
 		hc, ok := execCtx.HandlerContext.(*runtime.HandlerContext)
 		if !ok || hc == nil {
 			return next()
+		}
+		service, err := serviceOf(execCtx)
+		if err != nil {
+			return err
 		}
 		principal, err := service.Authenticate(hc)
 		if err != nil {
@@ -27,11 +34,15 @@ func Middleware(service *Service) aop.MiddlewareFunc {
 }
 
 // RequireAuthenticated 创建一个要求当前请求已认证的 guard。
-func RequireAuthenticated(service *Service) aop.GuardFunc {
+func RequireAuthenticated() aop.GuardFunc {
 	return func(execCtx *aop.ExecutionContext) (bool, error) {
 		hc, ok := execCtx.HandlerContext.(*runtime.HandlerContext)
 		if !ok || hc == nil {
 			return false, nil
+		}
+		service, err := serviceOf(execCtx)
+		if err != nil {
+			return false, err
 		}
 		principal, err := ensurePrincipal(service, hc)
 		if err != nil {
@@ -42,7 +53,7 @@ func RequireAuthenticated(service *Service) aop.GuardFunc {
 }
 
 // RequireRoles 创建一个要求主体至少具备任一角色的 guard。
-func RequireRoles(service *Service, roles ...string) aop.GuardFunc {
+func RequireRoles(roles ...string) aop.GuardFunc {
 	required := make(map[string]struct{}, len(roles))
 	for _, role := range roles {
 		required[strings.TrimSpace(role)] = struct{}{}
@@ -51,6 +62,10 @@ func RequireRoles(service *Service, roles ...string) aop.GuardFunc {
 		hc, ok := execCtx.HandlerContext.(*runtime.HandlerContext)
 		if !ok || hc == nil {
 			return false, nil
+		}
+		service, err := serviceOf(execCtx)
+		if err != nil {
+			return false, err
 		}
 		principal, err := ensurePrincipal(service, hc)
 		if err != nil || principal == nil {
@@ -66,11 +81,15 @@ func RequireRoles(service *Service, roles ...string) aop.GuardFunc {
 }
 
 // RequireTenant 创建一个要求当前请求具备租户信息的 guard。
-func RequireTenant(service *Service) aop.GuardFunc {
+func RequireTenant() aop.GuardFunc {
 	return func(execCtx *aop.ExecutionContext) (bool, error) {
 		hc, ok := execCtx.HandlerContext.(*runtime.HandlerContext)
 		if !ok || hc == nil {
 			return false, nil
+		}
+		service, err := serviceOf(execCtx)
+		if err != nil {
+			return false, err
 		}
 		principal, err := ensurePrincipal(service, hc)
 		if err != nil {
@@ -83,23 +102,16 @@ func RequireTenant(service *Service) aop.GuardFunc {
 	}
 }
 
-// Install 把认证中间件安装到支持全局 middleware 的对象上。
-func Install(into interface {
-	UseGlobalMiddlewares(...aop.MiddlewareFunc)
-}, service *Service) {
-	if into == nil || service == nil {
-		return
-	}
-	into.UseGlobalMiddlewares(Middleware(service))
-}
-
-// InstallOnFactory 把认证中间件安装到暴露 `UseGlobalMiddleware` 的 factory 上。
 // RequireClaims 创建一个要求 claims 包含指定键值对的 guard。
-func RequireClaims(service *Service, claims map[string]interface{}) aop.GuardFunc {
+func RequireClaims(claims map[string]interface{}) aop.GuardFunc {
 	return func(execCtx *aop.ExecutionContext) (bool, error) {
 		hc, ok := execCtx.HandlerContext.(*runtime.HandlerContext)
 		if !ok || hc == nil {
 			return false, nil
+		}
+		service, err := serviceOf(execCtx)
+		if err != nil {
+			return false, err
 		}
 		principal, err := ensurePrincipal(service, hc)
 		if err != nil || principal == nil {
@@ -115,12 +127,12 @@ func RequireClaims(service *Service, claims map[string]interface{}) aop.GuardFun
 }
 
 // RequireAnyRole 是 `RequireRoles` 的语义别名。
-func RequireAnyRole(service *Service, roles ...string) aop.GuardFunc {
-	return RequireRoles(service, roles...)
+func RequireAnyRole(roles ...string) aop.GuardFunc {
+	return RequireRoles(roles...)
 }
 
 // RequireAllRoles 创建一个要求主体具备全部角色的 guard。
-func RequireAllRoles(service *Service, roles ...string) aop.GuardFunc {
+func RequireAllRoles(roles ...string) aop.GuardFunc {
 	required := make(map[string]struct{}, len(roles))
 	for _, role := range roles {
 		required[strings.TrimSpace(role)] = struct{}{}
@@ -129,6 +141,10 @@ func RequireAllRoles(service *Service, roles ...string) aop.GuardFunc {
 		hc, ok := execCtx.HandlerContext.(*runtime.HandlerContext)
 		if !ok || hc == nil {
 			return false, nil
+		}
+		service, err := serviceOf(execCtx)
+		if err != nil {
+			return false, err
 		}
 		principal, err := ensurePrincipal(service, hc)
 		if err != nil || principal == nil {
@@ -158,4 +174,20 @@ func ChainGuards(guards ...aop.GuardFunc) aop.GuardFunc {
 		}
 		return true, nil
 	}
+}
+
+// serviceOf 从请求容器解析 auth Service。
+func serviceOf(ctx *aop.ExecutionContext) (*Service, error) {
+	if ctx == nil {
+		return nil, aop.InternalServerErrorException("auth: execution context unavailable")
+	}
+	container, ok := ctx.Container.(*di.Container)
+	if !ok || container == nil {
+		return nil, aop.InternalServerErrorException("auth: request container unavailable")
+	}
+	service, err := di.GetByType[*Service](container)
+	if err != nil || service == nil {
+		return nil, aop.InternalServerErrorException("auth: service not registered")
+	}
+	return service, nil
 }
