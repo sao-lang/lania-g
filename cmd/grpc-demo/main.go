@@ -657,7 +657,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	root := module.CreateModule(nil, []*di.Provider{pStore, pAuth, pUser, pStream}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pStore, pAuth, pUser, pStream}})
 
 	// 启用 server reflection，这样即使本地没有 `.proto` 也能用 `grpcurl` 调试。
 	server := grpc.NewServer()

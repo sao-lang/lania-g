@@ -476,7 +476,7 @@ func main() {
 	}
 
 	// WS gateway 需要落到模块 receiver 槽位，这里使用 controllers 槽位承载它。
-	root := module.CreateModule(nil, []*di.Provider{pStore}, []interface{}{gw}, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pStore}, Controllers: []interface{}{gw}})
 
 	httpAdp := httpadapter.New()
 	wsAdp := wsadapter.New() // shared listen: mount to http adapter at /socket.io/

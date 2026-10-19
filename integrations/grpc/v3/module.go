@@ -67,7 +67,7 @@ func ForRoot(cfg Config) (module.Module, error) {
 		return nil, err
 	}
 
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Providers: []*di.Provider{pClient, pNamedClient, pConn, pNamedConn, pConfigPtr, pConfigValue, pFactory},
 		Exports:   []interface{}{clientToken, namedClientToken, connToken, namedConnToken, configPtrToken, configValueToken, factoryToken},
 	})
@@ -119,7 +119,7 @@ func ForRootCompat(cfg Config) (module.Module, error) {
 		return nil, err
 	}
 
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Providers: []*di.Provider{pClient, pNamedClient, pConn, pNamedConn, pConfigPtr, pConfigValue, pFactory},
 		Exports:   []interface{}{clientToken, namedClientToken, connToken, namedConnToken, configPtrToken, configValueToken, factoryToken},
 	})

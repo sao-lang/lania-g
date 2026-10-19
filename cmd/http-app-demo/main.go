@@ -17,7 +17,7 @@ func (c *UserController) Ping() map[string]string {
 
 func main() {
 	ctrl := &UserController{}
-	root := module.CreateModule(nil, nil, []any{ctrl}, nil, nil)
+	root := module.New(module.Metadata{Controllers: []any{ctrl}})
 
 	httpAdapter := httpadapter.New()
 	app, err := application.NewWithOptions(root, application.Options{

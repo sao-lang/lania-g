@@ -517,7 +517,7 @@ func main() {
 		panic(err)
 	}
 	// GraphQL resolver 需要落到模块 receiver 槽位，这里使用 resolvers 槽位承载它。
-	root := module.CreateModule(nil, []*di.Provider{pStore}, nil, []interface{}{mutation, query, user}, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pStore}, Resolvers: []interface{}{mutation, query, user}})
 
 	httpAdp := httpadapter.New()
 	gqlAdp := graphqladapter.New().WithPlayground(true)

@@ -93,7 +93,7 @@ func (r *testResolver) Unbound(first gqlbinding.Arg[string], second gqlbinding.A
 func buildRuntimeForTest(t *testing.T) (*runtime.Runtime, *registry.Registry) {
 	t.Helper()
 	resolver := &testResolver{}
-	root := module.CreateModule(nil, nil, nil, []any{resolver}, nil)
+	root := module.New(module.Metadata{Resolvers: []any{resolver}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -122,7 +122,7 @@ func buildRuntimeForTest(t *testing.T) (*runtime.Runtime, *registry.Registry) {
 
 func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	resolver := &testResolver{}
-	root := module.CreateModule(nil, nil, nil, []any{resolver}, nil)
+	root := module.New(module.Metadata{Resolvers: []any{resolver}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestAdapter_BatchAndIntrospection(t *testing.T) {
 
 func TestCompile_RejectSubscription(t *testing.T) {
 	resolver := &testResolver{}
-	root := module.CreateModule(nil, nil, nil, []any{resolver}, nil)
+	root := module.New(module.Metadata{Resolvers: []any{resolver}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}

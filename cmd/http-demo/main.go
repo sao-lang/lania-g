@@ -566,7 +566,7 @@ type StoreModule struct {
 func NewStoreModule() *StoreModule {
 	store := newMemoryStore()
 	pStore, _ := di.ProviderFromInstanceWithToken(storeToken, store, di.Singleton)
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Providers: []*di.Provider{pStore},
 		Exports:   []any{storeToken},
 	})
@@ -605,12 +605,7 @@ func main() {
 	authCtrl := &AuthController{} // 零值，Init 时自动注入 Store
 	userCtrl := &UserController{} // 零值，Init 时自动注入 Store
 
-	root := module.CreateModule(
-		[]module.Module{storeModule, swaggerModule},
-		nil,
-		[]any{authCtrl, userCtrl},
-		nil, nil,
-	)
+	root := module.New(module.Metadata{Imports: []module.Module{storeModule, swaggerModule}, Controllers: []any{authCtrl, userCtrl}})
 
 	// 3. 创建应用
 	httpAdapter := httpadapter.New().WithValidatorV10()

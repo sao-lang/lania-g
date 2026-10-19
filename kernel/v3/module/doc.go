@@ -6,5 +6,5 @@
 // - `Controllers/Resolvers` 描述对外暴露的协议处理入口
 // - `Exports` 描述哪些能力可被其他模块复用
 //
-// 对大多数业务代码来说，`CreateModule(...)` 是最常见的声明入口。
+// 对大多数业务代码来说，`New(Metadata{Imports: ...})` 是最常见的声明入口。
 package module

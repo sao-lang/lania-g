@@ -19,7 +19,7 @@ func main() {
 	query := &QueryResolver{}
 
 	// GraphQL 的 owner 推导依赖 module resolvers 槽位。
-	root := module.CreateModule(nil, nil, nil, []any{query}, nil)
+	root := module.New(module.Metadata{Resolvers: []any{query}})
 
 	gqlAdapter := graphqladapter.New(addr.HTTP(":8080")).WithPlayground(true)
 	app, err := application.NewWithOptions(root, application.Options{

@@ -79,7 +79,7 @@ type memorySession struct {
 func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	consumer := &testConsumer{}
 	pConsumer, _ := di.ProviderFromInstance(consumer, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pConsumer}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pConsumer}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -130,7 +130,7 @@ func (s *memorySession) Close() error { return nil }
 func TestMQAdapter_CompileAndConsume(t *testing.T) {
 	consumer := &testConsumer{}
 	pConsumer, _ := di.ProviderFromInstance(consumer, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pConsumer}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pConsumer}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestMQBinding_RouteKey(t *testing.T) {
 func TestMQRuntime_Execute(t *testing.T) {
 	consumer := &testConsumer{}
 	pConsumer, _ := di.ProviderFromInstance(consumer, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pConsumer}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pConsumer}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -282,9 +282,9 @@ func TestMQRuntime_Execute(t *testing.T) {
 func TestMQPlugin_OwnerErrorsUseUnifiedMeta(t *testing.T) {
 	providerA, _ := di.ProviderFromInstance(&testConsumer{}, di.Singleton)
 	providerB, _ := di.ProviderFromInstance(&testConsumer{}, di.Singleton)
-	modA := &mqOwnerModuleA{BaseModule: module.NewBaseModule(&module.ModuleMetadata{Providers: []*di.Provider{providerA}})}
-	modB := &mqOwnerModuleB{BaseModule: module.NewBaseModule(&module.ModuleMetadata{Providers: []*di.Provider{providerB}})}
-	root := module.CreateModule([]module.Module{modA, modB}, nil, nil, nil, nil)
+	modA := &mqOwnerModuleA{BaseModule: module.New(module.Metadata{Providers: []*di.Provider{providerA}})}
+	modB := &mqOwnerModuleB{BaseModule: module.New(module.Metadata{Providers: []*di.Provider{providerB}})}
+	root := module.New(module.Metadata{Imports: []module.Module{modA, modB}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}

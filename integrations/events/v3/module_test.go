@@ -99,7 +99,7 @@ func TestAttachRegisteredHandlers(t *testing.T) {
 
 	svc := &eventBridgeService{}
 	pSvc, _ := di.ProviderFromInstanceWithToken(reflect.TypeOf(svc), svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestAttachRegisteredHandlers_RequiresExplicitRegistry(t *testing.T) {
 
 	svc := &eventBridgeService{}
 	pSvc, _ := di.ProviderFromInstanceWithToken(reflect.TypeOf(svc), svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestAttachRegisteredHandlersCompat(t *testing.T) {
 
 	svc := &eventBridgeService{}
 	pSvc, _ := di.ProviderFromInstanceWithToken(reflect.TypeOf(svc), svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -280,7 +280,7 @@ func TestLifecycleHook_UsesModuleRefReceiver(t *testing.T) {
 		t.Fatalf("new bus: %v", err)
 	}
 	svcProvider, _ := di.ProviderFromInstanceWithToken(reflect.TypeOf(resolved), resolved, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{svcProvider}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{svcProvider}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init root: %v", err)
 	}

@@ -79,7 +79,7 @@ func main() {
 	userSvc := &UserService{}
 
 	// gRPC receiver 只需要明确归属到某个模块 owner；业务样板中直接放入模块 owner 槽位即可。
-	root := module.CreateModule(nil, nil, []any{userSvc}, nil, nil)
+	root := module.New(module.Metadata{Controllers: []any{userSvc}})
 
 	grpcAdapter := grpcadapter.New(addr.GRPC(":50051"))
 	app, err := application.NewWithOptions(root, application.Options{

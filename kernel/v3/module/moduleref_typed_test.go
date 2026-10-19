@@ -31,7 +31,7 @@ func TestMustGetByType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("provider typed contract: %v", err)
 	}
-	root := CreateModule(nil, []*di.Provider{p1, p2}, nil, nil, nil)
+	root := New(Metadata{Providers: []*di.Provider{p1, p2}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init root: %v", err)
 	}

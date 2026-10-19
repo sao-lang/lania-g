@@ -52,7 +52,7 @@ func (g *testGateway) EchoAutoStruct(args dtoWithHeader) (any, error) {
 
 func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	gw := &testGateway{}
-	root := module.CreateModule(nil, nil, []any{gw}, nil, nil)
+	root := module.New(module.Metadata{Controllers: []any{gw}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 
 func TestPlugin_CompileAndExecute(t *testing.T) {
 	gw := &testGateway{}
-	root := module.CreateModule(nil, nil, []any{gw}, nil, nil)
+	root := module.New(module.Metadata{Controllers: []any{gw}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}

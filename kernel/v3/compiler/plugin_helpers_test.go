@@ -22,9 +22,9 @@ type ownerTestModuleB struct{ *module.BaseModule }
 func TestBuildSnapshotOwnerIndex_ResolvesAmbiguousControllerByPointer(t *testing.T) {
 	ctrlA := &ownerTestController{name: "a"}
 	ctrlB := &ownerTestController{name: "b"}
-	modA := &ownerTestModuleA{BaseModule: module.NewBaseModule(&module.ModuleMetadata{Controllers: []interface{}{ctrlA}})}
-	modB := &ownerTestModuleB{BaseModule: module.NewBaseModule(&module.ModuleMetadata{Controllers: []interface{}{ctrlB}})}
-	root := module.CreateModule([]module.Module{modA, modB}, nil, nil, nil, nil)
+	modA := &ownerTestModuleA{BaseModule: module.New(module.Metadata{Controllers: []interface{}{ctrlA}})}
+	modB := &ownerTestModuleB{BaseModule: module.New(module.Metadata{Controllers: []interface{}{ctrlB}})}
+	root := module.New(module.Metadata{Imports: []module.Module{modA, modB}})
 
 	index := BuildSnapshotOwnerIndex(corescanner.BuildSnapshot(module.NewModuleRef(root)), SnapshotOwnerOptions{Controllers: true})
 
@@ -55,11 +55,11 @@ func TestBuildSnapshotOwnerIndex_ResolvesAmbiguousControllerByPointer(t *testing
 func TestBuildSnapshotOwnerIndex_CombinesControllersAndResolvers(t *testing.T) {
 	ctrl := &ownerTestController{name: "ctrl"}
 	resolver := &ownerTestResolver{name: "resolver"}
-	modA := &ownerTestModuleA{BaseModule: module.NewBaseModule(&module.ModuleMetadata{
+	modA := &ownerTestModuleA{BaseModule: module.New(module.Metadata{
 		Controllers: []interface{}{ctrl},
 		Resolvers:   []interface{}{resolver},
 	})}
-	root := module.CreateModule([]module.Module{modA}, nil, nil, nil, nil)
+	root := module.New(module.Metadata{Imports: []module.Module{modA}})
 
 	index := BuildSnapshotOwnerIndex(corescanner.BuildSnapshot(module.NewModuleRef(root)), SnapshotOwnerOptions{
 		Controllers: true,
@@ -84,9 +84,9 @@ func TestBuildSnapshotOwnerIndex_ResolvesValueProviderByPointer(t *testing.T) {
 	svcB := &ownerTestController{name: "svc-b"}
 	providerA, _ := di.ProviderFromInstanceWithToken(reflect.TypeFor[*ownerTestController](), svcA, di.Singleton)
 	providerB, _ := di.ProviderFromInstanceWithToken(reflect.TypeFor[*ownerTestController](), svcB, di.Singleton)
-	modA := &ownerTestModuleA{BaseModule: module.NewBaseModule(&module.ModuleMetadata{Providers: []*di.Provider{providerA}})}
-	modB := &ownerTestModuleB{BaseModule: module.NewBaseModule(&module.ModuleMetadata{Providers: []*di.Provider{providerB}})}
-	root := module.CreateModule([]module.Module{modA, modB}, nil, nil, nil, nil)
+	modA := &ownerTestModuleA{BaseModule: module.New(module.Metadata{Providers: []*di.Provider{providerA}})}
+	modB := &ownerTestModuleB{BaseModule: module.New(module.Metadata{Providers: []*di.Provider{providerB}})}
+	root := module.New(module.Metadata{Imports: []module.Module{modA, modB}})
 
 	index := BuildSnapshotOwnerIndex(corescanner.BuildSnapshot(module.NewModuleRef(root)), SnapshotOwnerOptions{Providers: true})
 

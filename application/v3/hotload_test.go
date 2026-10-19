@@ -37,7 +37,7 @@ type hotLoadRootModule struct {
 
 func newHotLoadRootModule(ctrl *hotLoadBaseController) module.Module {
 	return &hotLoadRootModule{
-		BaseModule: module.NewBaseModule(&module.ModuleMetadata{
+		BaseModule: module.New(module.Metadata{
 			Controllers: []any{ctrl},
 		}),
 	}
@@ -49,7 +49,7 @@ type hotLoadExtraModule struct {
 
 func newHotLoadExtraModule(ctrl *hotLoadExtraController) module.Module {
 	return &hotLoadExtraModule{
-		BaseModule: module.NewBaseModule(&module.ModuleMetadata{
+		BaseModule: module.New(module.Metadata{
 			Controllers: []any{ctrl},
 		}),
 	}
@@ -65,7 +65,7 @@ func newHotLoadBootstrapModule(provider *hotLoadBootstrapProvider) (module.Modul
 		return nil, err
 	}
 	return &hotLoadBootstrapModule{
-		BaseModule: module.NewBaseModule(&module.ModuleMetadata{
+		BaseModule: module.New(module.Metadata{
 			Providers: []*di.Provider{p},
 		}),
 	}, nil
@@ -109,7 +109,7 @@ func TestHotLoad_RecompilesRuntimeWithNewModule(t *testing.T) {
 
 func TestHotLoad_BootstrapsNewModuleWhenApplicationAlreadyBootstrapped(t *testing.T) {
 	app, err := NewWithOptions(
-		module.CreateModule(nil, nil, nil, nil, nil),
+		module.New(module.Metadata{}),
 		Options{Registry: registry.New()},
 		httpadapter.New(),
 	)

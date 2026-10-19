@@ -35,7 +35,7 @@ func ForFeature(features ...Feature) (module.Module, error) {
 
 // ForFeatureWithOptions 根据完整选项创建 ORM feature module。
 func ForFeatureWithOptions(opts FeatureOptions) (module.Module, error) {
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Imports:   append([]module.Module{}, opts.Imports...),
 		Providers: []*di.Provider{},
 		Exports:   []any{},

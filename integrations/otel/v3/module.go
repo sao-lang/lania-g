@@ -83,7 +83,7 @@ func ForRoot(cfg Config) (module.Module, error) {
 		return nil, err
 	}
 
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Providers: []*di.Provider{
 			pTelemetry,
 			pNamedTelemetry,
@@ -158,7 +158,7 @@ func ForRootCompat(cfg Config) (module.Module, error) {
 		return nil, err
 	}
 
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Providers: []*di.Provider{
 			pTelemetry,
 			pNamedTelemetry,

@@ -19,7 +19,7 @@ func main() {
 	gateway := &ChatGateway{}
 
 	// WS 的 owner 推导依赖 module controllers 槽位。
-	root := module.CreateModule(nil, nil, []any{gateway}, nil, nil)
+	root := module.New(module.Metadata{Controllers: []any{gateway}})
 
 	wsAdapter := wsadapter.New(addr.HTTP(":8080"))
 	app, err := application.NewWithOptions(root, application.Options{

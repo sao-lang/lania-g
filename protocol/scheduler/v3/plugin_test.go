@@ -101,7 +101,7 @@ func (h *testHost) ModuleRef() *module.ModuleRef { return h.moduleRef }
 func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	svc := &testSchedulerService{}
 	pSvc, _ := di.ProviderFromInstance(svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestSchedulerAdapter_CompileAndTrigger(t *testing.T) {
 
 	svc := &testSchedulerService{}
 	pSvc, _ := di.ProviderFromInstance(svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestSchedulerAdapter_RetryAndUnique(t *testing.T) {
 
 	svc := &testSchedulerService{}
 	pSvc, _ := di.ProviderFromInstance(svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestSchedulerHTTPBridge(t *testing.T) {
 
 func TestSchedulerPlugin_OwnerErrorsUseUnifiedMeta(t *testing.T) {
 	receiver := &testSchedulerService{}
-	root := module.CreateModule(nil, nil, nil, nil, nil)
+	root := module.New(module.Metadata{})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}

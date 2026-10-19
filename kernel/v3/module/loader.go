@@ -30,6 +30,7 @@ type ModuleLoader struct {
 	moduleRef     *ModuleRef
 	diagnostics   *graph.Diagnostics
 	registry      *registry.Registry
+	aop           AOP
 	mu            sync.RWMutex
 }
 
@@ -81,6 +82,7 @@ func (l *ModuleLoader) LoadMultiple(roots ...Module) (*LoadResult, error) {
 			return nil, err
 		}
 	}
+	l.aop = l.collectAOP()
 
 	return &LoadResult{
 		Modules:     l.getModulesList(),
@@ -109,7 +111,7 @@ func (l *ModuleLoader) setRootModules(roots []Module) {
 	if len(roots) == 1 {
 		l.rootModule = roots[0]
 	} else {
-		l.rootModule = CreateModule(roots, nil, nil, nil, nil)
+		l.rootModule = New(Metadata{Imports: roots})
 	}
 
 	l.moduleRef = NewModuleRef(l.rootModule)
@@ -138,13 +140,16 @@ func (l *ModuleLoader) GetRootModule() Module {
 	return l.rootModule
 }
 
-// SetRegistry 设置 Registry，并向当前 root 树传播 RegistryAware 能力。
+// SetRegistry 设置应用级声明仓库，并在已有模块树时重新注入模块上下文。
 func (l *ModuleLoader) SetRegistry(reg *registry.Registry) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.registry = reg
 	if l.rootModule != nil {
-		l.propagateRegistry(l.rootModule)
+		_ = walkModule(l.rootModule, make(map[Module]bool), func(mod Module) error {
+			l.attachContext(mod)
+			return nil
+		})
 	}
 }
 
@@ -152,7 +157,7 @@ func (l *ModuleLoader) SetRegistry(reg *registry.Registry) {
 //
 // 这是“声明收集”阶段，不负责 runtime handler 注册。
 func (l *ModuleLoader) loadModule(mod Module) error {
-	l.propagateRegistry(mod)
+	l.attachContext(mod)
 	if l.modules[mod] {
 		return nil
 	}
@@ -175,16 +180,40 @@ func (l *ModuleLoader) loadModule(mod Module) error {
 	return nil
 }
 
-// propagateRegistry 将 registry 注入实现了 RegistryAware 的模块。
-// 这让模块内部的 DSL/API 可以感知当前应用 registry，而不必层层手传。
-func (l *ModuleLoader) propagateRegistry(mod Module) {
-	if mod == nil || l.registry == nil {
+// attachContext 为模块注入模块上下文。
+//
+// 上下文携带应用级声明仓库，模块在 Init 阶段通过 m.Context() 访问，
+// 不再需要 RegistryAware 这类额外通道。
+func (l *ModuleLoader) attachContext(mod Module) {
+	if mod == nil {
 		return
 	}
-	if aware, ok := mod.(RegistryAware); ok {
-		aware.SetRegistry(l.registry)
+	ctx := newContext(mod, l.registry)
+	if aware, ok := mod.(ModuleContextAware); ok {
+		aware.SetModuleContext(ctx)
 	}
 }
+
+// collectAOP 汇总所有模块在 Init 阶段贡献的全局 AOP。
+func (l *ModuleLoader) collectAOP() AOP {
+	var out AOP
+	for _, mod := range l.getModulesList() {
+		aware, ok := mod.(ModuleContextAware)
+		if !ok {
+			continue
+		}
+		contribution := aware.Context().AOP()
+		out.Middlewares = append(out.Middlewares, contribution.Middlewares...)
+		out.Guards = append(out.Guards, contribution.Guards...)
+		out.Interceptors = append(out.Interceptors, contribution.Interceptors...)
+		out.Pipes = append(out.Pipes, contribution.Pipes...)
+		out.Filters = append(out.Filters, contribution.Filters...)
+	}
+	return out
+}
+
+// GetAOP 返回模块贡献的全局 AOP（Init 完成后可用）。
+func (l *ModuleLoader) GetAOP() AOP { return l.aop }
 
 // getModulesList 返回当前已加载模块集合的切片快照。
 func (l *ModuleLoader) getModulesList() []Module {

@@ -103,7 +103,7 @@ func (f *NestFactory) Build() (*application.Application, error) {
 	// v3 中 runtime 不再硬编码任何协议 binding/DSL，由各 adapter 负责挂载与编译。
 	root := f.modules[0]
 	if len(f.modules) > 1 {
-		root = module.CreateModule(f.modules, nil, nil, nil, nil)
+		root = module.New(module.Metadata{Imports: f.modules})
 	}
 
 	app, err := application.NewCompat(root, f.adapters...)

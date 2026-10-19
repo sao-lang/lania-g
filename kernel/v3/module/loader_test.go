@@ -7,7 +7,7 @@ import (
 
 // 这个用例验证：带 root 初始化的 NewModuleLoader 不会因为锁顺序问题发生死锁。
 func TestNewModuleLoader_WithRootDoesNotDeadlock(t *testing.T) {
-	root := CreateModule(nil, nil, nil, nil, nil)
+	root := New(Metadata{})
 	done := make(chan *ModuleLoader, 1)
 
 	go func() {

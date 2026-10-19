@@ -41,7 +41,7 @@ func TestCompileCompat_UsesGlobalRegistry(t *testing.T) {
 	registry.ResetGlobal()
 	t.Cleanup(registry.ResetGlobal)
 
-	root := module.CreateModule(nil, nil, nil, nil, nil)
+	root := module.New(module.Metadata{})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init root: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestCompileCompat_UsesGlobalRegistry(t *testing.T) {
 }
 
 func TestCompile_RequiresExplicitRegistry(t *testing.T) {
-	root := module.CreateModule(nil, nil, nil, nil, nil)
+	root := module.New(module.Metadata{})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init root: %v", err)
 	}

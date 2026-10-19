@@ -14,7 +14,7 @@ type registryAwareModule struct {
 }
 
 func newRegistryAwareModule() *registryAwareModule {
-	return &registryAwareModule{BaseModule: module.NewBaseModule(&module.ModuleMetadata{})}
+	return &registryAwareModule{BaseModule: module.New(module.Metadata{})}
 }
 
 func (m *registryAwareModule) SetRegistry(reg *registry.Registry) { m.got = reg }

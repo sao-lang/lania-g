@@ -146,7 +146,7 @@ func ForRootMulti(cfg MultiConfig) (module.Module, error) {
 	providers = append([]*di.Provider{pDB, pConfigPtr, pConfigValue, pFactory, pTxManager}, providers...)
 	exports = append([]interface{}{dbToken, configPtrToken, configValueToken, factoryToken, txManagerToken}, exports...)
 
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Providers: providers,
 		Exports:   exports,
 	})

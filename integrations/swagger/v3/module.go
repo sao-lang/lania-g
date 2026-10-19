@@ -58,7 +58,7 @@ func ForRoot(cfg Config, ui ...*UIConfig) (module.Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Providers: []*di.Provider{pBuilder, pConfigPtr, pConfigValue, pUIConfig, pFactory},
 		Exports:   []interface{}{builderToken, configPtrToken, configValueToken, uiConfigToken, factoryToken},
 	})
@@ -102,7 +102,7 @@ func ForRootCompat(cfg Config, ui ...*UIConfig) (module.Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	base := module.NewBaseModule(&module.ModuleMetadata{
+	base := module.New(module.Metadata{
 		Providers: []*di.Provider{pBuilder, pConfigPtr, pConfigValue, pUIConfig, pFactory},
 		Exports:   []interface{}{builderToken, configPtrToken, configValueToken, uiConfigToken, factoryToken},
 	})

@@ -275,7 +275,7 @@ func (s *fakeServerStream) RecvMsg(m any) error {
 func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	svc := &testService{}
 	pSvc, _ := di.ProviderFromInstance(svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestPlugin_CompileAndExecute(t *testing.T) {
 	svc := &testService{}
 	pSvc, _ := di.ProviderFromInstance(svc, di.Singleton)
 	pRepo, _ := di.ProviderFromInstance(&testRepo{ID: "ok"}, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc, pRepo}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc, pRepo}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -408,7 +408,7 @@ func TestPlugin_CompileAndExecute(t *testing.T) {
 
 func TestPlugin_CompileWithControllerOwnedReceiver(t *testing.T) {
 	svc := &testService{}
-	root := module.CreateModule(nil, nil, []any{svc}, nil, nil)
+	root := module.New(module.Metadata{Controllers: []any{svc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -487,7 +487,7 @@ func TestAdapter_RegisterDeclaredServicesIncludesStreams(t *testing.T) {
 func TestAdapter_DispatchStreamModes(t *testing.T) {
 	svc := &testService{}
 	pSvc, _ := di.ProviderFromInstance(svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -657,7 +657,7 @@ func TestAdapter_DispatchStreamModes(t *testing.T) {
 func TestPlugin_CompileRejectsInvalidClientStreamSignature(t *testing.T) {
 	svc := &invalidStreamService{}
 	pSvc, _ := di.ProviderFromInstance(svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
@@ -682,7 +682,7 @@ func TestPlugin_CompileRejectsInvalidClientStreamSignature(t *testing.T) {
 func TestPlugin_CompileRejectsInvalidClientStreamCompositeSignature(t *testing.T) {
 	svc := &invalidStreamService{}
 	pSvc, _ := di.ProviderFromInstance(svc, di.Singleton)
-	root := module.CreateModule(nil, []*di.Provider{pSvc}, nil, nil, nil)
+	root := module.New(module.Metadata{Providers: []*di.Provider{pSvc}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}

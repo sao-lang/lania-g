@@ -180,7 +180,7 @@ func (c *testCtrl) Handle() (any, error) { return nil, nil }
 
 func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	ctrl := &testCtrl{}
-	root := module.CreateModule(nil, nil, []any{ctrl}, nil, nil)
+	root := module.New(module.Metadata{Controllers: []any{ctrl}})
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
