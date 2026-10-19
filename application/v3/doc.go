@@ -16,23 +16,21 @@
 //
 // 推荐的最小使用方式：
 //
-//	app, err := application.NewWithOptions(rootModule, application.Options{
-//		Registry: application.NewRegistry(),
-//	}, httpAdapter)
+//	root := module.New(module.Metadata{
+//		Imports:     []module.Module{http.Module(http.Config{Addr: ":8080"})},
+//		Controllers: []any{&UserController{}},
+//	})
+//	app, err := application.New(root, application.Options{Logger: os.Stdout})
 //	if err != nil {
 //		return err
 //	}
-//	if _, err := app.CompileDiagnostics(); err != nil {
-//		return err
-//	}
-//	return app.Listen(":8080")
+//	return app.Run()
 //
-// 常见区别：
-// - `NewWithOptions` 是推荐入口，可显式注入实例级 registry
-// - `New` 是便捷入口，仍保留历史兼容的默认回退语义
-// - `CompileDiagnostics` 适合在启动前做“声明是否可编译”的预检查
-// - `Run` 使用各 adapter 自己的监听配置启动
-// - `Listen` 为需要共享监听地址的 adapter 提供统一 addr
+// 两个入口的语义：
+// - `New` 加载模块树、发现并挂载 adapter（协议以模块形式出现在 Imports 中）
+// - `Run` 依次执行「声明（Declare）→ 编译 → 启动 adapter → 阻塞」
+//
+// `Diagnostics()` 可在启动后返回最近一次编译诊断快照。
 //
 // 注意：
 // - 协议 DSL（例如 HTTP Controller、GraphQL Resolver DSL）不在本包中，
