@@ -9,43 +9,53 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
-// Gateway 是一个全局 DSL 兼容入口：使用全局 registry 创建一个 GatewayBuilder。
-//
-// 等价于：NewCompatAPI().Gateway(prefix, gateway)
-// 新业务代码更推荐通过 mounted adapter 暴露的 `adapter.API()` 在应用实例上注册声明。
-func Gateway(prefix string, gateway any) *GatewayBuilder {
-	return globalCompatAPI("ws.Gateway").Gateway(prefix, gateway)
+// Controller 由需要声明 WS 事件处理器的 gateway 实现。
+type Controller interface {
+	Declare(*Routes)
 }
 
-// API 是 WS adapter 的 DSL 入口封装，用于把 gateway/handler 声明写入 registry。
-type API struct {
-	reg            *registry.Registry
-	fallbackSource string
+// Routes 收集一个 gateway 声明的全部事件处理器。
+//
+// 它是 WS 唯一的声明入口：控制器在所属模块内完成注册，无需手动 Build。
+type Routes struct {
+	reg      *registry.Registry
+	gateway  any
+	current  *GatewayBuilder
+	err      error
 }
 
-// NewAPI 创建 WS adapter 的 DSL API 对象。
-//
-// 推荐：使用挂载到应用实例后的 adapter API，或显式传入实例级 registry。
-// 兼容：历史上允许 `NewAPI(nil)`，当前等价于 `NewCompatAPI()`。
-func NewAPI(reg *registry.Registry) *API {
-	if reg == nil {
-		return NewCompatAPI()
+func newRoutes(reg *registry.Registry, gateway any) *Routes {
+	return &Routes{reg: reg, gateway: gateway}
+}
+
+// Gateway 声明一个 namespace(prefix) 下的事件处理器。
+func (r *Routes) Gateway(prefix string) *GatewayBuilder {
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
 	}
-	return &API{reg: reg}
+	b := newGatewayBuilder(prefix, r.gateway, r)
+	r.current = b
+	return b
 }
 
-// NewCompatAPI 创建一个显式保留给迁移场景的全局 DSL 入口，不作为新代码默认入口。
-func NewCompatAPI() *API {
-	return globalCompatAPI("ws.NewCompatAPI()")
+// Err 结束声明并返回累计错误。
+func (r *Routes) Err() error {
+	if r == nil {
+		return nil
+	}
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
+	}
+	return r.err
 }
 
-func globalCompatAPI(source string) *API {
-	return &API{reg: registry.Global(), fallbackSource: source}
-}
-
-// Gateway 创建一个 GatewayBuilder，用于声明某个 gateway（receiver）在指定 namespace(prefix) 下的事件处理器。
-func (api *API) Gateway(prefix string, gateway any) *GatewayBuilder {
-	return newGatewayBuilder(prefix, gateway, api.reg, api.fallbackSource)
+func (r *Routes) sealCurrent() error {
+	if r == nil || r.current == nil {
+		return nil
+	}
+	b := r.current
+	r.current = nil
+	return b.seal()
 }
 
 // GatewayBuilder 用于构建并注册某个 namespace 下的 gateway 事件处理器声明。
@@ -60,7 +70,7 @@ type GatewayBuilder struct {
 	paramPipes     map[int][]any
 	filters        []any
 	registry       *registry.Registry
-	fallbackSource string
+	routes         *Routes
 	err            error
 }
 
@@ -81,17 +91,14 @@ type HandlerBuilder struct {
 // newGatewayBuilder 构建 GatewayBuilder，并绑定到给定 registry。
 //
 // builder 会收集 handlers 与 AOP 配置，最终在 Build/BuildE 时写入 registry 声明。
-func newGatewayBuilder(prefix string, gateway any, reg *registry.Registry, fallbackSource string) *GatewayBuilder {
-	if reg == nil {
-		reg = registry.Global()
-	}
+func newGatewayBuilder(prefix string, gateway any, routes *Routes) *GatewayBuilder {
 	return &GatewayBuilder{
-		prefix:         prefix,
-		gateway:        gateway,
-		handlers:       make([]*HandlerBuilder, 0),
-		paramPipes:     make(map[int][]any),
-		registry:       reg,
-		fallbackSource: fallbackSource,
+		prefix:     prefix,
+		gateway:    gateway,
+		handlers:   make([]*HandlerBuilder, 0),
+		paramPipes: make(map[int][]any),
+		routes:     routes,
+		registry:   routes.reg,
 	}
 }
 
@@ -156,24 +163,12 @@ func (b *GatewayBuilder) On(event string, handler any) *HandlerBuilder {
 	return h
 }
 
-// Build 构建并注册 handler 声明（不返回错误，错误会存入 b.err，可用 Err() 读取）。
-func (b *GatewayBuilder) Build() []*HandlerDefinition {
-	return b.buildAndRegister()
-}
-
-// BuildE 构建并注册 handler 声明（返回 error）。
-//
-// 这是推荐用法：会先 validate，再写入 registry。
-func (b *GatewayBuilder) BuildE() ([]*HandlerDefinition, error) {
+// seal 把当前 gateway 的 handler 声明写入 registry。
+func (b *GatewayBuilder) seal() error {
 	if err := b.validate(); err != nil {
 		b.err = err
-		return nil, err
+		return err
 	}
-	return b.buildAndRegister(), nil
-}
-
-// buildAndRegister 生成 HandlerDefinition 列表并写入 registry（pluginID=ws, kind=handlers）。
-func (b *GatewayBuilder) buildAndRegister() []*HandlerDefinition {
 	defs := make([]*HandlerDefinition, 0, len(b.handlers))
 	for _, h := range b.handlers {
 		defs = append(defs, h.build(b))
@@ -182,11 +177,10 @@ func (b *GatewayBuilder) buildAndRegister() []*HandlerDefinition {
 	for _, def := range defs {
 		items = append(items, def)
 	}
-	if b.fallbackSource != "" {
-		b.registry.RecordFallbackUsage(b.fallbackSource)
+	if b.registry != nil {
+		b.registry.RegisterDecl(AdapterID, "handlers", items...)
 	}
-	b.registry.RegisterDecl(AdapterID, "handlers", items...)
-	return defs
+	return nil
 }
 
 // Err 返回最近一次 BuildE/validate 产生的错误（若无则为 nil）。
@@ -249,11 +243,6 @@ func (hb *HandlerBuilder) build(gb *GatewayBuilder) *HandlerDefinition {
 	}
 }
 
-// BuildE 代理到 GatewayBuilder.BuildE（便于链式写法从 handler builder 直接触发构建）。
-func (hb *HandlerBuilder) BuildE() ([]*HandlerDefinition, error) {
-	return hb.gatewayBuilder.BuildE()
-}
-
 // On 允许从 handler builder 继续声明下一个事件处理器（与 gRPC/GraphQL DSL 对齐）。
 //
 // 这样可以写成：
@@ -267,14 +256,6 @@ func (hb *HandlerBuilder) On(event string, handler any) *HandlerBuilder {
 		return nil
 	}
 	return hb.gatewayBuilder.On(event, handler)
-}
-
-// Build 代理到 GatewayBuilder.Build，便于链式调用在末尾直接 Build。
-func (hb *HandlerBuilder) Build() []*HandlerDefinition {
-	if hb == nil || hb.gatewayBuilder == nil {
-		return nil
-	}
-	return hb.gatewayBuilder.Build()
 }
 
 // Err 代理到 GatewayBuilder.Err，便于链式调用时读取构建错误。

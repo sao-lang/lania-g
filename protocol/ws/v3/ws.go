@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
+	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 	wsbinding "github.com/sao-lang/lania-g/protocol/ws/v3/binding"
@@ -24,7 +25,7 @@ const AdapterID = "ws"
 
 // Adapter 是 WebSocket(socket.io) 协议的运行期适配器，负责挂载 server 并把事件分发到 runtime.Execute。
 type Adapter struct {
-	api  *API
+	reg  *registry.Registry
 	host adapter.Host
 
 	server  *socket.Server
@@ -72,7 +73,6 @@ func New(addr ...string) *Adapter {
 		server:               s,
 		handler:              s.ServeHandler(opts),
 		path:                 "/socket.io/",
-		api:                  NewCompatAPI(),
 		gatewaysByNS:         make(map[string][]gatewayRef),
 		registeredNamespaces: make(map[string]bool),
 		registeredEvents:     make(map[string]map[string]string),
@@ -86,15 +86,10 @@ func New(addr ...string) *Adapter {
 	return a
 }
 
-// Listen 仅为兼容旧写法保留。
-// Deprecated: 请改用 `ws.New(":addr")`。
-func Listen(addr string) *Adapter { return New(addr) }
+// 
 
 // ID 返回该 adapter 的唯一标识（用于 registry/plugin 分组）。
 func (a *Adapter) ID() string { return AdapterID }
-
-// API 返回该 adapter 暴露给应用侧的 DSL API（用于声明 WS gateway/handlers）。
-func (a *Adapter) API() any { return a.api }
 
 // Plugins 返回该 adapter 参与编译的协议插件列表。
 func (a *Adapter) Plugins() []compiler.ProtocolPlugin {
@@ -109,7 +104,7 @@ func (a *Adapter) Plugins() []compiler.ProtocolPlugin {
 // - 尝试挂载到共享 HTTP listener（如果 host 支持 HTTPMountHost）
 func (a *Adapter) Mount(host adapter.Host) error {
 	a.host = host
-	a.api = NewAPI(host.Registry())
+	a.reg = host.Registry()
 	a.mountedToHTTP = a.tryMountToSharedHTTP(host) == nil
 
 	return nil

@@ -19,11 +19,11 @@ func (c *UserController) Ping() map[string]string {
 	return map[string]string{"ok": "true"}
 }
 
-// Register 声明本控制器的路由。
+// Declare 声明本控制器的路由。
 //
 // 控制器只能通过注册到模块树的 Controllers 槽位生效，
 // 因此路由天然归属于它所在的模块。
-func (c *UserController) Register(r *httpadapter.Routes) {
+func (c *UserController) Declare(r *httpadapter.Routes) {
 	r.Prefix("/users").
 		Get("/ping", c.Ping).
 		Summary("Ping").

@@ -147,8 +147,8 @@ func (c *AuthController) Login(args loginArgs) (any, error) {
 	return map[string]string{"token": "demo-token"}, nil
 }
 
-// Register 声明认证路由。
-func (c *AuthController) Register(r *httpadapter.Routes) {
+// Declare 声明认证路由。
+func (c *AuthController) Declare(r *httpadapter.Routes) {
 	r.Prefix("/auth").
 		Post("/login", c.Login).
 		Summary("Login").
@@ -180,8 +180,8 @@ func (c *UserController) Create(args createUserArgs) (any, error) {
 	return c.Store.CreateUser(args.Body.Value), nil
 }
 
-// Register 声明用户路由。
-func (c *UserController) Register(r *httpadapter.Routes) {
+// Declare 声明用户路由。
+func (c *UserController) Declare(r *httpadapter.Routes) {
 	r.Prefix("/users").
 		UseGuards(requireBearerToken()).
 		Get("", c.List).

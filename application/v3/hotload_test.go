@@ -19,7 +19,7 @@ func (c *hotLoadBaseController) Ping() (string, error) {
 	return "base", nil
 }
 
-func (c *hotLoadBaseController) Register(r *httpadapter.Routes) {
+func (c *hotLoadBaseController) Declare(r *httpadapter.Routes) {
 	r.Prefix("/base").Get("/ping", c.Ping)
 }
 
@@ -29,7 +29,7 @@ func (c *hotLoadExtraController) Ping() (string, error) {
 	return "extra", nil
 }
 
-func (c *hotLoadExtraController) Register(r *httpadapter.Routes) {
+func (c *hotLoadExtraController) Declare(r *httpadapter.Routes) {
 	r.Prefix("/extra").Get("/ping", c.Ping)
 }
 

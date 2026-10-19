@@ -16,6 +16,11 @@ func (g *ChatGateway) Ping() (map[string]string, error) {
 	return map[string]string{"ok": "true"}, nil
 }
 
+// Declare 声明 WS 事件处理器。
+func (g *ChatGateway) Declare(r *wsadapter.Routes) {
+	r.Gateway("/ws/chat").On("ping", g.Ping)
+}
+
 func main() {
 	gateway := &ChatGateway{}
 
@@ -27,13 +32,6 @@ func main() {
 
 	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	wsAPI := wsModule.API()
-	builder := wsAPI.Gateway("/ws/chat", gateway)
-	builder.On("ping", gateway.Ping)
-	if _, err := builder.BuildE(); err != nil {
 		log.Fatal(err)
 	}
 

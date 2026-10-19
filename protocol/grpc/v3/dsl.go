@@ -11,45 +11,53 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
-// Service 提供一个类似 v2 的全局 DSL 兼容入口：
-//
-//	b := grpc.Service("UserService", svc).Method("GetUser", svc.GetUser).Build()
-//
-// 它会把声明写入 `core/registry.Global()`。
-// 新业务代码应优先使用挂载在应用实例上的 `adapter.API()`。
-func Service(name string, receiver any) *ServiceBuilder {
-	return globalCompatAPI("grpc.Service").Service(name, receiver)
+// Controller 由需要声明 gRPC service 的控制器实现。
+type Controller interface {
+	Declare(*Routes)
 }
 
-// API 是 gRPC DSL 对 registry 的轻量封装入口。
-type API struct {
-	reg            *registry.Registry
-	fallbackSource string
+// Routes 收集一个控制器声明的全部 gRPC service。
+//
+// 它是 gRPC 唯一的声明入口：控制器在所属模块内完成注册，无需手动 Build。
+type Routes struct {
+	reg      *registry.Registry
+	receiver any
+	current  *ServiceBuilder
+	err      error
 }
 
-// NewAPI 创建一个 gRPC DSL 入口。
-//
-// 推荐：使用挂载到应用实例后的 adapter API，或显式传入实例级 registry。
-// 兼容：历史上允许 `NewAPI(nil)`，当前等价于 `NewCompatAPI()`。
-func NewAPI(reg *registry.Registry) *API {
-	if reg == nil {
-		return NewCompatAPI()
+func newRoutes(reg *registry.Registry, receiver any) *Routes {
+	return &Routes{reg: reg, receiver: receiver}
+}
+
+// Service 开始声明一个 gRPC service。
+func (r *Routes) Service(name string) *ServiceBuilder {
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
 	}
-	return &API{reg: reg}
+	b := newServiceBuilder(name, r.receiver, r)
+	r.current = b
+	return b
 }
 
-// NewCompatAPI 创建一个显式保留给迁移场景的全局 DSL 入口，不作为新代码默认入口。
-func NewCompatAPI() *API {
-	return globalCompatAPI("grpc.NewCompatAPI()")
+// Err 结束声明并返回累计错误。
+func (r *Routes) Err() error {
+	if r == nil {
+		return nil
+	}
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
+	}
+	return r.err
 }
 
-func globalCompatAPI(source string) *API {
-	return &API{reg: registry.Global(), fallbackSource: source}
-}
-
-// Service 创建一个 gRPC service 声明构建器。
-func (api *API) Service(name string, receiver any) *ServiceBuilder {
-	return newServiceBuilder(name, receiver, api.reg, api.fallbackSource)
+func (r *Routes) sealCurrent() error {
+	if r == nil || r.current == nil {
+		return nil
+	}
+	b := r.current
+	r.current = nil
+	return b.seal()
 }
 
 // ServiceBuilder 用于声明一个 gRPC service 及其共享配置。
@@ -64,7 +72,7 @@ type ServiceBuilder struct {
 	paramPipes     map[int][]any
 	filters        []any
 	registry       *registry.Registry
-	fallbackSource string
+	routes         *Routes
 	sealed         bool
 	mu             sync.RWMutex
 	err            error
@@ -94,17 +102,13 @@ type MethodBuilder struct {
 	filters      []any
 }
 
-func newServiceBuilder(name string, receiver any, reg *registry.Registry, fallbackSource string) *ServiceBuilder {
-	if reg == nil {
-		reg = registry.Global()
-	}
+func newServiceBuilder(name string, receiver any, routes *Routes) *ServiceBuilder {
 	return &ServiceBuilder{
-		service:        name,
-		receiver:       receiver,
-		methods:        make([]*MethodBuilder, 0),
-		paramPipes:     make(map[int][]any),
-		registry:       reg,
-		fallbackSource: fallbackSource,
+		service:    name,
+		receiver:   receiver,
+		methods:    make([]*MethodBuilder, 0),
+		paramPipes: make(map[int][]any),
+		routes:     routes,
 	}
 }
 
@@ -315,21 +319,15 @@ func (mb *MethodBuilder) BidiStreamMethod(method string, handler any) *MethodBui
 	return mb.serviceBuilder.BidiStreamMethod(method, handler)
 }
 
-// Build 返回当前 service 已声明的方法定义。
-func (mb *MethodBuilder) Build() []*MethodDefinition { return mb.serviceBuilder.Build() }
-
-// Build 返回当前 service 收集到的方法定义；忽略构建错误。
-func (b *ServiceBuilder) Build() []*MethodDefinition {
-	defs, _ := b.BuildE()
-	return defs
-}
-
-// BuildE 完成当前 service 的声明收集，并把方法注册进 registry。
-func (b *ServiceBuilder) BuildE() ([]*MethodDefinition, error) {
+// seal 把当前 service 的方法注册进声明仓库。
+func (b *ServiceBuilder) seal() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.sealed {
+		return b.err
+	}
 	if b.err != nil {
-		return nil, b.err
+		return b.err
 	}
 	b.sealed = true
 
@@ -337,22 +335,15 @@ func (b *ServiceBuilder) BuildE() ([]*MethodDefinition, error) {
 	for _, mb := range b.methods {
 		defs = append(defs, mb.build(b))
 	}
-
 	items := make([]any, 0, len(defs))
 	for _, def := range defs {
 		items = append(items, def)
 	}
-	if b.fallbackSource != "" {
-		b.registry.RecordFallbackUsage(b.fallbackSource)
+	if b.routes != nil && b.routes.reg != nil {
+		b.routes.reg.RegisterDecl(AdapterID, "methods", items...)
 	}
-	// registry 中仍然只保存统一的 MethodDefinition 列表；
-	// 后续到底注册成 `MethodDesc` 还是 `StreamDesc`，由 adapter 在启动时再按 mode 分发。
-	b.registry.RegisterDecl(AdapterID, "methods", items...)
-	return defs, nil
+	return nil
 }
-
-// Register 构建并返回当前 service 的方法定义。
-func (b *ServiceBuilder) Register() []*MethodDefinition { return b.Build() }
 
 // Err 返回 service 级 DSL 声明过程中记录的错误。
 func (b *ServiceBuilder) Err() error { return b.err }

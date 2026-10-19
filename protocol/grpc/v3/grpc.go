@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
+	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 	grpcbinding "github.com/sao-lang/lania-g/protocol/grpc/v3/binding"
@@ -24,7 +25,7 @@ import (
 // - 启动和停止底层 grpc.Server
 type Adapter struct {
 	host adapter.Host
-	api  *API
+	reg  *registry.Registry
 
 	addr string
 	opts []grpc.ServerOption
@@ -46,8 +47,7 @@ type Adapter struct {
 func New(addr ...string) *Adapter {
 	a := &Adapter{
 		addr: ":50051",
-		api:  NewCompatAPI(),
-	}
+		}
 	if len(addr) > 0 && strings.TrimSpace(addr[0]) != "" {
 		a.addr = addr[0]
 	}
@@ -72,9 +72,6 @@ func (a *Adapter) ID() string { return AdapterID }
 
 // Plugins 返回 gRPC 协议参与编译的插件列表。
 func (a *Adapter) Plugins() []compiler.ProtocolPlugin { return []compiler.ProtocolPlugin{NewPlugin()} }
-
-// API 返回 gRPC adapter 暴露给应用侧的 DSL API。
-func (a *Adapter) API() any { return a.api }
 
 // WithServerOptions 为内部创建的 `grpc.Server` 追加 server options。
 func (a *Adapter) WithServerOptions(opts ...grpc.ServerOption) *Adapter {
@@ -101,7 +98,7 @@ func (a *Adapter) Mount(host adapter.Host) error {
 		return fmt.Errorf("grpc adapter host is nil")
 	}
 	a.host = host
-	a.api = NewAPI(host.Registry())
+	a.reg = host.Registry()
 	return nil
 }
 

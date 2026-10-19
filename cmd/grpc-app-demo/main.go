@@ -76,6 +76,15 @@ func (s *UserService) Chat(args chatArgs) error {
 	}
 }
 
+// Declare 声明 gRPC service。
+func (s *UserService) Declare(r *grpcadapter.Routes) {
+	r.Service("UserService").
+		Method("Ping", s.Ping).
+		ServerStreamMethod("Watch", s.Watch).
+		ClientStreamMethod("Upload", s.Upload).
+		BidiStreamMethod("Chat", s.Chat)
+}
+
 func main() {
 	userSvc := &UserService{}
 
@@ -89,14 +98,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	grpcAPI := grpcModule.API()
-	builder := grpcAPI.Service("UserService", userSvc)
-	builder.Method("Ping", userSvc.Ping)
-	builder.ServerStreamMethod("Watch", userSvc.Watch)
-	builder.ClientStreamMethod("Upload", userSvc.Upload)
-	builder.BidiStreamMethod("Chat", userSvc.Chat)
-	builder.Build()
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

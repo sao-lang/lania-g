@@ -462,6 +462,20 @@ func (g *ChatGateway) RoomBroadcast(ctx wsbinding.Context) (any, error) {
 	return map[string]any{"sent": true}, nil
 }
 
+// Declare 声明 WS 事件处理器。
+func (g *ChatGateway) Declare(r *wsadapter.Routes) {
+	r.Gateway("/ws/chat").
+		On("auth_register", g.AuthRegister).
+		On("auth_login", g.AuthLogin).
+		On("users_list", g.UsersList).
+		On("users_get", g.UsersGet).
+		On("users_create", g.UsersCreate).
+		On("users_update", g.UsersUpdate).
+		On("users_delete", g.UsersDelete).
+		On("room_join", g.RoomJoin).
+		On("room_broadcast", g.RoomBroadcast)
+}
+
 func main() {
 	store := newMemoryStore()
 	gw := &ChatGateway{}
@@ -483,19 +497,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	wsAPI := wsModule.API()
-	wsAPI.Gateway("/ws/chat", gw).
-		On("auth_register", gw.AuthRegister).
-		On("auth_login", gw.AuthLogin).
-		On("users_list", gw.UsersList).
-		On("users_get", gw.UsersGet).
-		On("users_create", gw.UsersCreate).
-		On("users_update", gw.UsersUpdate).
-		On("users_delete", gw.UsersDelete).
-		On("room_join", gw.RoomJoin).
-		On("room_broadcast", gw.RoomBroadcast).
-		Build()
 
 	// 这里使用全局 interceptor 来演示跨 socket event 的 envelope / 鉴权行为；
 	// `cmd/ws-app-demo` 则是更精简、更偏业务起步的版本。

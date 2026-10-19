@@ -32,7 +32,7 @@ import (
 // 模块加载完成后，协议层会为每个实现了该接口的控制器创建一份 Routes，
 // 并调用 Register。控制器因此始终归属于它所在的模块。
 type Controller interface {
-	Register(*Routes)
+	Declare(*Routes)
 }
 
 // Routes 是唯一的路由声明类型。

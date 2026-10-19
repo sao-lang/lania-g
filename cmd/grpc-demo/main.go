@@ -631,6 +631,30 @@ func (s *StreamService) ChatUsers(args chatUsersArgs) error {
 	}
 }
 
+// Declare 声明全部 gRPC service。
+func (s *AuthService) Declare(r *grpcadapter.Routes) {
+	r.Service("AuthService").
+		Method("Register", s.Register).
+		Method("Login", s.Login)
+}
+
+func (s *UserService) Declare(r *grpcadapter.Routes) {
+	r.Service("UserService").
+		Method("Me", s.Me).
+		Method("List", s.List).
+		Method("Get", s.Get).
+		Method("Create", s.Create).WithReqType((*structpb.Struct)(nil)).
+		Method("Update", s.Update).
+		Method("Delete", s.Delete)
+}
+
+func (s *StreamService) Declare(r *grpcadapter.Routes) {
+	r.Service("StreamService").
+		ServerStreamMethod("WatchUsers", s.WatchUsers).
+		ClientStreamMethod("UploadUsers", s.UploadUsers).
+		BidiStreamMethod("ChatUsers", s.ChatUsers)
+}
+
 func main() {
 	store := newMemoryStore()
 	authSvc := &AuthService{}
@@ -669,27 +693,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	grpcAPI := grpcModule.API()
-	grpcAPI.Service("AuthService", authSvc).
-		Method("Register", authSvc.Register).
-		Method("Login", authSvc.Login).
-		Build()
-
-	grpcAPI.Service("UserService", userSvc).
-		Method("Me", userSvc.Me).
-		Method("List", userSvc.List). // demonstrate grpc composite + tag binding
-		Method("Get", userSvc.Get).
-		Method("Create", userSvc.Create).WithReqType((*structpb.Struct)(nil)).
-		Method("Update", userSvc.Update).
-		Method("Delete", userSvc.Delete).
-		Build()
-
-	grpcAPI.Service("StreamService", streamSvc).
-		ServerStreamMethod("WatchUsers", streamSvc.WatchUsers).
-		ClientStreamMethod("UploadUsers", streamSvc.UploadUsers).
-		BidiStreamMethod("ChatUsers", streamSvc.ChatUsers).
-		Build()
 
 	// 这里保留全局 interceptor，用来在一个文件里同时演示鉴权与响应整形；
 	// 它会刻意比业务 app demo 更偏高级能力展示。

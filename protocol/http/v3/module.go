@@ -102,7 +102,7 @@ func (m *httpModule) Declare(root *module.ModuleRef) error {
 				continue
 			}
 			routes := newRoutes(reg, instance)
-			declarer.Register(routes)
+			declarer.Declare(routes)
 			defs, err := routes.Defs()
 			if err != nil {
 				errs = append(errs, err)
