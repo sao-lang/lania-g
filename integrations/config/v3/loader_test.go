@@ -28,8 +28,3 @@ func TestLoad_ReadsConfigIntoStruct(t *testing.T) {
 	}
 }
 
-func TestMustLoad_CompatibilityAlias(t *testing.T) {
-	if err := MustLoad("", fileLoadConfig{}); err == nil {
-		t.Fatalf("MustLoad: want error for invalid target")
-	}
-}

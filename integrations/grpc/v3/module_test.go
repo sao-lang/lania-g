@@ -4,13 +4,8 @@ import (
 	stdctx "context"
 	"io"
 	"net"
-	"reflect"
-	"strings"
 	"testing"
 
-	coredi "github.com/sao-lang/lania-g/kernel/v3/di"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
-	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 
 	gogrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
@@ -91,108 +86,6 @@ func newStreamTestConfig(t *testing.T) (Config, func()) {
 		_ = listener.Close()
 	}
 	return cfg, cleanup
-}
-
-func TestForRoot_RegistersGRPCClientConnFactoryAndConfig(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	cfg, cleanup := newTestConfig(t)
-	defer cleanup()
-
-	mod, err := ForRoot(cfg)
-	if err != nil {
-		t.Fatalf("for root: %v", err)
-	}
-	mod.(interface{ SetRegistry(*registry.Registry) }).SetRegistry(registry.Global())
-	if err := mod.Init(); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-	defer mod.Destroy()
-
-	client, err := coredi.GetByType[*Client](mod.Container())
-	if err != nil {
-		t.Fatalf("get client: %v", err)
-	}
-	if client.Conn() == nil {
-		t.Fatalf("conn is nil")
-	}
-
-	conn, err := coredi.GetByType[*gogrpc.ClientConn](mod.Container())
-	if err != nil {
-		t.Fatalf("get conn: %v", err)
-	}
-	if conn != client.Conn() {
-		t.Fatalf("conn mismatch")
-	}
-
-	br := runtime.NewBindingRegistry()
-	for _, resolver := range registry.Global().GetBindings() {
-		br.Register(resolver)
-	}
-	ctx := runtime.NewHandlerContext("test")
-	ctx.WithContext(stdctx.Background())
-	ctx.Container = mod.Container().NewChild()
-
-	value, err := br.Resolve(ctx, nil, reflect.TypeFor[*Client](), 0)
-	if err != nil {
-		t.Fatalf("resolve client: %v", err)
-	}
-	if value.(*Client) != client {
-		t.Fatalf("resolved client mismatch")
-	}
-
-	factoryToken := reflect.TypeFor[Factory]()
-	factoryValue, err := br.Resolve(ctx, nil, factoryToken, 1)
-	if err != nil {
-		t.Fatalf("resolve factory: %v", err)
-	}
-	factory := factoryValue.(Factory)
-	derived, err := factory.New(cfg)
-	if err != nil {
-		t.Fatalf("new client: %v", err)
-	}
-	defer derived.Close()
-	if derived.Conn() == nil {
-		t.Fatalf("derived conn nil")
-	}
-}
-
-func TestForRoot_InitRequiresExplicitRegistry(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	cfg, cleanup := newTestConfig(t)
-	defer cleanup()
-
-	mod, err := ForRoot(cfg)
-	if err != nil {
-		t.Fatalf("for root: %v", err)
-	}
-	if err := mod.Init(); err == nil {
-		t.Fatalf("expected missing registry error")
-	} else if !strings.Contains(err.Error(), "requires an explicit registry") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestForRootCompat_InitRoutesToCompatFallbackSource(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	cfg, cleanup := newTestConfig(t)
-	defer cleanup()
-
-	mod, err := ForRootCompat(cfg)
-	if err != nil {
-		t.Fatalf("for root compat: %v", err)
-	}
-	if err := mod.Init(); err != nil {
-		t.Fatalf("init compat module: %v", err)
-	}
-	if got := registry.Global().SnapshotFallbackUsage()["integrations/grpc.ForRootCompat"]; got != 1 {
-		t.Fatalf("fallback usage = %d, want 1", got)
-	}
 }
 
 func TestClient_NewStream(t *testing.T) {

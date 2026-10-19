@@ -2,8 +2,6 @@ package otel
 
 import (
 	"context"
-	"reflect"
-	"strings"
 	"testing"
 
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -11,8 +9,6 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
-	"github.com/sao-lang/lania-g/application/v3/factory"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 	"github.com/sao-lang/lania-g/integrations/logger/v3"
 )
@@ -24,58 +20,6 @@ func (auditTelemetry) TelemetryName() string { return "audit" }
 type otelTestHandler struct{}
 
 func (h *otelTestHandler) Handle() string { return "pong" }
-
-func TestForRoot_RegistersTelemetryFactoryAndBindings(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	reader := sdkmetric.NewManualReader()
-	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	tracerProvider := sdktrace.NewTracerProvider()
-
-	mod, err := ForRoot(Config{
-		Name:           "audit",
-		ServiceName:    "svc-audit",
-		MeterProvider:  meterProvider,
-		TracerProvider: tracerProvider,
-	})
-	if err != nil {
-		t.Fatalf("for root: %v", err)
-	}
-	mod.(interface{ SetRegistry(*registry.Registry) }).SetRegistry(registry.Global())
-	if err := mod.Init(); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-
-	telemetryAny, err := mod.Container().Get(reflect.TypeFor[*Telemetry]())
-	if err != nil {
-		t.Fatalf("get telemetry: %v", err)
-	}
-	telemetry := telemetryAny.(*Telemetry)
-	if telemetry.Config().ServiceName != "svc-audit" {
-		t.Fatalf("service name = %q", telemetry.Config().ServiceName)
-	}
-
-	br := runtime.NewBindingRegistry()
-	for _, resolver := range registry.Global().GetBindings() {
-		br.Register(resolver)
-	}
-	ctx := runtime.NewHandlerContext("test")
-	ctx.Container = mod.Container().NewChild()
-
-	refType := reflect.TypeOf(TelemetryRef[auditTelemetry]{})
-	handler := &runtime.Handler{
-		Meta: &runtime.HandlerMeta{ParamPlans: []runtime.ParamPlan{{Index: 0, Type: refType}}},
-	}
-	value, err := br.Resolve(ctx, handler, refType, 0)
-	if err != nil {
-		t.Fatalf("resolve telemetry ref: %v", err)
-	}
-	ref := value.(TelemetryRef[auditTelemetry])
-	if ref.Telemetry == nil || ref.Config().Name != "audit" {
-		t.Fatalf("resolved telemetry ref invalid")
-	}
-}
 
 func TestMiddlewareAndInterceptor_PropagateTraceAndMetrics(t *testing.T) {
 	reader := sdkmetric.NewManualReader()
@@ -152,78 +96,6 @@ func TestMiddlewareAndInterceptor_PropagateTraceAndMetrics(t *testing.T) {
 	}
 }
 
-func TestBindings_ResolveTraceContextAndRequestID(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	mod, err := ForRoot(Config{})
-	if err != nil {
-		t.Fatalf("for root: %v", err)
-	}
-	mod.(interface{ SetRegistry(*registry.Registry) }).SetRegistry(registry.Global())
-	if err := mod.Init(); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-
-	br := runtime.NewBindingRegistry()
-	for _, resolver := range registry.Global().GetBindings() {
-		br.Register(resolver)
-	}
-
-	ctx := runtime.NewHandlerContext("http")
-	ctx.Container = mod.Container().NewChild()
-	ctx.Set(MetadataKeyTraceContext, TraceContext{
-		TraceID:   "trace-1",
-		SpanID:    "span-1",
-		RequestID: "req-1",
-	})
-
-	traceType := reflect.TypeOf(InjectTraceContext{})
-	traceValue, err := br.Resolve(ctx, nil, traceType, 0)
-	if err != nil {
-		t.Fatalf("resolve trace context: %v", err)
-	}
-	traceCtx := traceValue.(InjectTraceContext)
-	if traceCtx.TraceID != "trace-1" || traceCtx.RequestID != "req-1" {
-		t.Fatalf("trace context = %+v", traceCtx.TraceContext)
-	}
-
-	requestType := reflect.TypeOf(InjectRequestID{})
-	requestValue, err := br.Resolve(ctx, nil, requestType, 1)
-	if err != nil {
-		t.Fatalf("resolve request id: %v", err)
-	}
-	requestID := requestValue.(InjectRequestID)
-	if requestID.Value != "req-1" {
-		t.Fatalf("request id = %q", requestID.Value)
-	}
-}
-
-func TestInstallHelpers(t *testing.T) {
-	reader := sdkmetric.NewManualReader()
-	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	tracerProvider := sdktrace.NewTracerProvider()
-	telemetry, err := New(Config{
-		ServiceName:    "svc-otel",
-		MeterProvider:  meterProvider,
-		TracerProvider: tracerProvider,
-	})
-	if err != nil {
-		t.Fatalf("new telemetry: %v", err)
-	}
-
-	app := &installTarget{}
-	Install(app, telemetry)
-	if app.middlewareCount != 1 || app.interceptorCount != 1 {
-		t.Fatalf("application install counts = %d/%d", app.middlewareCount, app.interceptorCount)
-	}
-
-	f := factory.New()
-	if err := InstallOnFactory(f, telemetry); err != nil {
-		t.Fatalf("install on factory: %v", err)
-	}
-}
-
 type testLogger struct{}
 
 type installTarget struct {
@@ -273,33 +145,3 @@ func requestCount(rm metricdata.ResourceMetrics, metricName string) int64 {
 	return 0
 }
 
-func TestForRoot_InitRequiresExplicitRegistry(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	mod, err := ForRoot(Config{})
-	if err != nil {
-		t.Fatalf("for root: %v", err)
-	}
-	if err := mod.Init(); err == nil {
-		t.Fatalf("expected missing registry error")
-	} else if !strings.Contains(err.Error(), "requires an explicit registry") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestForRootCompat_InitRoutesToCompatFallbackSource(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	mod, err := ForRootCompat(Config{})
-	if err != nil {
-		t.Fatalf("for root compat: %v", err)
-	}
-	if err := mod.Init(); err != nil {
-		t.Fatalf("init compat module: %v", err)
-	}
-	if got := registry.Global().SnapshotFallbackUsage()["integrations/otel.ForRootCompat"]; got != 1 {
-		t.Fatalf("fallback usage = %d, want 1", got)
-	}
-}

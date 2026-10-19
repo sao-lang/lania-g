@@ -3,92 +3,13 @@ package kafka
 import (
 	stdctx "context"
 	"errors"
-	"reflect"
-	"strings"
 	"sync/atomic"
 	"testing"
 
 	mqadapter "github.com/sao-lang/lania-g/protocol/mq/v3"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
-	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 
 	kgo "github.com/segmentio/kafka-go"
 )
-
-func TestForRoot_RegistersProvidersAndBindings(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	mod, err := ForRoot(Config{Brokers: []string{"127.0.0.1:9092"}})
-	if err != nil {
-		t.Fatalf("for root: %v", err)
-	}
-	mod.(interface{ SetRegistry(*registry.Registry) }).SetRegistry(registry.Global())
-	if err := mod.Init(); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-
-	clientToken := reflect.TypeFor[*Client]()
-	configPtrToken := reflect.TypeFor[*Config]()
-	readerFactoryToken := reflect.TypeFor[ReaderFactory]()
-	writerFactoryToken := reflect.TypeFor[WriterFactory]()
-	factoryToken := reflect.TypeFor[Factory]()
-
-	clientAny, err := mod.Container().Get(clientToken)
-	if err != nil {
-		t.Fatalf("get client: %v", err)
-	}
-	client := clientAny.(*Client)
-	if len(client.Brokers()) != 1 || client.Brokers()[0] != "127.0.0.1:9092" {
-		t.Fatalf("brokers=%v", client.Brokers())
-	}
-
-	configAny, err := mod.Container().Get(configPtrToken)
-	if err != nil {
-		t.Fatalf("get config ptr: %v", err)
-	}
-	if got := configAny.(*Config).Brokers[0]; got != "127.0.0.1:9092" {
-		t.Fatalf("config brokers=%s", got)
-	}
-
-	if _, err := mod.Container().Get(readerFactoryToken); err != nil {
-		t.Fatalf("get reader factory: %v", err)
-	}
-	if _, err := mod.Container().Get(writerFactoryToken); err != nil {
-		t.Fatalf("get writer factory: %v", err)
-	}
-	if _, err := mod.Container().Get(factoryToken); err != nil {
-		t.Fatalf("get factory: %v", err)
-	}
-
-	br := runtime.NewBindingRegistry()
-	for _, resolver := range registry.Global().GetBindings() {
-		br.Register(resolver)
-	}
-	ctx := runtime.NewHandlerContext("test")
-	ctx.WithContext(stdctx.Background())
-	ctx.Container = mod.Container().NewChild()
-
-	value, err := br.Resolve(ctx, nil, clientToken, 0)
-	if err != nil {
-		t.Fatalf("resolve client binding: %v", err)
-	}
-	if value.(*Client) != client {
-		t.Fatalf("resolved client mismatch")
-	}
-
-	factoryValue, err := br.Resolve(ctx, nil, factoryToken, 1)
-	if err != nil {
-		t.Fatalf("resolve factory binding: %v", err)
-	}
-	derived, err := factoryValue.(Factory).New(Config{Brokers: []string{"127.0.0.1:9092"}})
-	if err != nil {
-		t.Fatalf("factory new: %v", err)
-	}
-	if derived == nil || len(derived.Brokers()) != 1 {
-		t.Fatalf("derived invalid")
-	}
-}
 
 func TestClient_NewReaderAndWriterApplyDefaults(t *testing.T) {
 	client, err := NewClient(Config{Brokers: []string{"127.0.0.1:9092"}})
@@ -112,41 +33,6 @@ func TestClient_NewReaderAndWriterApplyDefaults(t *testing.T) {
 type analyticsKafkaClient struct{}
 
 func (analyticsKafkaClient) KafkaClientName() string { return "analytics" }
-
-func TestBindings_ResolveNamedClientRef(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	mod, err := ForRoot(Config{Name: "analytics", Brokers: []string{"127.0.0.1:9092"}})
-	if err != nil {
-		t.Fatalf("for root: %v", err)
-	}
-	mod.(interface{ SetRegistry(*registry.Registry) }).SetRegistry(registry.Global())
-	if err := mod.Init(); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-
-	br := runtime.NewBindingRegistry()
-	for _, resolver := range registry.Global().GetBindings() {
-		br.Register(resolver)
-	}
-	ctx := runtime.NewHandlerContext("test")
-	ctx.WithContext(stdctx.Background())
-	ctx.Container = mod.Container().NewChild()
-
-	refType := reflect.TypeOf(ClientRef[analyticsKafkaClient]{})
-	handler := &runtime.Handler{
-		Meta: &runtime.HandlerMeta{ParamPlans: []runtime.ParamPlan{{Index: 0, Type: refType}}},
-	}
-	value, err := br.Resolve(ctx, handler, refType, 0)
-	if err != nil {
-		t.Fatalf("resolve kafka ref: %v", err)
-	}
-	ref := value.(ClientRef[analyticsKafkaClient])
-	if len(ref.Brokers()) != 1 || ref.Brokers()[0] != "127.0.0.1:9092" {
-		t.Fatalf("brokers=%v", ref.Brokers())
-	}
-}
 
 type fakeWriter struct {
 	calls    atomic.Int32
@@ -257,33 +143,3 @@ func TestProducer_PublishValueAndConsumerConfigFromMQ(t *testing.T) {
 	}
 }
 
-func TestForRoot_InitRequiresExplicitRegistry(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	mod, err := ForRoot(Config{Brokers: []string{"127.0.0.1:9092"}})
-	if err != nil {
-		t.Fatalf("for root: %v", err)
-	}
-	if err := mod.Init(); err == nil {
-		t.Fatalf("expected missing registry error")
-	} else if !strings.Contains(err.Error(), "requires an explicit registry") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestForRootCompat_InitRoutesToCompatFallbackSource(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
-
-	mod, err := ForRootCompat(Config{Brokers: []string{"127.0.0.1:9092"}})
-	if err != nil {
-		t.Fatalf("for root compat: %v", err)
-	}
-	if err := mod.Init(); err != nil {
-		t.Fatalf("init compat module: %v", err)
-	}
-	if got := registry.Global().SnapshotFallbackUsage()["integrations/kafka.ForRootCompat"]; got != 1 {
-		t.Fatalf("fallback usage = %d, want 1", got)
-	}
-}

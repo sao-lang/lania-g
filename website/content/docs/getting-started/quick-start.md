@@ -9,16 +9,17 @@ next: /docs/getting-started/project-structure
 
 ## 1. 写业务代码
 
-`lania-g` 不要求嵌入特定基类，普通 Go struct + 方法就是 Controller：
+`lania-g` 不要求嵌入特定基类，普通 Go struct + 方法就是 Controller。
+路由声明写在控制器自己的 `Register` 方法里：
 
 ```go
 package main
 
 import (
+	"log"
 	"os"
 
-	"github.com/sao-lang/lania-g/application/v3"
-	"github.com/sao-lang/lania-g/cmd/internal/addr"
+	application "github.com/sao-lang/lania-g/application/v3"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	httpadapter "github.com/sao-lang/lania-g/protocol/http/v3"
 )
@@ -29,41 +30,33 @@ func (c *UserController) Ping() map[string]string {
 	return map[string]string{"ok": "true"}
 }
 
+// Register 等价于 NestJS 的 @Controller + @Get 元数据块。
+func (c *UserController) Register(r *httpadapter.Routes) {
+	r.Prefix("/users").
+		Get("/ping", c.Ping).
+		Summary("Ping").
+		Tags("users")
+}
+
 func main() {
-	ctrl := &UserController{}
+	// 1) 根模块是唯一的装配入口
+	root := module.New(module.Metadata{
+		Imports: []module.Module{
+			// 2) 协议也是模块
+			httpadapter.Module(httpadapter.Config{Addr: ":8080"}),
+		},
+		Controllers: []any{&UserController{}},
+	})
 
-	// 1) 把 Controller 放进模块的 controllers 槽位
-	root := module.CreateModule(nil, nil, []any{ctrl}, nil, nil)
-
-	// 2) 创建 HTTP adapter（共享监听模式）
-	httpAdapter := httpadapter.New()
-
-	// 3) 装配应用：显式注入实例级 Registry
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        application.NewRegistry(),
-		StartupReporter: os.Stdout,
-	}, httpAdapter)
+	// 3) 一个构造入口
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	// 4) 用 DSL 声明路由
-	httpAPI := httpAdapter.API().(*httpadapter.API)
-	builder := httpAPI.Controller("/users", ctrl)
-	builder.Get("/ping", ctrl.Ping)
-	if _, err := builder.BuildE(); err != nil {
-		panic(err)
-	}
-
-	// 5) 启动前诊断 + 监听
-	if _, err := app.CompileDiagnostics(); err != nil {
-		panic(err)
-	}
-	if _, err := app.StartupReport(); err != nil {
-		panic(err)
-	}
-	if err := app.Listen(addr.HTTP(":8080")); err != nil {
-		panic(err)
+	// 4) 一个运行入口：编译、启动、阻塞
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
 	}
 }
 ```
@@ -84,14 +77,14 @@ curl http://127.0.0.1:18080/users/ping
 
 | 步骤 | 作用 | 相关章节 |
 |------|------|----------|
-| `module.CreateModule` | 声明模块树、providers、controllers | [Module](../core-concepts/module) |
-| `httpadapter.New()` | 注册 HTTP 协议插件与 transport | [HTTP](../protocols/http) |
-| `NewWithOptions` | 加载模块、构建容器树、挂载 adapter | [依赖注入](../core-concepts/di) |
-| DSL `Controller(...).Get(...)` | 把路由声明写入 Registry | [编译与执行](../core-concepts/compile-runtime) |
-| `CompileDiagnostics` + `Listen` | 编译声明、安装到 Runtime、开始监听 | [编译与执行](../core-concepts/compile-runtime) |
+| `module.New(Metadata)` | 声明模块树、providers、controllers、AOP | [Module](../core-concepts/module) |
+| `httpadapter.Module(Config)` | 把 HTTP 适配器装配成模块 | [HTTP](../protocols/http) |
+| `Controller.Register(*Routes)` | 在控制器内声明路由，归属所在模块 | [编译与执行](../core-concepts/compile-runtime) |
+| `application.New` | 加载模块树、发现并挂载适配器 | [依赖注入](../core-concepts/di) |
+| `app.Run()` | 声明阶段 → 编译 → 启动 → 阻塞 | [编译与执行](../core-concepts/compile-runtime) |
 
 {{< callout type="info" >}}
-`app.Listen(addr)` 会阻塞直到 `app.Stop()` 被调用，符合"长驻服务"直觉。
+`app.Run()` 会阻塞直到 `app.Stop()` 被调用；监听地址来自 `http.Config{Addr}`。
 {{< /callout >}}
 
 ## 4. 下一步

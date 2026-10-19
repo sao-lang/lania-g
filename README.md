@@ -92,6 +92,9 @@ lania-g/
 package main
 
 import (
+	"log"
+	"os"
+
 	application "github.com/sao-lang/lania-g/application/v3"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	httpprotocol "github.com/sao-lang/lania-g/protocol/http/v3"
@@ -103,33 +106,25 @@ func (c *UserController) Ping() map[string]string {
 	return map[string]string{"ok": "true"}
 }
 
+// Register 声明控制器路由；控制器在哪个模块，路由就属于哪个模块。
+func (c *UserController) Register(r *httpprotocol.Routes) {
+	r.Prefix("/users").Get("/ping", c.Ping).Summary("Ping").Tags("users")
+}
+
 func main() {
-	ctrl := &UserController{}
-	root := module.CreateModule(nil, nil, []interface{}{ctrl}, nil, nil)
+	root := module.New(module.Metadata{
+		Imports: []module.Module{
+			httpprotocol.Module(httpprotocol.Config{Addr: ":8080"}),
+		},
+		Controllers: []any{&UserController{}},
+	})
 
-	httpModule := httpprotocol.New()
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry: application.NewRegistry(),
-	}, httpModule)
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-
-	httpAPI := httpModule.API().(*httpprotocol.API)
-	builder := httpAPI.Controller("/users", ctrl)
-	builder.Get("/ping", ctrl.Ping)
-	if _, err := builder.BuildE(); err != nil {
-		panic(err)
-	}
-
-	if _, err := app.CompileDiagnostics(); err != nil {
-		panic(err)
-	}
-	if _, err := app.StartupReport(); err != nil {
-		panic(err)
-	}
-	if err := app.Listen(":8080"); err != nil {
-		panic(err)
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
 	}
 }
 ```
@@ -144,11 +139,11 @@ cd integrations/logger/v3 && go test ./...
 
 ## 推荐接入路径
 
-1. 使用 `application/v3` 创建应用实例
-2. 使用 `kernel/v3/module` 组织根模块与 imports/providers/controllers
-3. 按需挂载协议模块，如 `protocol/http/v3`
-4. 按需引入 integrations，如 `integrations/logger/v3`、`integrations/orm/v3`
-5. 启动前执行 `CompileDiagnostics()` 与 `StartupReport()` 做诊断
+1. 用 `module.New(module.Metadata{...})` 定义根模块（唯一装配入口）
+2. 协议以模块形式放进 `Imports`，如 `http.Module(http.Config{Addr: ":8080"})`
+3. 控制器实现 `Register(*Routes)` / `Subscribe(*Routes)` 在模块内声明路由与订阅
+4. 集成同样以模块形式接入，如 `logger.Module(...)`、`orm.Module(...)`
+5. 启动只需 `application.New(root, opts)` + `app.Run()`；编译与诊断在内部完成
 
 ## 文档站
 
