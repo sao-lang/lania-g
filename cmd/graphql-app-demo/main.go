@@ -5,6 +5,7 @@ import (
 
 	graphqladapter "github.com/sao-lang/lania-g/protocol/graphql/v3"
 	"github.com/sao-lang/lania-g/application/v3"
+	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 )
 
@@ -20,7 +21,7 @@ func main() {
 	// GraphQL 的 owner 推导依赖 module resolvers 槽位。
 	root := module.CreateModule(nil, nil, nil, []any{query}, nil)
 
-	gqlAdapter := graphqladapter.New(":8080").WithPlayground(true)
+	gqlAdapter := graphqladapter.New(addr.HTTP(":8080")).WithPlayground(true)
 	app, err := application.NewWithOptions(root, application.Options{
 		Registry:        application.NewRegistry(),
 		StartupReporter: os.Stdout,

@@ -31,6 +31,8 @@ func writeHTTPError(w http.ResponseWriter, r *http.Request, ctx *runtime.Handler
 	switch {
 	case kerr.Kind == kerrors.KindRouteNotFound:
 		status = http.StatusNotFound
+	case kerr.Kind == kerrors.KindUnauthorized:
+		status = http.StatusUnauthorized
 	case kerr.Kind == kerrors.KindForbidden:
 		status = http.StatusForbidden
 	case kerr.Kind == kerrors.KindBinding,

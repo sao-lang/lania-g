@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sao-lang/lania-g/application/v3"
+	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
@@ -21,6 +22,7 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 	grpcadapter "github.com/sao-lang/lania-g/protocol/grpc/v3"
 	grpcbinding "github.com/sao-lang/lania-g/protocol/grpc/v3/binding"
+	"github.com/sao-lang/lania-g/protocol/grpc/v3/grpcvalue"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -218,7 +220,7 @@ func envelopeFail(code int, msg string) *structpb.Struct {
 }
 
 func mustStruct(m map[string]any) *structpb.Struct {
-	s, err := structpb.NewStruct(m)
+	s, err := grpcvalue.ToStruct(m)
 	if err != nil {
 		// 演示代码里如果遇到意外的序列化错误，会直接提前 panic。
 		panic(err)
@@ -661,7 +663,7 @@ func main() {
 	server := grpc.NewServer()
 	reflection.Register(server)
 
-	grpcAdp := grpcadapter.New(":50051").WithServer(server)
+	grpcAdp := grpcadapter.New(addr.GRPC(":50051")).WithServer(server)
 	app, err := application.NewWithOptions(root, application.Options{
 		Registry:        registry.New(),
 		StartupReporter: os.Stdout,

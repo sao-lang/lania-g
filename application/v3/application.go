@@ -7,6 +7,7 @@ package application
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
@@ -39,6 +40,9 @@ type Application struct {
 	plugins         []compiler.ProtocolPlugin
 	startupReporter io.Writer
 	bootstrapped    bool
+
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // Options 描述创建 Application 时的基础选项。
@@ -105,6 +109,7 @@ func newWithOptions(root module.Module, opts Options, explicitCompat bool, adapt
 		adapters:        make(map[string]adapter.Adapter),
 		adapterList:     make([]adapter.Adapter, 0),
 		startupReporter: opts.StartupReporter,
+		stopCh:          make(chan struct{}),
 	}
 
 	for _, adp := range adapters {

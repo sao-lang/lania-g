@@ -5,6 +5,7 @@ import (
 
 	wsadapter "github.com/sao-lang/lania-g/protocol/ws/v3"
 	"github.com/sao-lang/lania-g/application/v3"
+	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 )
 
@@ -20,7 +21,7 @@ func main() {
 	// WS 的 owner 推导依赖 module controllers 槽位。
 	root := module.CreateModule(nil, nil, []any{gateway}, nil, nil)
 
-	wsAdapter := wsadapter.New(":8080")
+	wsAdapter := wsadapter.New(addr.HTTP(":8080"))
 	app, err := application.NewWithOptions(root, application.Options{
 		Registry:        application.NewRegistry(),
 		StartupReporter: os.Stdout,

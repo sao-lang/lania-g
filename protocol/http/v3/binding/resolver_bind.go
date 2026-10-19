@@ -29,12 +29,8 @@ func resolveAutoStruct(ctx *runtime.HandlerContext, desc runtime.WrapperDescript
 
 	// validator 是 adapter 在请求入口按需注入的可选能力。
 	// 这里放在 BindInto 之后执行，保证校验面对的是已经完成字段映射的对象。
-	if vAny, ok := ctx.Get(MetadataKeyValidator); ok && vAny != nil {
-		if v, ok := vAny.(Validator); ok && v != nil {
-			if err := v.Validate(outPtr.Interface()); err != nil {
-				return nil, err
-			}
-		}
+	if err := validateBoundValue(ctx, outPtr.Interface()); err != nil {
+		return nil, err
 	}
 
 	if ptr {
@@ -52,6 +48,13 @@ func resolveBody(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor) (a
 	value, err := decodeTo(desc.InnerType, raw)
 	if err != nil {
 		return nil, err
+	}
+	// Body[T] 的 T 通常是带 `validate:"..."` 标签的 DTO；
+	// 直接使用 Body[T] 或把它放进 CompositeStruct 时都必须执行校验。
+	if value.IsValid() {
+		if err := validateBoundValue(ctx, value.Interface()); err != nil {
+			return nil, err
+		}
 	}
 	return wrapValue(desc.WrapperType, value), nil
 }
@@ -78,6 +81,34 @@ func resolveMustBind(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor
 		return nil, err
 	}
 	return wrapValue(desc.WrapperType, value), nil
+}
+
+// validateBoundValue 执行 adapter 注入的结构体校验器（若存在）。
+// 只对 struct / *struct 生效，标量 wrapper（如 Query[int]）会被跳过。
+func validateBoundValue(ctx *runtime.HandlerContext, obj any) error {
+	if ctx == nil || obj == nil {
+		return nil
+	}
+	vAny, ok := ctx.Get(MetadataKeyValidator)
+	if !ok || vAny == nil {
+		return nil
+	}
+	validator, ok := vAny.(Validator)
+	if !ok || validator == nil {
+		return nil
+	}
+
+	rv := reflect.ValueOf(obj)
+	for rv.IsValid() && rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+	if !rv.IsValid() || rv.Kind() != reflect.Struct {
+		return nil
+	}
+	return validator.Validate(obj)
 }
 
 // buildBoundValue 支撑 `Bind[T]` / `MustBind[T]`：
@@ -123,12 +154,8 @@ func buildBoundValue(ctx *runtime.HandlerContext, inner reflect.Type, must bool)
 		return reflect.Value{}, fmt.Errorf("missing request body")
 	}
 
-	if vAny, ok := ctx.Get(MetadataKeyValidator); ok && vAny != nil {
-		if v, ok := vAny.(Validator); ok {
-			if err := v.Validate(uValPtr.Interface()); err != nil {
-				return reflect.Value{}, err
-			}
-		}
+	if err := validateBoundValue(ctx, uValPtr.Interface()); err != nil {
+		return reflect.Value{}, err
 	}
 
 	var uValue reflect.Value

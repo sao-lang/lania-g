@@ -2,12 +2,30 @@
 
 `cmd/` 下的示例用于展示多协议能力、调试方式和框架扩展场景。
 
+## 端口配置
+
+所有示例都支持环境变量覆盖监听地址，无需改代码：
+
+| 变量 | 适用示例 | 说明 |
+|------|----------|------|
+| `PORT` | 全部 | 只写数字（如 `PORT=18080`）会自动补成 `:18080` |
+| `APP_ADDR` | HTTP / WS / GraphQL | 优先级高于 `PORT`，可写 `:18080` 或 `127.0.0.1:18080` |
+| `GRPC_ADDR` | gRPC | 优先级高于 `PORT` |
+
+```powershell
+$env:PORT='18080'; go run ./http-demo
+$env:GRPC_ADDR=':19051'; go run ./grpc-demo
+```
+
+## 示例分类
+
 请按以下方式理解这些示例：
 
 - `cmd/http-app-demo` 是业务接入示例，推荐作为最小 HTTP 应用骨架参考
 - `cmd/graphql-app-demo` 是业务接入示例，推荐作为最小 GraphQL 应用骨架参考
 - `cmd/ws-app-demo` 是业务接入示例，推荐作为最小 WebSocket 应用骨架参考
 - `cmd/grpc-app-demo` 是业务接入示例，推荐作为最小 gRPC 应用骨架参考；当前 unary 和 streaming 也统一采用 `CompositeStruct` 风格
+- `cmd/ws-app-demo` / `cmd/ws-demo` 使用 Socket.IO v4 协议（Engine.IO v4），客户端请使用 `socket.io-client` v4
 - `cmd/*-demo` 主要是能力演示与高级示例
 - 这些示例可能会直接使用部分内部基础设施包，以便展示框架机制
 - 业务应用初始化时，不建议直接把这些 demo 作为生产骨架复制
@@ -111,3 +129,5 @@ EOF
 - `AuthService/*` 和 `StreamService/*` 为公开演示接口，不需要额外认证
 - `UserService/*` 需要先通过 `AuthService/Login` 获取 token，再通过 `Authorization` header 传入
 - `grpc-demo` 使用的是 `google.protobuf.Struct` 作为消息体，因此 `grpcurl` 可以直接用 JSON 传参
+- `UserService/Me` 没有请求消息字段，编译期会自动使用 `google.protobuf.Empty` 作为请求类型
+- 业务 handler 可以直接返回 JSON 友好的 Go 值，框架会通过 `grpcvalue.ToMessage` 转换成 `Struct`

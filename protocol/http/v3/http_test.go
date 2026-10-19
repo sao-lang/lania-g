@@ -12,8 +12,10 @@ import (
 	"testing"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
+	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
+	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
@@ -110,6 +112,59 @@ func TestAdapter_ValidatorV10_Email(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"kind":"Validation"`) {
 		t.Fatalf("unexpected response body: %s", rec.Body.String())
+	}
+}
+
+type bodyValidateCtrl struct{}
+
+func (c *bodyValidateCtrl) Direct(args httpbinding.Body[validateDTO]) (any, error) {
+	return map[string]any{"email": args.Value.Email}, nil
+}
+
+func (c *bodyValidateCtrl) Composite(args struct {
+	Ctx  httpbinding.Context
+	Body httpbinding.Body[validateDTO]
+}) (any, error) {
+	return map[string]any{"email": args.Body.Value.Email}, nil
+}
+
+func TestAdapter_ValidatorV10_BodyWrapper(t *testing.T) {
+	a := New().WithValidatorV10()
+	rt := runtime.NewRuntime()
+	reg := registry.New()
+	if err := a.Mount(&fakeHost{rt: rt, reg: reg}); err != nil {
+		t.Fatalf("mount: %v", err)
+	}
+	httpbinding.RegisterDefaults(rt)
+	registerHandler(t, rt, http.MethodPost, "/body", &bodyValidateCtrl{}, "Direct")
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/body", strings.NewReader(`{"email":"not-an-email"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	a.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
+func TestAdapter_ValidatorV10_CompositeBodyWrapper(t *testing.T) {
+	a := New().WithValidatorV10()
+	rt := runtime.NewRuntime()
+	reg := registry.New()
+	if err := a.Mount(&fakeHost{rt: rt, reg: reg}); err != nil {
+		t.Fatalf("mount: %v", err)
+	}
+	httpbinding.RegisterDefaults(rt)
+	registerHandler(t, rt, http.MethodPost, "/composite", &bodyValidateCtrl{}, "Composite")
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/composite", strings.NewReader(`{"email":"not-an-email"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	a.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
 	}
 }
 
@@ -395,5 +450,50 @@ func TestAdapter_ContextServeFile_SkipsNormalResponseWrite(t *testing.T) {
 	}
 	if got := rec.Body.String(); got != "hello-file" {
 		t.Fatalf("body = %q, want %q", got, "hello-file")
+	}
+}
+
+func TestWriteHTTPError_MapsKernelErrorKinds(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"unauthorized", &kerrors.KernelError{Kind: kerrors.KindUnauthorized, Message: "no token"}, http.StatusUnauthorized},
+		{"forbidden", &kerrors.KernelError{Kind: kerrors.KindForbidden, Message: "denied"}, http.StatusForbidden},
+		{"validation", &kerrors.KernelError{Kind: kerrors.KindValidation, Message: "bad"}, http.StatusBadRequest},
+		{"di", &kerrors.KernelError{Kind: kerrors.KindDI, Message: "missing"}, http.StatusBadRequest},
+		{"routeNotFound", &kerrors.KernelError{Kind: kerrors.KindRouteNotFound, Message: "404"}, http.StatusNotFound},
+		{"execution", &kerrors.KernelError{Kind: kerrors.KindExecution, Message: "boom"}, http.StatusInternalServerError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/x", nil)
+			rec := httptest.NewRecorder()
+			ctx := runtime.NewHandlerContext(httpprotocol.Protocol)
+			ctx.RouteKey = "http:GET:/x"
+
+			writeHTTPError(rec, req, ctx, tc.err)
+
+			if rec.Code != tc.want {
+				t.Fatalf("status = %d, want %d", rec.Code, tc.want)
+			}
+			if !strings.Contains(rec.Body.String(), "\"kind\"") {
+				t.Fatalf("body = %q, want kind field", rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestWriteHTTPError_HttpExceptionOverridesKind(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/x", nil)
+	rec := httptest.NewRecorder()
+	ctx := runtime.NewHandlerContext(httpprotocol.Protocol)
+
+	writeHTTPError(rec, req, ctx, aop.ConflictException("already exists"))
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	graphqladapter "github.com/sao-lang/lania-g/protocol/graphql/v3"
 	httpadapter "github.com/sao-lang/lania-g/protocol/http/v3"
 	"github.com/sao-lang/lania-g/application/v3"
+	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	gqlbinding "github.com/sao-lang/lania-g/protocol/graphql/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
@@ -466,7 +467,7 @@ func (r *QueryResolver) Users(args struct {
 	Page    int    `json:"page"`
 	Size    int    `json:"size"`
 	Keyword string `json:"keyword"`
-}, trace gqlbinding.Header[string], hc *runtime.HandlerContext, store *memoryStore) (UserListResult, error) {
+}, hc *runtime.HandlerContext, store *memoryStore) (UserListResult, error) {
 	page := args.Page
 	size := args.Size
 	if page <= 0 {
@@ -477,6 +478,12 @@ func (r *QueryResolver) Users(args struct {
 	}
 	items, total := store.listUsers(args.Keyword, page, size)
 	acc, _ := currentAccount(hc)
+	traceID := ""
+	if hc != nil {
+		// Header[T] 只有显式 bindingName 时才能按名取单值；
+		// 直接参数场景下从 HandlerContext 读取更直观。
+		traceID = hc.Request.Headers["X-Trace-Id"]
+	}
 	return UserListResult{
 		BaseResponse: okBase(),
 		List:         items,
@@ -484,7 +491,7 @@ func (r *QueryResolver) Users(args struct {
 		Page:         page,
 		Size:         size,
 		Keyword:      args.Keyword,
-		TraceID:      trace.Value,
+		TraceID:      traceID,
 		Account:      acc,
 	}, nil
 }
@@ -553,7 +560,7 @@ func main() {
 	if _, err := app.StartupReport(); err != nil {
 		panic(err)
 	}
-	if err := app.Listen(":8080"); err != nil {
+	if err := app.Listen(addr.HTTP(":8080")); err != nil {
 		panic(err)
 	}
 

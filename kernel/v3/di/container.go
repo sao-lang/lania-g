@@ -339,6 +339,9 @@ func (c *Container) construct(typ reflect.Type, resolving map[interface{}]bool, 
 func (c *Container) injectFields(instance interface{}, resolving map[interface{}]bool, requester *Container) error {
 	rv := reflect.ValueOf(instance)
 	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil
+		}
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Struct {
@@ -349,16 +352,23 @@ func (c *Container) injectFields(instance interface{}, resolving map[interface{}
 		ft := rv.Type().Field(i)
 		fv := rv.Field(i)
 
-		if !ft.IsExported() || !fv.IsZero() {
+		// 非指针 struct（例如以值 token 注册的 value provider）不可寻址，
+		// 写入副本没有意义且会 panic，直接跳过。
+		if !ft.IsExported() || !fv.IsZero() || !fv.CanSet() {
 			continue
 		}
 
 		dep, err := c.get(ft.Type, resolving, requester)
-		if err != nil {
+		if err != nil || dep == nil {
 			continue
 		}
 
-		fv.Set(reflect.ValueOf(dep))
+		depValue := reflect.ValueOf(dep)
+		if !depValue.IsValid() || !depValue.Type().AssignableTo(ft.Type) {
+			continue
+		}
+
+		fv.Set(depValue)
 	}
 	return nil
 }

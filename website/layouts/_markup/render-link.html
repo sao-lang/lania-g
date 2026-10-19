@@ -1,0 +1,23 @@
+{{- /*
+  链接渲染钩子：把「相对内容路径」解析为正确的站点内链接。
+
+  作者写 `core-concepts/di` 或 `../protocols/http` 时，这些路径按
+  “源文件所在目录”解析，而不是按最终 URL 目录解析，避免出现
+  `features.md -> /docs/features/core-concepts/di` 这类断链。
+*/ -}}
+{{- $dest := .Destination -}}
+{{- $u := urls.Parse $dest -}}
+{{- $attrs := "" -}}
+{{- with .Title }}{{ $attrs = printf " title=%q" . }}{{ end -}}
+{{- if or $u.IsAbs (eq $u.Path "") -}}
+  <a href="{{ $dest }}"{{ $attrs | safeHTMLAttr }}>{{ .Text }}</a>
+{{- else -}}
+  {{- $dir := "" -}}
+  {{- with .Page.File }}{{ $dir = .Dir }}{{ end -}}
+  {{- $target := path.Join "/" $dir $u.Path -}}
+  {{- with site.GetPage $target -}}
+    <a href="{{ .RelPermalink }}{{ with $u.Fragment }}#{{ . }}{{ end }}"{{ $attrs | safeHTMLAttr }}>{{ $.Text }}</a>
+  {{- else -}}
+    <a href="{{ $dest }}"{{ $attrs | safeHTMLAttr }}>{{ .Text }}</a>
+  {{- end -}}
+{{- end -}}

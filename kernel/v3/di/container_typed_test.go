@@ -14,6 +14,26 @@ type typedContainerImpl struct{}
 
 func (typedContainerImpl) Value() string { return "ok" }
 
+type typedContainerInjectableValue struct {
+	Dep *typedContainerValue
+}
+
+func TestGet_ValueProviderWithStructValueDoesNotPanic(t *testing.T) {
+	container := NewContainer()
+	dep := &typedContainerValue{Name: "dep"}
+	container.RegisterValue(typeToken[*typedContainerValue](), dep)
+	container.RegisterValue(typeToken[typedContainerInjectableValue](), typedContainerInjectableValue{})
+
+	got, err := GetByType[typedContainerInjectableValue](container)
+	if err != nil {
+		t.Fatalf("get value: %v", err)
+	}
+	// 值类型不可寻址，注入不可见，只要求不 panic 且返回注册的零值副本。
+	if got.Dep != nil {
+		t.Fatalf("expected zero value copy, got %#v", got.Dep)
+	}
+}
+
 func TestMustGetByType(t *testing.T) {
 	container := NewContainer()
 	value := &typedContainerValue{Name: "demo"}

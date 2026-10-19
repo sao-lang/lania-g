@@ -60,5 +60,5 @@ func (s *compiledSchema) field(parentType, fieldName string) *compiledField {
 	if field := parent.Fields[fieldName]; field != nil {
 		return field
 	}
-	return implicitFieldForModel(parent, fieldName)
+	return implicitFieldForModel(s, parent, fieldName)
 }

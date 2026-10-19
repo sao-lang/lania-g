@@ -70,6 +70,15 @@ type BindingRegistry struct {
 	resolvers []BindingResolver
 	mu        sync.RWMutex
 	cache     map[reflect.Type]bindingCacheEntry
+	// protocolCache 是“协议感知”的查找缓存：
+	// 同一个参数类型在不同协议下可能命中不同的 resolver（例如 HTTP 与 GraphQL 的 AutoStruct）。
+	protocolCache map[bindingCacheKey]bindingCacheEntry
+}
+
+// bindingCacheKey 是协议感知查找的缓存键。
+type bindingCacheKey struct {
+	typ      reflect.Type
+	protocol Protocol
 }
 
 // NewBindingRegistry 创建一个 BindingRegistry。
@@ -79,8 +88,9 @@ type BindingRegistry struct {
 // - 缓存 paramType -> (resolver, descriptor, ok) 的查找结果，减少反射与遍历开销
 func NewBindingRegistry() *BindingRegistry {
 	return &BindingRegistry{
-		resolvers: make([]BindingResolver, 0),
-		cache:     make(map[reflect.Type]bindingCacheEntry),
+		resolvers:     make([]BindingResolver, 0),
+		cache:         make(map[reflect.Type]bindingCacheEntry),
+		protocolCache: make(map[bindingCacheKey]bindingCacheEntry),
 	}
 }
 
@@ -96,6 +106,11 @@ func (br *BindingRegistry) Register(resolver BindingResolver) {
 	if br.cache != nil {
 		for k := range br.cache {
 			delete(br.cache, k)
+		}
+	}
+	if br.protocolCache != nil {
+		for k := range br.protocolCache {
+			delete(br.protocolCache, k)
 		}
 	}
 }
@@ -177,24 +192,85 @@ func (br *BindingRegistry) Find(paramType reflect.Type) (BindingResolver, Wrappe
 	return nil, WrapperDescriptor{}, false
 }
 
+// findForProtocol 在“类型匹配 + 协议允许”的前提下选择 resolver。
+//
+// 这是跨协议共存的关键：同一个参数类型（尤其是普通 struct 的 AutoStruct）
+// 可能同时被多个协议注册，必须按当前请求协议挑选，而不能只看类型。
+//
+// 返回约定：
+// - ok=true：resolver/desc 可用
+// - ok=false 且 resolver!=nil：类型命中但协议不允许（用于 ErrBindingNotSupported 诊断）
+// - ok=false 且 resolver==nil：完全没有类型匹配
+func (br *BindingRegistry) findForProtocol(paramType reflect.Type, protocol Protocol) (BindingResolver, WrapperDescriptor, bool) {
+	key := bindingCacheKey{typ: paramType, protocol: protocol}
+
+	br.mu.RLock()
+	if br.protocolCache != nil {
+		if cached, ok := br.protocolCache[key]; ok {
+			br.mu.RUnlock()
+			return cached.resolver, cached.desc, cached.ok
+		}
+	}
+	br.mu.RUnlock()
+
+	// 后注册优先：越靠后的 resolver 越“具体”，允许覆盖默认实现。
+	var rejected BindingResolver
+	var rejectedDesc WrapperDescriptor
+	var matched BindingResolver
+	var matchedDesc WrapperDescriptor
+
+	for i := len(br.resolvers) - 1; i >= 0; i-- {
+		desc, ok := br.resolvers[i].Match(paramType)
+		if !ok {
+			continue
+		}
+		res := br.resolvers[i]
+		if allowed := res.AllowedProtocols(); len(allowed) > 0 && !allowed[protocol] {
+			if rejected == nil {
+				// 记录“最先被协议拒绝”的 resolver，仅用于错误信息。
+				rejected, rejectedDesc = res, desc
+			}
+			continue
+		}
+		matched, matchedDesc = res, desc
+		break
+	}
+
+	entry := bindingCacheEntry{resolver: matched, desc: matchedDesc, ok: matched != nil}
+	if matched == nil && rejected != nil {
+		entry = bindingCacheEntry{resolver: rejected, desc: rejectedDesc, ok: false}
+	}
+
+	br.mu.Lock()
+	if br.protocolCache == nil {
+		br.protocolCache = make(map[bindingCacheKey]bindingCacheEntry)
+	}
+	br.protocolCache[key] = entry
+	br.mu.Unlock()
+
+	if matched != nil {
+		return matched, matchedDesc, true
+	}
+	return entry.resolver, entry.desc, false
+}
+
 // Resolve 将某个参数类型解析为运行时值。
 //
 // 解析流程：
-// 1) Find(paramType) 选择 resolver 并拿到 descriptor（可能来自缓存）
-// 2) 校验协议是否允许（AllowedProtocols）
+// 1) findForProtocol(paramType, ctx.Protocol) 选择 resolver 并拿到 descriptor（可能来自缓存）
+// 2) 没有任何类型匹配时返回 ErrBindingNotFound；类型匹配但协议不允许时返回 ErrBindingNotSupported
 // 3) 用 handler.Meta.ParamPlans[paramIndex].BindingName 覆盖 desc.BindingName（如果编译期指定了名字）
 // 4) 调用 resolver.Resolve(ctx, desc) 产生最终值
 func (br *BindingRegistry) Resolve(ctx *HandlerContext, handler *Handler, paramType reflect.Type, paramIndex int) (interface{}, error) {
-	resolver, desc, ok := br.Find(paramType)
+	resolver, desc, ok := br.findForProtocol(paramType, ctx.Protocol)
 	if !ok {
+		if resolver != nil {
+			return nil, fmt.Errorf("%w: protocol=%s binding=%s type=%s", ErrBindingNotSupported, ctx.Protocol, resolver.Name(), paramType.String())
+		}
 		return nil, ErrBindingNotFound
 	}
 
 	desc.ParamIndex = paramIndex
-	if allowed := resolver.AllowedProtocols(); len(allowed) > 0 && !allowed[ctx.Protocol] {
-		return nil, fmt.Errorf("%w: protocol=%s binding=%s type=%s", ErrBindingNotSupported, ctx.Protocol, resolver.Name(), paramType.String())
-	}
-
 	if handler != nil && paramIndex >= 0 && paramIndex < len(handler.Meta.ParamPlans) {
 		if name := handler.Meta.ParamPlans[paramIndex].BindingName; name != "" {
 			// 编译期若已经为这个参数钉死 bindingName，则以编译结果为准覆盖 matcher 默认值。

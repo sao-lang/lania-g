@@ -150,6 +150,23 @@ cd integrations/logger/v3 && go test ./...
 4. 按需引入 integrations，如 `integrations/logger/v3`、`integrations/orm/v3`
 5. 启动前执行 `CompileDiagnostics()` 与 `StartupReport()` 做诊断
 
+## 文档站
+
+仓库内置一个基于 **Hugo + Hextra** 的文档站（无需 Node.js）：
+
+```bash
+# 首次：拉取主题模块
+hugo mod tidy --source website
+
+# 本地预览
+hugo server --source website
+
+# 构建静态站点（产物在 website/public）
+hugo --source website --minify
+```
+
+文档内容位于 `website/content/docs/`，按「入门 → 核心概念 → 协议指南 → 集成 → 深入原理 → 最佳实践」组织。
+
 ## 文档索引
 
 - [文档导航](docs/README.md)

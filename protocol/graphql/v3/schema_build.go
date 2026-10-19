@@ -154,6 +154,7 @@ func bindReturnModelType(schema *compiledSchema, compiled *compiledField, field 
 		return
 	}
 	obj.ModelType = inferResultGoType(field.Handler)
+	registerNestedModelTypes(schema, obj.ModelType)
 }
 
 func buildCompiledField(schema *compiledSchema, resolverDef *ResolverDefinition, field *FieldDefinition, override *FieldSchema) *compiledField {
@@ -181,6 +182,7 @@ func buildCompiledField(schema *compiledSchema, resolverDef *ResolverDefinition,
 	if out.ReturnType != nil && !out.ReturnType.Scalar {
 		if obj := schema.object(out.ReturnType.Name); obj != nil && obj.ModelType == nil {
 			obj.ModelType = inferResultGoType(field.Handler)
+			registerNestedModelTypes(schema, obj.ModelType)
 		}
 	}
 	return out
@@ -239,6 +241,7 @@ func applyDeclaredReturnType(schema *compiledSchema, out *compiledField, field *
 	if !out.ReturnType.Scalar && inferredModel != nil {
 		if obj := schema.object(out.ReturnType.Name); obj != nil && obj.ModelType == nil {
 			obj.ModelType = inferredModel
+			registerNestedModelTypes(schema, inferredModel)
 		}
 	}
 	return true

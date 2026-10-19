@@ -8,6 +8,7 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 	grpcbinding "github.com/sao-lang/lania-g/protocol/grpc/v3/binding"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // validateMethodDefinition 在编译阶段前置约束每种 RPC 模式允许出现的参数/返回值形态，
@@ -257,7 +258,9 @@ func inferMethodRequestType(def *MethodDefinition) (reflect.Type, error) {
 			return reqType, nil
 		}
 	}
-	return nil, fmt.Errorf("cannot infer grpc request type for %s/%s in %s mode", def.Service, def.Method, def.Mode.Normalize())
+	// 业务方法可能只依赖上下文/DI，没有任何请求字段。
+	// 此时按 gRPC 约定使用 google.protobuf.Empty 作为请求消息，而不是直接失败。
+	return reflect.TypeFor[*emptypb.Empty](), nil
 }
 
 func compositeFields(t reflect.Type) ([]reflect.StructField, bool) {

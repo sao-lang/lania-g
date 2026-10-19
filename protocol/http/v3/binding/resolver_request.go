@@ -44,6 +44,12 @@ func resolveForm(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor) (a
 	if err != nil {
 		return nil, err
 	}
+	// Form[T] 与 Body[T] 一样可能承载带校验标签的 DTO。
+	if value.IsValid() {
+		if err := validateBoundValue(ctx, value.Interface()); err != nil {
+			return nil, err
+		}
+	}
 	return wrapValue(desc.WrapperType, value), nil
 }
 

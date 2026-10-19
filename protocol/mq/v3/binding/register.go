@@ -188,8 +188,11 @@ func resolveHeader(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor) 
 	if desc.BindingName == "" {
 		return nil, fmt.Errorf("mq Header[T] requires binding name; use MethodBuilder.BindParam(...) or inject mq.Headers instead")
 	}
+	// adapter 在投递时会统一把 header key 归一化为小写，
+	// 这里做一次大小写无关的查找，避免 `BindParam(3, "X-Trace-Id")` 这类写法失效。
 	raw := ""
-	if list := headers[desc.BindingName]; len(list) > 0 {
+	name := strings.ToLower(strings.TrimSpace(desc.BindingName))
+	if list := headers[name]; len(list) > 0 {
 		raw = list[0]
 	}
 	value, err := decodeTo(desc.InnerType, raw)

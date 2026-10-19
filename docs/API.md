@@ -559,9 +559,19 @@ grpcAPI.Service("UserService", svc).
 - `BidiStreamMethod(...)`
   - 声明双向流 RPC
 
+响应编码约定：
+
+- handler 可以直接返回 `proto.Message`，也可以返回任意 JSON 友好的 Go 值（`map` / `struct` / `slice` / 标量）
+- 非 `proto.Message` 的返回值会统一走 `protocol/grpc/v3/grpcvalue.ToMessage` 做 JSON → `google.protobuf.Struct/Value` 桥接
+- 没有请求消息字段的 unary / server-stream 方法，编译期默认使用 `google.protobuf.Empty` 作为请求类型
+- 需要在业务代码里手动构造 `*structpb.Struct` 时，优先使用 `grpcvalue.ToStruct(...)`；
+  `structpb.NewStruct` 只接受 JSON 基础类型，无法直接容纳 Go struct
+
 ### 7.3 WebSocket
 
 包：`github.com/sao-lang/lania-g/protocol/ws/v3`
+
+底层实现：`github.com/zishang520/socket.io`（Socket.IO v4 / Engine.IO v4）。
 
 ```go
 wsAdapter := ws.New().WithSocketPath("/socket.io/")
@@ -587,6 +597,17 @@ wsAPI.Gateway("/chat", gateway).
   - 声明 namespace 与事件处理器
   - 事件通过 `On("event", handler)` 注册
 
+客户端兼容性：
+
+- 推荐 `socket.io-client` **v4**（当前 npm 默认版本）
+- 不再兼容 Engine.IO v3 客户端（`socket.io-client` v2）
+
+广播能力：
+
+- `binding/ws.Context` 的 `BroadcastTo` / `BroadcastToNamespace` / `RoomLen` 由 adapter 自身实现
+  （通过 `MetadataKeyServer` 暴露，无需业务再持有 socket.io server）
+
+
 ### 7.4 GraphQL
 
 包：`github.com/sao-lang/lania-g/protocol/graphql/v3`
@@ -598,6 +619,20 @@ graphqlAPI.Resolver("User", resolver).
 	Query("user", resolver.User).
 	Build()
 ```
+
+schema 推导约定：
+
+- 返回类型（`.Returns("RegisterResult")`）会自动绑定 Go 模型，并按字段推导选择集
+- **嵌套 struct 会递归注册为 GraphQL object**，因此 `account { id username }` 这类选择集可以直接使用
+- **匿名嵌入字段会被摊平**：例如 `RegisterResult` 内嵌 `BaseResponse` 后，可以直接查询 `code` / `msg` / `success`
+- `json:"-"` 字段不会出现在 schema 中
+- `map[string]any` 等动态结构按标量（JSON）处理，不做递归展开
+- 自引用类型（如 `Manager *User`）不会递归注册死循环
+
+字段名推导规则：
+
+- 优先使用 `json` tag 中的名称
+- 未设置 tag 时使用首字母小写的 Go 字段名（例如 `Username` -> `username`）
 
 ### 7.5 MQ
 
@@ -865,6 +900,12 @@ func (r *UserResolver) CreateUser(ctx bindinggraphql.Context) (any, error) {
 
 说明：
 
+- `Header[T]` 只有在存在 bindingName（例如 CompositeStruct 上的 `header:"X-Trace-Id"`）时才按名取单值
+- 直接作为 resolver 参数且没有 bindingName 时：
+  - `T` 是 map/struct 时返回整份 header 视图
+  - `T` 是标量时返回零值（不会让整个查询失败）
+- 需要读取特定请求头时，推荐注入 `bindinggraphql.Context` 或 `*runtime.HandlerContext` 后直接读取
+
 - `bindinggraphql.Context`
   - 当前 GraphQL 增强上下文
   - 提供 `Request()`、`Writer()`、`OperationName()`、`Query()`、`Variables()`、`Headers()`、`Extensions()`、`FieldType()`、`FieldName()`、`Path()`、`SelectionSet()`、`Root()`、`Info()`、`Args()`、`Session()`、`Header()`、`Var()`、`Arg()` 与 `ShouldBindArgs()`
@@ -915,6 +956,11 @@ func (c *Consumer) HandleUserCreated(
 	return ack()
 }
 ```
+
+说明：
+
+- `Header[T]` 必须通过 `BindParam(index, name)` 指定 header 名称
+- header 名称查找是**大小写无关**的（adapter 会把 driver 传入的 header key 归一化为小写）
 
 ### 8.6 Scheduler Binding
 

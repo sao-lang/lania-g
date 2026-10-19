@@ -47,13 +47,16 @@ func resolveFromArgs(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor
 
 // resolveHeader 既支持 `Header[string]` 这种“按名取单值”，
 // 也支持没有 bindingName 时把整份 header map 解码给目标类型。
+//
+// 当没有 bindingName 且目标类型是标量时，无法从整份 header 中确定取值，
+// 这里返回零值而不是让整个查询失败（与 HTTP `Param` 缺失时的语义一致）。
 func resolveHeader(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor) (any, error) {
 	var raw any
 	if v, ok := ctx.Get(MetadataKeyHeaders); ok {
 		if h, ok2 := v.(http.Header); ok2 {
 			if desc.BindingName != "" {
 				raw = h.Get(desc.BindingName)
-			} else {
+			} else if headerTargetIsContainer(desc.InnerType) {
 				raw = h
 			}
 		}
@@ -63,6 +66,22 @@ func resolveHeader(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor) 
 		return nil, err
 	}
 	return wrapValue(desc.WrapperType, val), nil
+}
+
+// headerTargetIsContainer 判断 Header[T] 的 T 是否适合承载整份 header map。
+func headerTargetIsContainer(t reflect.Type) bool {
+	for t != nil && t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t == nil {
+		return false
+	}
+	switch t.Kind() {
+	case reflect.Map, reflect.Struct, reflect.Interface:
+		return true
+	default:
+		return false
+	}
 }
 
 // resolveParent 读取 GraphQL resolver 的父节点值（root/parent）。

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sao-lang/lania-g/application/v3"
+	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	swagger "github.com/sao-lang/lania-g/integrations/swagger/v3"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
@@ -716,7 +717,7 @@ func main() {
 	if _, err := app.StartupReport(); err != nil {
 		panic(err)
 	}
-	if err := app.Listen(":8080"); err != nil {
+	if err := app.Listen(addr.HTTP(":8080")); err != nil {
 		panic(err)
 	}
 

@@ -22,7 +22,7 @@ import (
 func (a *Application) Start() error { return a.Run() }
 
 // Run 会在需要时完成编译，触发 bootstrap 生命周期钩子，
-// 然后按各 adapter 自己的监听配置启动它们。
+// 然后按各 adapter 自己的监听配置启动它们，并阻塞到 Stop 被调用。
 //
 // 当各 adapter 已经各自完成配置时，直接用 Run 即可。
 // 如果某个 adapter 需要共享监听地址，应改用 Listen。
@@ -41,11 +41,29 @@ func (a *Application) Run() error {
 	if err := a.emitStartupReport(); err != nil {
 		return err
 	}
-	return a.startAdapters()
+	if err := a.startAdapters(); err != nil {
+		return err
+	}
+	a.WaitStop()
+	return nil
+}
+
+// WaitStop 阻塞直到 Stop 被调用，用于让 Run/Listen 保持“长驻服务”语义。
+func (a *Application) WaitStop() {
+	if a == nil || a.stopCh == nil {
+		return
+	}
+	<-a.stopCh
 }
 
 // Stop 按 adapter 挂载的逆序停止服务，然后执行 shutdown 生命周期钩子。
+// 它同时会唤醒等待中的 Run/Listen 调用。
 func (a *Application) Stop() error {
+	defer a.stopOnce.Do(func() {
+		if a.stopCh != nil {
+			close(a.stopCh)
+		}
+	})
 	for i := len(a.adapterList) - 1; i >= 0; i-- {
 		if err := a.adapterList[i].Stop(); err != nil {
 			return err
@@ -369,7 +387,7 @@ func totalGlobalAOPCount(items registry.GlobalAOPRegistration) int {
 		len(items.Filters)
 }
 
-// Listen 使用 addr 作为共享监听地址来启动应用。
+// Listen 使用 addr 作为共享监听地址来启动应用，并阻塞到 Stop 被调用。
 //
 // 独立监听模式的 adapter 仍然使用自己的地址配置；
 // 需要共享监听的 adapter 会在启动前通过 ConfigureSharedListen 收到这个 addr。
@@ -397,7 +415,11 @@ func (a *Application) Listen(addr string) error {
 	if err := a.emitStartupReport(); err != nil {
 		return err
 	}
-	return a.startAdapters()
+	if err := a.startAdapters(); err != nil {
+		return err
+	}
+	a.WaitStop()
+	return nil
 }
 
 // startAdapters 按挂载顺序启动所有 adapter。

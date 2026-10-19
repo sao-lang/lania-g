@@ -7,6 +7,8 @@ import (
 	"reflect"
 
 	gogrpc "google.golang.org/grpc"
+
+	"github.com/sao-lang/lania-g/protocol/grpc/v3/grpcvalue"
 )
 
 // Req 用于显式声明“参数从 gRPC 请求消息取值”。
@@ -50,7 +52,11 @@ type ServerStream[T any] struct {
 
 func (s ServerStream[T]) Send(msg T) error {
 	// ServerStream 只暴露发送侧能力，避免把“只写响应流”的场景建模得过重。
-	return s.Raw.SendMsg(msg)
+	converted, err := grpcvalue.ToMessage(any(msg))
+	if err != nil {
+		return err
+	}
+	return s.Raw.SendMsg(converted)
 }
 
 // ClientStream 表示客户端流式接收能力。
@@ -73,7 +79,11 @@ func (s BidiStream[Req, Resp]) Recv() (Req, error) {
 }
 
 func (s BidiStream[Req, Resp]) Send(msg Resp) error {
-	return s.Raw.SendMsg(msg)
+	converted, err := grpcvalue.ToMessage(any(msg))
+	if err != nil {
+		return err
+	}
+	return s.Raw.SendMsg(converted)
 }
 
 func recvStreamMessage[T any](stream gogrpc.ServerStream) (T, error) {

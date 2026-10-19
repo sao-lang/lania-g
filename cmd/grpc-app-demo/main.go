@@ -7,6 +7,7 @@ import (
 
 	grpcadapter "github.com/sao-lang/lania-g/protocol/grpc/v3"
 	"github.com/sao-lang/lania-g/application/v3"
+	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	grpcbinding "github.com/sao-lang/lania-g/protocol/grpc/v3/binding"
 
@@ -80,7 +81,7 @@ func main() {
 	// gRPC receiver 只需要明确归属到某个模块 owner；业务样板中直接放入模块 owner 槽位即可。
 	root := module.CreateModule(nil, nil, []any{userSvc}, nil, nil)
 
-	grpcAdapter := grpcadapter.New(":50051")
+	grpcAdapter := grpcadapter.New(addr.GRPC(":50051"))
 	app, err := application.NewWithOptions(root, application.Options{
 		Registry:        application.NewRegistry(),
 		StartupReporter: os.Stdout,

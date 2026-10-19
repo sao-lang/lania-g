@@ -11,13 +11,12 @@ import (
 	"time"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
-	wsbinding "github.com/sao-lang/lania-g/protocol/ws/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	wsbinding "github.com/sao-lang/lania-g/protocol/ws/v3/binding"
 	wsprotocol "github.com/sao-lang/lania-g/protocol/ws/v3/protocol"
 
-	socketio "github.com/googollee/go-socket.io"
-	"github.com/googollee/go-socket.io/engineio"
+	"github.com/zishang520/socket.io/socket"
 )
 
 // AdapterID 是 WebSocket 协议插件与 adapter 的统一标识。
@@ -28,9 +27,10 @@ type Adapter struct {
 	api  *API
 	host adapter.Host
 
-	server *socketio.Server
-	path   string
-	addr   string
+	server  *socket.Server
+	handler http.Handler
+	path    string
+	addr    string
 
 	gatewayMu    sync.RWMutex
 	gatewaysByNS map[string][]gatewayRef
@@ -39,8 +39,6 @@ type Adapter struct {
 	registeredNamespaces map[string]bool
 	registeredEvents     map[string]map[string]string
 
-	serveMu    sync.Mutex
-	serving    bool
 	standalone bool
 
 	responseSuffix string
@@ -59,14 +57,20 @@ var _ adapter.Adapter = (*Adapter)(nil)
 // - `New()` 使用共享监听模式：挂到共享 HTTP listener 上，需要 HTTP adapter + `app.Listen(...)`
 // - `New(":3000")` 使用独立监听模式：adapter 自己启动一个 HTTP 服务
 //
+// 底层使用支持 Socket.IO v4 / Engine.IO v4 的 zishang520/socket.io，
+// 现代 `socket.io-client` v4 可以直接连接。
+//
 // 这是该 adapter 唯一的公开端口绑定入口。
 func New(addr ...string) *Adapter {
-	s := socketio.NewServer(&engineio.Options{
-		PingInterval: 25 * time.Second,
-		PingTimeout:  60 * time.Second,
-	})
+	opts := &socket.ServerOptions{}
+	opts.SetPingInterval(25 * time.Second)
+	opts.SetPingTimeout(60 * time.Second)
+	opts.SetPath("/socket.io/")
+
+	s := socket.NewServer(nil, opts)
 	a := &Adapter{
 		server:               s,
+		handler:              s.ServeHandler(opts),
 		path:                 "/socket.io/",
 		api:                  NewCompatAPI(),
 		gatewaysByNS:         make(map[string][]gatewayRef),
@@ -148,10 +152,8 @@ func (a *Adapter) Start() error {
 		if a.httpServer != nil || a.listener != nil {
 			return nil
 		}
-		a.ensureServing()
 		return a.startStandaloneLocked()
 	}
-	a.ensureServing()
 	return nil
 }
 
@@ -185,7 +187,7 @@ func (a *Adapter) tryMountToSharedHTTP(host adapter.Host) error {
 	if !ok {
 		return fmt.Errorf("host does not support http mount")
 	}
-	return mh.MountHTTP(a.path, a.server)
+	return mh.MountHTTP(a.path, a.handler)
 }
 
 // WithResponseEventSuffix 设置“响应事件”的后缀（默认 Response）。
@@ -214,19 +216,6 @@ func (a *Adapter) WithErrorEventSuffix(suffix string) *Adapter {
 	return a
 }
 
-// ensureServing 确保 socket.io server 的 Serve() 只启动一次（后台 goroutine）。
-func (a *Adapter) ensureServing() {
-	a.serveMu.Lock()
-	defer a.serveMu.Unlock()
-	if a.serving {
-		return
-	}
-	a.serving = true
-	go func() {
-		_ = a.server.Serve()
-	}()
-}
-
 // startStandaloneLocked 在 standalone 模式下启动一个独立的 http.Server。
 //
 // 注意：调用方需持有 a.mu（Start 中已持有），避免并发启动多个 listener。
@@ -237,7 +226,7 @@ func (a *Adapter) startStandaloneLocked() error {
 	}
 	a.listener = ln
 	mux := http.NewServeMux()
-	mux.Handle(a.path, a.server)
+	mux.Handle(a.path, a.handler)
 	a.httpServer = &http.Server{Addr: a.addr, Handler: mux}
 	go func() {
 		_ = a.httpServer.Serve(ln)
@@ -245,11 +234,11 @@ func (a *Adapter) startStandaloneLocked() error {
 	return nil
 }
 
-// Reload 重新加载运行时路由并注册 socket.io 事件回调。
+// Reload 重新加载运行时路由并注册 socket.io 连接钩子。
 //
 // 目前实现会：
 // - collectGatewaysByNamespace：从编译期声明推导 namespace -> gateways（用于连接/断开等 hooks）
-// - registerRoutesFromRuntimeDelta：从 runtime.Router 拉取 WS routes 并注册 OnEvent
+// - registerRoutesFromRuntimeDelta：从 runtime.Router 拉取 WS routes，建立 namespace 钩子并做冲突检测
 func (a *Adapter) Reload() error {
 	a.collectGatewaysByNamespace()
 	return a.registerRoutesFromRuntimeDelta()
@@ -268,11 +257,8 @@ func (a *Adapter) Stop() error {
 		a.listener = nil
 	}
 	if a.server != nil {
-		a.server.Close()
+		a.server.Close(nil)
 	}
-	a.serveMu.Lock()
-	a.serving = false
-	a.serveMu.Unlock()
 
 	a.gatewayMu.Lock()
 	for k := range a.gatewaysByNS {
@@ -296,7 +282,7 @@ func (a *Adapter) Stop() error {
 
 // Handler 返回 socket.io server 作为 http.Handler，供 HTTP adapter mount。
 func (a *Adapter) Handler() http.Handler {
-	return a.server
+	return a.handler
 }
 
 // WithSocketPath 设置 socket.io 的挂载路径（默认 `/socket.io/`）。
@@ -323,8 +309,13 @@ const (
 	errorEventSuffix    = "Error"
 )
 
-// registerRoutesFromRuntimeDelta 从 runtime.Router 读取已经编译好的 WS routes，
-// 并把它们翻译成 socket.io 的 `OnEvent(namespace, event, handler)` 注册。
+// registerRoutesFromRuntimeDelta 从 runtime.Router 读取已经编译好的 WS routes。
+//
+// 与旧实现不同，这里不再为每个 event 单独注册回调，而是：
+// - 为每个 namespace 建立连接钩子（连接建立后挂 OnAny 做事件分发）
+// - 记录 namespace/event -> routeKey，用于冲突检测
+//
+// 事件名到 routeKey 的映射在 dispatchEvent 中按需计算。
 func (a *Adapter) registerRoutesFromRuntimeDelta() error {
 	rt := a.host.Runtime()
 	if rt == nil {
@@ -342,76 +333,80 @@ func (a *Adapter) registerRoutesFromRuntimeDelta() error {
 		}
 
 		ns := normalizeNamespace(rk.Path)
-		event := rk.Method
-		routeKey := key
-
 		if err := a.ensureNamespaceHooks(ns); err != nil {
 			return err
 		}
-		ok, err := a.markEventRegistered(ns, event, routeKey)
-		if err != nil {
+		if _, err := a.markEventRegistered(ns, rk.Method, key); err != nil {
 			return err
 		}
-		if !ok {
-			continue
-		}
-
-		a.server.OnEvent(ns, event, func(conn socketio.Conn, msg any) {
-			ctx := runtime.AcquireHandlerContext(wsprotocol.Protocol)
-			defer runtime.ReleaseHandlerContext(ctx)
-
-			// 把 socket.io 回调现场投影成框架统一的 HandlerContext，
-			// 后续就能直接复用 runtime.Execute + binding/ws 整套参数解析。
-			ctx.Request.Method = event
-			ctx.Request.Path = ns
-			ctx.RouteKey = routeKey
-			ctx.Set(wsbinding.MetadataKeySocket, conn)
-			ctx.Set(wsbinding.MetadataKeyServer, a.server)
-			ctx.Set(wsbinding.MetadataKeyEvent, event)
-
-			h := conn.RemoteHeader()
-			if h != nil {
-				ctx.Set(wsbinding.MetadataKeyHeaders, h)
-				for k, v := range h {
-					ctx.Request.HeadersMulti[k] = append([]string{}, v...)
-					if len(v) > 0 {
-						ctx.Request.Headers[k] = v[0]
-					}
-				}
-			}
-
-			ctx.Request.Body = msg
-			if b, err := jsonBytes(msg); err == nil {
-				// BodyBytes 主要服务 `WSMessageBody[T]` / BindInto 这类按 JSON 处理的路径。
-				ctx.Request.BodyBytes = b
-			}
-
-			result, execErr := rt.Execute(ctx)
-			if execErr != nil {
-				errSuffix := a.errorSuffix
-				if errSuffix == "" {
-					errSuffix = errorEventSuffix
-				}
-				conn.Emit(event+errSuffix, execErr.Error())
-				return
-			}
-			if result != nil {
-				respSuffix := a.responseSuffix
-				if respSuffix == "" {
-					respSuffix = responseEventSuffix
-				}
-				conn.Emit(event+respSuffix, result)
-			}
-		})
 	}
 	return nil
 }
 
-// ensureNamespaceHooks 确保某个 namespace 的 connect/disconnect/error hooks 只注册一次。
+// dispatchEvent 把一次 socket.io 事件投影成框架统一的 HandlerContext，
+// 再交给 runtime.Execute 执行，最后按配置的后缀回写响应/错误事件。
+func (a *Adapter) dispatchEvent(ns, event string, conn *socketConn, msg any) {
+	rt := a.host.Runtime()
+	if rt == nil {
+		return
+	}
+
+	routeKey := runtime.BuildRouteKey(wsprotocol.Protocol, event, ns)
+	if _, ok := rt.GetRouter().Get(routeKey); !ok {
+		// 未声明的事件直接忽略。
+		return
+	}
+
+	ctx := runtime.AcquireHandlerContext(wsprotocol.Protocol)
+	defer runtime.ReleaseHandlerContext(ctx)
+
+	ctx.Request.Method = event
+	ctx.Request.Path = ns
+	ctx.RouteKey = routeKey
+	ctx.Set(wsbinding.MetadataKeySocket, conn)
+	// MetadataKeyServer 暴露 adapter 自身：它实现了 BroadcastToRoom / BroadcastToNamespace / RoomLen。
+	ctx.Set(wsbinding.MetadataKeyServer, a)
+	ctx.Set(wsbinding.MetadataKeyEvent, event)
+
+	if h := conn.RemoteHeader(); h != nil {
+		ctx.Set(wsbinding.MetadataKeyHeaders, h)
+		for k, v := range h {
+			ctx.Request.HeadersMulti[k] = append([]string{}, v...)
+			if len(v) > 0 {
+				ctx.Request.Headers[k] = v[0]
+			}
+		}
+	}
+
+	ctx.Request.Body = msg
+	if b, err := jsonBytes(msg); err == nil {
+		// BodyBytes 主要服务 `WSMessageBody[T]` / BindInto 这类按 JSON 处理的路径。
+		ctx.Request.BodyBytes = b
+	}
+
+	result, execErr := rt.Execute(ctx)
+	if execErr != nil {
+		errSuffix := a.errorSuffix
+		if errSuffix == "" {
+			errSuffix = errorEventSuffix
+		}
+		conn.Emit(event+errSuffix, execErr.Error())
+		return
+	}
+	if result != nil {
+		respSuffix := a.responseSuffix
+		if respSuffix == "" {
+			respSuffix = responseEventSuffix
+		}
+		conn.Emit(event+respSuffix, result)
+	}
+}
+
+// ensureNamespaceHooks 确保某个 namespace 的连接/断开钩子只注册一次。
 //
-// 注意：
-// - registeredNamespaces/registeredEvents 用于去重与冲突检测
-// - hooks 的回调会调用对应 gateway 的 OnWebSocket* 接口方法
+// 每个连接建立时都会挂一个 OnAny 监听器：
+// - 兜住该连接上的所有事件（无需为每个 event 单独注册）
+// - 由 dispatchEvent 统一判断是否命中已编译的 WS route
 func (a *Adapter) ensureNamespaceHooks(ns string) error {
 	a.nsMu.Lock()
 	if a.registeredNamespaces[ns] {
@@ -424,15 +419,60 @@ func (a *Adapter) ensureNamespaceHooks(ns string) error {
 	}
 	a.nsMu.Unlock()
 
-	a.server.OnConnect(ns, func(conn socketio.Conn) error {
+	nsp := a.server.Of(ns, nil)
+	if nsp == nil {
+		return fmt.Errorf("ws namespace %s is unavailable", ns)
+	}
+
+	nsp.On("connection", func(clients ...any) {
+		if len(clients) == 0 {
+			return
+		}
+		sock, ok := clients[0].(*socket.Socket)
+		if !ok || sock == nil {
+			return
+		}
+
+		conn := newSocketConn(sock)
 		conn.SetContext(nil)
-		return a.callOnConnect(ns, conn)
-	})
-	a.server.OnDisconnect(ns, func(conn socketio.Conn, reason string) {
-		a.callOnDisconnect(ns, conn, reason)
-	})
-	a.server.OnError(ns, func(conn socketio.Conn, err error) {
-		a.callOnError(ns, conn, err)
+		if err := a.callOnConnect(ns, conn); err != nil {
+			sock.Disconnect(true)
+			return
+		}
+
+		sock.OnAny(func(events ...any) {
+			if len(events) == 0 {
+				return
+			}
+			event, _ := events[0].(string)
+			if event == "" {
+				return
+			}
+			var msg any
+			if len(events) > 1 {
+				msg = events[1]
+			}
+			a.dispatchEvent(ns, event, conn, msg)
+		})
+
+		sock.On("disconnect", func(datas ...any) {
+			reason := ""
+			if len(datas) > 0 && datas[0] != nil {
+				reason = fmt.Sprint(datas[0])
+			}
+			a.callOnDisconnect(ns, conn, reason)
+		})
+
+		sock.On("error", func(datas ...any) {
+			if len(datas) == 0 {
+				return
+			}
+			err, ok := datas[0].(error)
+			if !ok || err == nil {
+				return
+			}
+			a.callOnError(ns, conn, err)
+		})
 	})
 	return nil
 }

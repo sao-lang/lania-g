@@ -12,6 +12,7 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 	grpcbinding "github.com/sao-lang/lania-g/protocol/grpc/v3/binding"
+	"github.com/sao-lang/lania-g/protocol/grpc/v3/grpcvalue"
 	grpcprotocol "github.com/sao-lang/lania-g/protocol/grpc/v3/protocol"
 	"google.golang.org/grpc"
 	grpcmetadata "google.golang.org/grpc/metadata"
@@ -290,7 +291,13 @@ func (a *Adapter) dispatchUnary(routeKey, fullMethod, service, method string, mo
 	rctx.Request.Body = req
 	rctx.Request.Raw = req
 	a.prepareHandlerContext(rctx, routeKey, fullMethod, service, method, string(mode.Normalize()), ctx)
-	return a.host.Runtime().Execute(rctx)
+	result, err := a.host.Runtime().Execute(rctx)
+	if err != nil {
+		return nil, err
+	}
+	// handler 可能返回任意 JSON 友好的 Go 值（map/struct/slice），
+	// gRPC 只能编码 proto.Message，因此这里统一桥接一次。
+	return grpcvalue.ToMessage(result)
 }
 
 func (a *Adapter) dispatchStream(routeKey, fullMethod, service, method string, mode RPCMode, reqType reflect.Type, stream grpc.ServerStream) error {
@@ -324,7 +331,11 @@ func (a *Adapter) dispatchStream(routeKey, fullMethod, service, method string, m
 	}
 	if mode == RPCModeClientStream && result != nil {
 		// client-streaming 在 handler 完成后只回写一次聚合结果。
-		return stream.SendMsg(result)
+		msg, convErr := grpcvalue.ToMessage(result)
+		if convErr != nil {
+			return convErr
+		}
+		return stream.SendMsg(msg)
 	}
 	return nil
 }
