@@ -81,19 +81,6 @@ func RepositoryToken(name string, entityType reflect.Type) string {
 
 // RegisterBindings 安装 ORM 专用的参数 binding，
 // 不再依赖装饰器语义，泛型包装类型会在运行时通过反射构造。
-func RegisterBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterBindingsCompat()
-		return
-	}
-	registerBindings(reg)
-}
-
-// RegisterBindingsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterBindingsCompat() {
-	registerBindings(registry.GlobalWithUsage("integrations/orm.RegisterBindingsCompat"))
-}
-
 func registerBindings(reg *registry.Registry) {
 	reg.RegisterBindings(runtime.NewBindingResolvers(
 		registration("InjectDataSource", coreintegration.MatchNamedWrapper(packagePath(), "InjectDataSource"), resolveInjectDataSource),

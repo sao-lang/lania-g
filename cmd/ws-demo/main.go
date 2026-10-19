@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	httpadapter "github.com/sao-lang/lania-g/protocol/http/v3"
 	wsadapter "github.com/sao-lang/lania-g/protocol/ws/v3"
 	"github.com/sao-lang/lania-g/application/v3"
 	"github.com/sao-lang/lania-g/cmd/internal/addr"
@@ -19,7 +18,6 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 )
 
@@ -478,18 +476,15 @@ func main() {
 	// WS gateway 需要落到模块 receiver 槽位，这里使用 controllers 槽位承载它。
 	root := module.New(module.Metadata{Providers: []*di.Provider{pStore}, Controllers: []interface{}{gw}})
 
-	httpAdp := httpadapter.New()
-	wsAdp := wsadapter.New() // shared listen: mount to http adapter at /socket.io/
+	wsModule := wsadapter.Module(wsadapter.Config{Addr: addr.HTTP(":8081")})
+	root.Metadata().Imports = append(root.Metadata().Imports, wsModule)
 
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        registry.New(),
-		StartupReporter: os.Stdout,
-	}, httpAdp, wsAdp)
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
 		panic(err)
 	}
 
-	wsAPI := wsAdp.API().(*wsadapter.API)
+	wsAPI := wsModule.API()
 	wsAPI.Gateway("/ws/chat", gw).
 		On("auth_register", gw.AuthRegister).
 		On("auth_login", gw.AuthLogin).
@@ -506,13 +501,8 @@ func main() {
 	// `cmd/ws-app-demo` 则是更精简、更偏业务起步的版本。
 	app.UseGlobalInterceptors(wsEnvelopeInterceptor, wsAuthInterceptor(store))
 
-	if _, err := app.CompileDiagnostics(); err != nil {
-		panic(err)
-	}
-	if _, err := app.StartupReport(); err != nil {
-		panic(err)
-	}
-	if err := app.Listen(addr.HTTP(":8080")); err != nil {
+
+	if err := app.Run(); err != nil {
 		panic(err)
 	}
 

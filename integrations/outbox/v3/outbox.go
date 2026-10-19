@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
 // DefaultName 是默认 outbox 服务实例名。
@@ -102,12 +101,10 @@ type Factory interface {
 }
 
 // Module 是 outbox integration 对应的模块封装。
-type Module struct {
+type integrationModule struct {
 	*module.BaseModule
 	service      *Service
 	config       Config
-	reg          *registry.Registry
-	compatSource string
 }
 
 // Inbox 用于做简单的消息去重控制。

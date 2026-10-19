@@ -43,19 +43,6 @@ func ClientToken(name string) string {
 }
 
 // RegisterBindings 注册 HTTP client 引用相关的 binding。
-func RegisterBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterBindingsCompat()
-		return
-	}
-	registerBindings(reg)
-}
-
-// RegisterBindingsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterBindingsCompat() {
-	registerBindings(registry.GlobalWithUsage("integrations/http.RegisterBindingsCompat"))
-}
-
 func registerBindings(reg *registry.Registry) {
 	reg.RegisterBindings(runtime.NewBindingResolvers(
 		registration("HTTPInjectClient", coreintegration.MatchNamedWrapper(packagePath(), "InjectClient"), resolveInjectClient),

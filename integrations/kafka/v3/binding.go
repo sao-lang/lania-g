@@ -9,19 +9,6 @@ import (
 )
 
 // RegisterBindings 注册 Kafka integration 的容器绑定与命名注入 wrapper。
-func RegisterBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterBindingsCompat()
-		return
-	}
-	registerBindings(reg)
-}
-
-// RegisterBindingsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterBindingsCompat() {
-	registerBindings(registry.GlobalWithUsage("integrations/kafka.RegisterBindingsCompat"))
-}
-
 func registerBindings(reg *registry.Registry) {
 	coreintegration.RegisterContainerBindings(reg,
 		coreintegration.NewBindingEntryFor[*Client]("KafkaClient"),
@@ -31,5 +18,5 @@ func registerBindings(reg *registry.Registry) {
 		coreintegration.NewBindingEntry("KafkaConfigPtr", reflect.TypeFor[*Config]()),
 		coreintegration.NewBindingEntry("KafkaFactory", reflect.TypeFor[Factory]()),
 	)
-	RegisterNamedBindings(reg)
+	registerNamedBindings(reg)
 }

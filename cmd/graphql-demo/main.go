@@ -12,7 +12,6 @@ import (
 	"time"
 
 	graphqladapter "github.com/sao-lang/lania-g/protocol/graphql/v3"
-	httpadapter "github.com/sao-lang/lania-g/protocol/http/v3"
 	"github.com/sao-lang/lania-g/application/v3"
 	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	gqlbinding "github.com/sao-lang/lania-g/protocol/graphql/v3/binding"
@@ -20,7 +19,6 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 )
 
@@ -519,19 +517,16 @@ func main() {
 	// GraphQL resolver 需要落到模块 receiver 槽位，这里使用 resolvers 槽位承载它。
 	root := module.New(module.Metadata{Providers: []*di.Provider{pStore}, Resolvers: []interface{}{mutation, query, user}})
 
-	httpAdp := httpadapter.New()
-	gqlAdp := graphqladapter.New().WithPlayground(true)
+	gqlModule := graphqladapter.Module(graphqladapter.Config{Addr: addr.HTTP(":8080")})
+	root.Metadata().Imports = append(root.Metadata().Imports, gqlModule)
 
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        registry.New(),
-		StartupReporter: os.Stdout,
-	}, httpAdp, gqlAdp)
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
 		panic(err)
 	}
 
 	// 全局 GraphQL 配置演示：
-	gqlAPI := gqlAdp.API().(*graphqladapter.API)
+	gqlAPI := gqlModule.API()
 	gqlAPI.UseComplexityLimit(200)
 
 	// 下面的 Query / Mutation / Object 定义刻意比 app demo 更丰富，
@@ -554,13 +549,7 @@ func main() {
 		Object("displayName", user.DisplayName).
 		Build()
 
-	if _, err := app.CompileDiagnostics(); err != nil {
-		panic(err)
-	}
-	if _, err := app.StartupReport(); err != nil {
-		panic(err)
-	}
-	if err := app.Listen(addr.HTTP(":8080")); err != nil {
+	if err := app.Run(); err != nil {
 		panic(err)
 	}
 

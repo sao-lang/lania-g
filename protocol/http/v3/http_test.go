@@ -14,7 +14,6 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
-	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
@@ -48,7 +47,7 @@ func (c *formCookieCtrl) Upload(args struct {
 }
 
 func TestAdapter_FormAndCookieBinding(t *testing.T) {
-	a := New()
+	a := testAdapter()
 	rt := runtime.NewRuntime()
 	reg := registry.New()
 	if err := a.Mount(&fakeHost{rt: rt, reg: reg}); err != nil {
@@ -93,7 +92,7 @@ func (c *validateCtrl) H(args httpbinding.Bind[httpbinding.Body[validateDTO]]) (
 }
 
 func TestAdapter_ValidatorV10_Email(t *testing.T) {
-	a := New().WithValidatorV10()
+	a := testAdapter().WithValidatorV10()
 	rt := runtime.NewRuntime()
 	reg := registry.New()
 	if err := a.Mount(&fakeHost{rt: rt, reg: reg}); err != nil {
@@ -129,7 +128,7 @@ func (c *bodyValidateCtrl) Composite(args struct {
 }
 
 func TestAdapter_ValidatorV10_BodyWrapper(t *testing.T) {
-	a := New().WithValidatorV10()
+	a := testAdapter().WithValidatorV10()
 	rt := runtime.NewRuntime()
 	reg := registry.New()
 	if err := a.Mount(&fakeHost{rt: rt, reg: reg}); err != nil {
@@ -149,7 +148,7 @@ func TestAdapter_ValidatorV10_BodyWrapper(t *testing.T) {
 }
 
 func TestAdapter_ValidatorV10_CompositeBodyWrapper(t *testing.T) {
-	a := New().WithValidatorV10()
+	a := testAdapter().WithValidatorV10()
 	rt := runtime.NewRuntime()
 	reg := registry.New()
 	if err := a.Mount(&fakeHost{rt: rt, reg: reg}); err != nil {
@@ -186,24 +185,12 @@ func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	}
 	moduleRef := module.NewModuleRef(root)
 
-	reg := registry.New()
-	api := NewAPI(reg, nil)
-	api.Controller("/users", ctrl).Get("/ping", ctrl.Handle).Build()
-
 	_, err := (&Plugin{}).Scan(moduleRef, nil)
 	if err == nil {
 		t.Fatalf("expected missing registry error")
 	}
 	if !strings.Contains(err.Error(), "requires an explicit registry") {
 		t.Fatalf("unexpected error: %v", err)
-	}
-
-	compiled, err := compiler.Compile(moduleRef, reg, NewPlugin())
-	if err != nil {
-		t.Fatalf("compile with explicit registry: %v", err)
-	}
-	if compiled == nil {
-		t.Fatalf("expected compiled app")
 	}
 }
 
@@ -261,7 +248,7 @@ func registerHandler(t *testing.T, rt *runtime.Runtime, method, path string, ins
 }
 
 func TestAdapter_MountHandler_RespectsBasePath(t *testing.T) {
-	a := New().WithBasePath("/api")
+	a := testAdapter().WithBasePath("/api")
 	mountForTest(t, a)
 
 	a.MountHandler("/mounted", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -282,7 +269,7 @@ func TestAdapter_MountHandler_RespectsBasePath(t *testing.T) {
 }
 
 func TestAdapter_CORS_Preflight(t *testing.T) {
-	a := New().EnableCors(nil)
+	a := testAdapter().EnableCors(nil)
 	mountForTest(t, a)
 
 	req := httptest.NewRequest(http.MethodOptions, "http://example.com/any", nil)
@@ -302,7 +289,7 @@ func TestAdapter_CORS_Preflight(t *testing.T) {
 }
 
 func TestAdapter_ReadBody_RestoresForDownstream(t *testing.T) {
-	a := New()
+	a := testAdapter()
 	mountForTest(t, a)
 
 	var got string
@@ -330,7 +317,7 @@ func TestAdapter_ReadBody_RestoresForDownstream(t *testing.T) {
 }
 
 func TestAdapter_FileFiles_BindInCompositeArgs(t *testing.T) {
-	a := New()
+	a := testAdapter()
 	// 自定义挂载，同时注册一个上传路由 handler。
 	rt := runtime.NewRuntime()
 	reg := registry.New()
@@ -402,7 +389,7 @@ func (c *directWriteCtrl) DoServeFile(ctx httpbinding.Context) (any, error) {
 }
 
 func TestAdapter_ContextRedirect_SkipsNormalResponseWrite(t *testing.T) {
-	a := New()
+	a := testAdapter()
 	rt := runtime.NewRuntime()
 	reg := registry.New()
 	if err := a.Mount(&fakeHost{rt: rt, reg: reg}); err != nil {
@@ -432,7 +419,7 @@ func TestAdapter_ContextServeFile_SkipsNormalResponseWrite(t *testing.T) {
 	_, _ = tmp.WriteString("hello-file")
 	_ = tmp.Close()
 
-	a := New()
+	a := testAdapter()
 	rt := runtime.NewRuntime()
 	reg := registry.New()
 	if err := a.Mount(&fakeHost{rt: rt, reg: reg}); err != nil {
@@ -496,4 +483,9 @@ func TestWriteHTTPError_HttpExceptionOverridesKind(t *testing.T) {
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
 	}
+}
+
+// testAdapter 构造一个不监听端口的适配器，供单元测试直接调用 ServeHTTP。
+func testAdapter() *Adapter {
+	return newAdapter(Config{})
 }

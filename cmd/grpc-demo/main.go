@@ -18,7 +18,6 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 	grpcadapter "github.com/sao-lang/lania-g/protocol/grpc/v3"
 	grpcbinding "github.com/sao-lang/lania-g/protocol/grpc/v3/binding"
@@ -663,16 +662,15 @@ func main() {
 	server := grpc.NewServer()
 	reflection.Register(server)
 
-	grpcAdp := grpcadapter.New(addr.GRPC(":50051")).WithServer(server)
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        registry.New(),
-		StartupReporter: os.Stdout,
-	}, grpcAdp)
+	grpcModule := grpcadapter.Module(grpcadapter.Config{Addr: addr.GRPC(":50051"), Server: server})
+	root.Metadata().Imports = append(root.Metadata().Imports, grpcModule)
+
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
 		panic(err)
 	}
 
-	grpcAPI := grpcAdp.API().(*grpcadapter.API)
+	grpcAPI := grpcModule.API()
 	grpcAPI.Service("AuthService", authSvc).
 		Method("Register", authSvc.Register).
 		Method("Login", authSvc.Login).
@@ -697,12 +695,7 @@ func main() {
 	// 它会刻意比业务 app demo 更偏高级能力展示。
 	app.UseGlobalInterceptors(grpcEnvelopeInterceptor, grpcAuthInterceptor(store))
 
-	if _, err := app.CompileDiagnostics(); err != nil {
-		panic(err)
-	}
-	if _, err := app.StartupReport(); err != nil {
-		panic(err)
-	}
+
 	if err := app.Run(); err != nil {
 		panic(err)
 	}

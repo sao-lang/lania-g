@@ -62,19 +62,6 @@ func ConnToken(name string) string {
 }
 
 // RegisterBindings 注册 gRPC client/conn 引用相关的 binding。
-func RegisterBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterBindingsCompat()
-		return
-	}
-	registerBindings(reg)
-}
-
-// RegisterBindingsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterBindingsCompat() {
-	registerBindings(registry.GlobalWithUsage("integrations/grpc.RegisterBindingsCompat"))
-}
-
 func registerBindings(reg *registry.Registry) {
 	reg.RegisterBindings(runtime.NewBindingResolvers(
 		registration("GRPCInjectClient", coreintegration.MatchNamedWrapper(packagePath(), "InjectClient"), resolveInjectClient),

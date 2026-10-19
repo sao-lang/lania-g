@@ -48,19 +48,6 @@ func TelemetryToken(name string) string {
 }
 
 // RegisterBindings 注册 OTel 相关的 binding resolver。
-func RegisterBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterBindingsCompat()
-		return
-	}
-	registerBindings(reg)
-}
-
-// RegisterBindingsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterBindingsCompat() {
-	registerBindings(registry.GlobalWithUsage("integrations/otel.RegisterBindingsCompat"))
-}
-
 func registerBindings(reg *registry.Registry) {
 	reg.RegisterBindings(runtime.NewBindingResolvers(
 		registration("OTelInject", coreintegration.MatchNamedWrapper(packagePath(), "InjectTelemetry"), resolveInjectTelemetry),

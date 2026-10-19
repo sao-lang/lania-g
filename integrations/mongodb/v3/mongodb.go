@@ -8,7 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
 // DefaultName 是默认 MongoDB 实例名。
@@ -32,14 +31,12 @@ type Factory interface {
 }
 
 // Module 是 MongoDB integration 的模块封装。
-type Module struct {
+type integrationModule struct {
 	*module.BaseModule
 	client       *mongo.Client
 	db           *mongo.Database
 	factory      *factory
 	config       Config
-	reg          *registry.Registry
-	compatSource string
 }
 
 type factory struct {

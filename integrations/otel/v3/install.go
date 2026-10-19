@@ -2,8 +2,6 @@
 package otel
 
 import (
-	"fmt"
-	"reflect"
 
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 )
@@ -26,17 +24,3 @@ func Install(into ApplicationInstaller, telemetry *Telemetry) {
 // InstallOnFactory 尝试通过反射把 OTel middleware/interceptor 安装到 factory 上。
 //
 // 适用于无法直接依赖 ApplicationInstaller 接口的场景。
-func InstallOnFactory(into any, telemetry *Telemetry) error {
-	if into == nil || telemetry == nil {
-		return nil
-	}
-	value := reflect.ValueOf(into)
-	middlewareMethod := value.MethodByName("UseGlobalMiddleware")
-	interceptorMethod := value.MethodByName("UseGlobalInterceptors")
-	if !middlewareMethod.IsValid() || !interceptorMethod.IsValid() {
-		return fmt.Errorf("factory does not expose global otel install hooks")
-	}
-	middlewareMethod.Call([]reflect.Value{reflect.ValueOf(Middleware(telemetry))})
-	interceptorMethod.Call([]reflect.Value{reflect.ValueOf(Interceptor(telemetry))})
-	return nil
-}

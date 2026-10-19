@@ -165,3 +165,8 @@ type OAuthFlow struct {
 	RefreshURL       string            `json:"refreshUrl,omitempty"`
 	Scopes           map[string]string `json:"scopes,omitempty"`
 }
+
+// BearerAuth 声明需要注册的 Bearer 安全方案名称。
+type BearerAuthConfig struct {
+	Names []string
+}

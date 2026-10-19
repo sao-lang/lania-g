@@ -11,6 +11,14 @@ type Config struct {
 	Title       string
 	Description string
 	Version     string
+	// BearerAuth 声明需要注册的 Bearer 安全方案名称（供 Security() 引用）。
+	BearerAuth []string
+	// Servers 声明可访问的服务地址。
+	Servers []Server
+	// Tags 声明文档标签。
+	Tags []Tag
+	// DefaultErrorResponse 声明默认错误响应文案。
+	DefaultErrorResponse string
 }
 
 // UIConfig 描述 Swagger UI / Redoc 页面使用的展示配置。

@@ -2,8 +2,6 @@
 package auth
 
 import (
-	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
@@ -96,19 +94,6 @@ func Install(into interface {
 }
 
 // InstallOnFactory 把认证中间件安装到暴露 `UseGlobalMiddleware` 的 factory 上。
-func InstallOnFactory(factory any, service *Service) error {
-	if factory == nil || service == nil {
-		return nil
-	}
-	value := reflect.ValueOf(factory)
-	method := value.MethodByName("UseGlobalMiddleware")
-	if !method.IsValid() {
-		return fmt.Errorf("factory does not expose auth install hook")
-	}
-	method.Call([]reflect.Value{reflect.ValueOf(Middleware(service))})
-	return nil
-}
-
 // RequireClaims 创建一个要求 claims 包含指定键值对的 guard。
 func RequireClaims(service *Service, claims map[string]interface{}) aop.GuardFunc {
 	return func(execCtx *aop.ExecutionContext) (bool, error) {

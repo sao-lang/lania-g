@@ -42,19 +42,6 @@ func LoggerToken(name string) string {
 }
 
 // RegisterBindings 注册 logger 相关的注入包装 binding。
-func RegisterBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterBindingsCompat()
-		return
-	}
-	registerBindings(reg)
-}
-
-// RegisterBindingsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterBindingsCompat() {
-	registerBindings(registry.GlobalWithUsage("integrations/logger.RegisterBindingsCompat"))
-}
-
 func registerBindings(reg *registry.Registry) {
 	reg.RegisterBindings(runtime.NewBindingResolvers(
 		registration("LoggerInject", coreintegration.MatchNamedWrapper(packagePath(), "InjectLogger"), resolveInjectLogger),

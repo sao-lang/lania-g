@@ -7,7 +7,6 @@ import (
 
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
 // KafkaModule 是 Kafka integration 的模块封装。
@@ -18,12 +17,10 @@ type KafkaModule struct {
 	*module.BaseModule
 	client       *Client
 	config       *Config
-	reg          *registry.Registry
-	compatSource string
 }
 
 // ForRoot 基于配置创建一个 Kafka 模块。
-func ForRoot(cfg Config) (module.Module, error) {
+func build(cfg Config) (module.Module, error) {
 	client, err := NewClient(cfg)
 	if err != nil {
 		return nil, err
@@ -80,77 +77,13 @@ func ForRoot(cfg Config) (module.Module, error) {
 	}, nil
 }
 
-// ForRootCompat 显式保留 standalone Init 写入全局 registry 的兼容语义。
-func ForRootCompat(cfg Config) (module.Module, error) {
-	client, err := NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	cfgCopy := client.Config()
-
-	clientToken := reflect.TypeFor[*Client]()
-	namedClientToken := ClientToken(cfgCopy.Name)
-	configPtrToken := reflect.TypeFor[*Config]()
-	configValueToken := reflect.TypeOf(Config{})
-	readerFactoryToken := reflect.TypeFor[ReaderFactory]()
-	writerFactoryToken := reflect.TypeFor[WriterFactory]()
-	factoryToken := reflect.TypeFor[Factory]()
-
-	pClient, err := di.ProviderFromInstanceWithToken(clientToken, client, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pNamedClient, err := di.ProviderFromInstanceWithToken(namedClientToken, client, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pConfigPtr, err := di.ProviderFromInstanceWithToken(configPtrToken, &cfgCopy, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pConfigValue, err := di.ProviderFromInstanceWithToken(configValueToken, cfgCopy, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pReaderFactory, err := di.ProviderFromInstanceWithToken(readerFactoryToken, ReaderFactory(client), di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pWriterFactory, err := di.ProviderFromInstanceWithToken(writerFactoryToken, WriterFactory(client), di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pFactory, err := di.ProviderFromInstanceWithToken(factoryToken, Factory(client), di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-
-	base := module.New(module.Metadata{
-		Imports:   nil,
-		Providers: []*di.Provider{pClient, pNamedClient, pConfigPtr, pConfigValue, pReaderFactory, pWriterFactory, pFactory},
-		Exports:   []interface{}{clientToken, namedClientToken, configPtrToken, configValueToken, readerFactoryToken, writerFactoryToken, factoryToken},
-	})
-	return &KafkaModule{compatSource: "integrations/kafka.ForRootCompat",
-		BaseModule: base,
-		client:     client,
-		config:     &cfgCopy,
-	}, nil
-}
-
 // Init 完成 BaseModule 初始化并注册 Kafka binding。
 func (m *KafkaModule) Init() error {
 	if err := m.BaseModule.Init(); err != nil {
 		return err
 	}
-	reg := m.reg
-	if reg == nil {
-		if m.compatSource == "" {
-			return fmt.Errorf("kafka.Module.Init requires an explicit registry; call SetRegistry(...) before Init or use kafka.ForRootCompat(...) for standalone/global compatibility")
-		}
-		reg = registry.GlobalWithUsage(m.compatSource)
-	}
-	RegisterBindings(reg)
+	reg := m.Context().Registry()
+	registerBindings(reg)
 	return nil
 }
 
@@ -165,5 +98,24 @@ func (m *KafkaModule) Config() Config {
 	return m.config.clone()
 }
 
-// SetRegistry 为 Init 阶段指定要写入的 registry；为空时使用全局 registry。
-func (m *KafkaModule) SetRegistry(reg *registry.Registry) { m.reg = reg }
+// Module 创建 kafka 集成模块。
+//
+// 它是该集成唯一的装配入口：把模块加入根模块的 Imports 即可。
+func Module(cfgs ...Config) module.Module {
+	if len(cfgs) == 0 {
+		return module.Failed(fmt.Errorf("kafka.Module requires at least one Config"))
+	}
+	modules := make([]module.Module, 0, len(cfgs))
+	for _, cfg := range cfgs {
+		m, err := build(cfg)
+		if err != nil {
+			return module.Failed(err)
+		}
+		modules = append(modules, m)
+	}
+	if len(modules) == 1 {
+		return modules[0]
+	}
+	return module.New(module.Metadata{Imports: modules})
+}
+

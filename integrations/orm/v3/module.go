@@ -9,7 +9,6 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	coreintegration "github.com/sao-lang/lania-g/kernel/v3/integration"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 
 	"gorm.io/gorm"
 )
@@ -40,13 +39,11 @@ type Factory interface {
 }
 
 // Module 是 ORM integration 对应的模块封装。
-type Module struct {
+type integrationModule struct {
 	*module.BaseModule
 	db           *gorm.DB
 	factory      *factory
 	config       Config
-	reg          *registry.Registry
-	compatSource string
 }
 
 type factory struct {
@@ -57,28 +54,18 @@ type factory struct {
 	managed     map[string]bool
 }
 
-// ForRoot 使用单个 datasource 配置创建 ORM 模块。
-func ForRoot(cfg Config) (module.Module, error) {
-	return ForRootMulti(MultiConfig{DefaultName: cfg.Name, DataSources: []Config{cfg}})
+// build 使用单个 datasource 配置创建 ORM 模块。
+func build(cfg Config) (module.Module, error) {
+	return buildMulti(MultiConfig{DefaultName: cfg.Name, DataSources: []Config{cfg}})
 }
 
-// ForRootCompat 显式保留 standalone Init 写入全局 registry 的兼容语义。
-func ForRootCompat(cfg Config) (module.Module, error) {
-	return ForRootMultiCompat(MultiConfig{DefaultName: cfg.Name, DataSources: []Config{cfg}})
+// buildAll 使用多份 datasource 配置创建 ORM 模块。
+func buildAll(configs ...Config) (module.Module, error) {
+	return buildMulti(MultiConfig{DataSources: configs})
 }
 
-// ForRoots 使用多份 datasource 配置创建 ORM 模块。
-func ForRoots(configs ...Config) (module.Module, error) {
-	return ForRootMulti(MultiConfig{DataSources: configs})
-}
-
-// ForRootsCompat 显式保留 standalone Init 写入全局 registry 的兼容语义。
-func ForRootsCompat(configs ...Config) (module.Module, error) {
-	return ForRootMultiCompat(MultiConfig{DataSources: configs})
-}
-
-// ForRootMulti 使用多数据源配置创建 ORM 模块。
-func ForRootMulti(cfg MultiConfig) (module.Module, error) {
+// buildMulti 使用多数据源配置创建 ORM 模块。
+func buildMulti(cfg MultiConfig) (module.Module, error) {
 	configs, defaultName, err := normalizeMultiConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -150,34 +137,28 @@ func ForRootMulti(cfg MultiConfig) (module.Module, error) {
 		Providers: providers,
 		Exports:   exports,
 	})
-	return &Module{BaseModule: base, db: defaultDB, factory: f, config: defaultConfig}, nil
+	return &integrationModule{BaseModule: base, db: defaultDB, factory: f, config: defaultConfig}, nil
 }
 
 // ForRootMultiCompat 显式保留 standalone Init 写入全局 registry 的兼容语义。
-func ForRootMultiCompat(cfg MultiConfig) (module.Module, error) {
-	mod, err := ForRootMulti(cfg)
+// Init 初始化 ORM 模块，并把 ORM 相关 binding 注册到 registry。
+// Module 创建 orm 集成模块。
+//
+// 它是该集成唯一的装配入口：把模块加入根模块的 Imports 即可。
+func Module(cfgs ...Config) module.Module {
+	m, err := buildAll(cfgs...)
 	if err != nil {
-		return nil, err
+		return module.Failed(err)
 	}
-	if typed, ok := mod.(*Module); ok {
-		typed.compatSource = "integrations/orm.ForRootMultiCompat"
-	}
-	return mod, nil
+	return m
 }
 
-// Init 初始化 ORM 模块，并把 ORM 相关 binding 注册到 registry。
-func (m *Module) Init() error {
+func (m *integrationModule) Init() error {
 	if err := m.BaseModule.Init(); err != nil {
 		return err
 	}
 	txManagerToken := TransactionManagerToken()
-	reg := m.reg
-	if reg == nil {
-		if m.compatSource == "" {
-			return fmt.Errorf("orm.Module.Init requires an explicit registry; call SetRegistry(...) before Init or use orm.ForRootCompat(...) / orm.ForRootsCompat(...) / orm.ForRootMultiCompat(...) for standalone/global compatibility")
-		}
-		reg = registry.GlobalWithUsage(m.compatSource)
-	}
+	reg := m.Context().Registry()
 	coreintegration.RegisterContainerBindings(reg,
 		coreintegration.NewBindingEntry("ORMDataSource", reflect.TypeFor[*gorm.DB]()),
 		coreintegration.NewBindingEntry("ORMFactory", reflect.TypeFor[Factory]()),
@@ -185,15 +166,15 @@ func (m *Module) Init() error {
 		coreintegration.NewBindingEntry("ORMConfigPtr", reflect.TypeFor[*Config]()),
 		coreintegration.NewBindingEntry("ORMTransactionManager", txManagerToken),
 	)
-	RegisterBindings(reg)
+	registerBindings(reg)
 	return nil
 }
 
 // DB 返回默认 datasource 对应的 `*gorm.DB`。
-func (m *Module) DB() *gorm.DB { return m.db }
+func (m *integrationModule) DB() *gorm.DB { return m.db }
 
 // DataSource 按名称返回某个 datasource。
-func (m *Module) DataSource(name string) (*gorm.DB, bool) {
+func (m *integrationModule) DataSource(name string) (*gorm.DB, bool) {
 	if m.factory == nil {
 		return nil, false
 	}
@@ -201,13 +182,10 @@ func (m *Module) DataSource(name string) (*gorm.DB, bool) {
 }
 
 // Factory 返回 ORM 数据源工厂。
-func (m *Module) Factory() Factory { return m.factory }
+func (m *integrationModule) Factory() Factory { return m.factory }
 
 // Config 返回默认 datasource 的配置快照。
-func (m *Module) Config() Config { return cloneConfig(m.config) }
-
-// SetRegistry 注入 registry，供 Init 阶段注册 binding。
-func (m *Module) SetRegistry(reg *registry.Registry) { m.reg = reg }
+func (m *integrationModule) Config() Config { return cloneConfig(m.config) }
 
 func normalizeConfig(cfg Config) Config {
 	if cfg.Name == "" {

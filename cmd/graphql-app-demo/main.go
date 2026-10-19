@@ -1,12 +1,13 @@
 package main
 
 import (
+	"log"
 	"os"
 
-	graphqladapter "github.com/sao-lang/lania-g/protocol/graphql/v3"
-	"github.com/sao-lang/lania-g/application/v3"
+	application "github.com/sao-lang/lania-g/application/v3"
 	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
+	graphqladapter "github.com/sao-lang/lania-g/protocol/graphql/v3"
 )
 
 type QueryResolver struct{}
@@ -18,32 +19,25 @@ func (r *QueryResolver) Ping() (map[string]string, error) {
 func main() {
 	query := &QueryResolver{}
 
-	// GraphQL 的 owner 推导依赖 module resolvers 槽位。
-	root := module.New(module.Metadata{Resolvers: []any{query}})
+	gqlModule := graphqladapter.Module(graphqladapter.Config{Addr: addr.HTTP(":8080")})
+	root := module.New(module.Metadata{
+		Imports:   []module.Module{gqlModule},
+		Resolvers: []any{query},
+	})
 
-	gqlAdapter := graphqladapter.New(addr.HTTP(":8080")).WithPlayground(true)
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        application.NewRegistry(),
-		StartupReporter: os.Stdout,
-	}, gqlAdapter)
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	gqlAPI := gqlAdapter.API().(*graphqladapter.API)
+	gqlAPI := gqlModule.API()
 	builder := gqlAPI.Resolver("Query", query)
 	builder.Query("ping", query.Ping)
 	if _, err := builder.BuildE(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	if _, err := app.CompileDiagnostics(); err != nil {
-		panic(err)
-	}
-	if _, err := app.StartupReport(); err != nil {
-		panic(err)
-	}
 	if err := app.Run(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }

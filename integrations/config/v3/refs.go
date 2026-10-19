@@ -65,19 +65,6 @@ func ReadValue[T any](loader *Loader, key string) (T, error) {
 }
 
 // RegisterBindings 注册配置读取相关的 binding wrapper。
-func RegisterBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterBindingsCompat()
-		return
-	}
-	registerBindings(reg)
-}
-
-// RegisterBindingsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterBindingsCompat() {
-	registerBindings(registry.GlobalWithUsage("integrations/config.RegisterBindingsCompat"))
-}
-
 func registerBindings(reg *registry.Registry) {
 	reg.RegisterBindings(runtime.NewBindingResolvers(
 		registration("ConfigSection", coreintegration.MatchNamedWrapper(packagePath(), "Section"), resolveSection),

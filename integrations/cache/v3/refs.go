@@ -42,19 +42,6 @@ func CacheToken(name string) string {
 }
 
 // RegisterBindings 注册缓存引用相关的 binding。
-func RegisterBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterBindingsCompat()
-		return
-	}
-	registerBindings(reg)
-}
-
-// RegisterBindingsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterBindingsCompat() {
-	registerBindings(registry.GlobalWithUsage("integrations/cache.RegisterBindingsCompat"))
-}
-
 func registerBindings(reg *registry.Registry) {
 	reg.RegisterBindings(runtime.NewBindingResolvers(
 		registration("CacheInject", coreintegration.MatchNamedWrapper(packagePath(), "InjectCache"), resolveInjectCache),

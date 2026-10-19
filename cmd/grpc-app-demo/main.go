@@ -3,6 +3,7 @@ package main
 import (
 	stdctx "context"
 	"io"
+	"log"
 	"os"
 
 	grpcadapter "github.com/sao-lang/lania-g/protocol/grpc/v3"
@@ -78,19 +79,18 @@ func (s *UserService) Chat(args chatArgs) error {
 func main() {
 	userSvc := &UserService{}
 
-	// gRPC receiver 只需要明确归属到某个模块 owner；业务样板中直接放入模块 owner 槽位即可。
-	root := module.New(module.Metadata{Controllers: []any{userSvc}})
+	grpcModule := grpcadapter.Module(grpcadapter.Config{Addr: addr.GRPC(":50051")})
+	root := module.New(module.Metadata{
+		Imports:     []module.Module{grpcModule},
+		Controllers: []any{userSvc},
+	})
 
-	grpcAdapter := grpcadapter.New(addr.GRPC(":50051"))
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        application.NewRegistry(),
-		StartupReporter: os.Stdout,
-	}, grpcAdapter)
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	grpcAPI := grpcAdapter.API().(*grpcadapter.API)
+	grpcAPI := grpcModule.API()
 	builder := grpcAPI.Service("UserService", userSvc)
 	builder.Method("Ping", userSvc.Ping)
 	builder.ServerStreamMethod("Watch", userSvc.Watch)
@@ -98,13 +98,7 @@ func main() {
 	builder.BidiStreamMethod("Chat", userSvc.Chat)
 	builder.Build()
 
-	if _, err := app.CompileDiagnostics(); err != nil {
-		panic(err)
-	}
-	if _, err := app.StartupReport(); err != nil {
-		panic(err)
-	}
 	if err := app.Run(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }

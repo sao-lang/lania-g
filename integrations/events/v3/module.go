@@ -8,20 +8,17 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	coreintegration "github.com/sao-lang/lania-g/kernel/v3/integration"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
 // Module 是事件集成对应的模块封装。
-type Module struct {
+type integrationModule struct {
 	*module.BaseModule
 	bus          *Bus
 	config       Config
-	reg          *registry.Registry
-	compatSource string
 }
 
 // ForRoot 创建事件集成模块，并注册事件总线、发射器、配置和工厂。
-func ForRoot(cfg Config) (module.Module, error) {
+func build(cfg Config) (module.Module, error) {
 	bus, err := New(cfg)
 	if err != nil {
 		return nil, err
@@ -31,7 +28,6 @@ func ForRoot(cfg Config) (module.Module, error) {
 	configPtrToken := reflect.TypeFor[*Config]()
 	configValueToken := reflect.TypeOf(Config{})
 	factoryToken := reflect.TypeFor[Factory]()
-	lifecycleToken := reflect.TypeFor[interface{ OnApplicationBootstrap() error }]()
 
 	pBus, err := di.ProviderFromInstanceWithToken(busToken, bus, di.Singleton)
 	if err != nil {
@@ -53,73 +49,30 @@ func ForRoot(cfg Config) (module.Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	pLifecycle, err := di.ProviderFromInstanceWithToken(lifecycleToken, NewLifecycleHook(bus, nil), di.Singleton)
-	if err != nil {
-		return nil, err
-	}
 	base := module.New(module.Metadata{
-		Providers: []*di.Provider{pBus, pEmitter, pConfigPtr, pConfigValue, pFactory, pLifecycle},
+		Providers: []*di.Provider{pBus, pEmitter, pConfigPtr, pConfigValue, pFactory},
 		Exports:   []interface{}{busToken, emitterToken, configPtrToken, configValueToken, factoryToken},
 	})
-	return &Module{BaseModule: base, bus: bus, config: cfg}, nil
-}
-
-// ForRootCompat 显式保留 standalone Init 写入全局 registry 的兼容语义。
-func ForRootCompat(cfg Config) (module.Module, error) {
-	bus, err := New(cfg)
-	if err != nil {
-		return nil, err
-	}
-	busToken := reflect.TypeFor[*Bus]()
-	emitterToken := reflect.TypeFor[Emitter]()
-	configPtrToken := reflect.TypeFor[*Config]()
-	configValueToken := reflect.TypeOf(Config{})
-	factoryToken := reflect.TypeFor[Factory]()
-	lifecycleToken := reflect.TypeFor[interface{ OnApplicationBootstrap() error }]()
-
-	pBus, err := di.ProviderFromInstanceWithToken(busToken, bus, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pEmitter, err := di.ProviderFromInstanceWithToken(emitterToken, Emitter(bus), di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pConfigPtr, err := di.ProviderFromInstanceWithToken(configPtrToken, &cfg, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pConfigValue, err := di.ProviderFromInstanceWithToken(configValueToken, cfg, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pFactory, err := di.ProviderFromInstanceWithToken(factoryToken, Factory(bus), di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pLifecycle, err := di.ProviderFromInstanceWithToken(lifecycleToken, NewLifecycleHook(bus, nil), di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	base := module.New(module.Metadata{
-		Providers: []*di.Provider{pBus, pEmitter, pConfigPtr, pConfigValue, pFactory, pLifecycle},
-		Exports:   []interface{}{busToken, emitterToken, configPtrToken, configValueToken, factoryToken},
-	})
-	return &Module{compatSource: "integrations/events.ForRootCompat", BaseModule: base, bus: bus, config: cfg}, nil
+	return &integrationModule{BaseModule: base, bus: bus, config: cfg}, nil
 }
 
 // Init 初始化事件模块，并把相关 container binding 注册到 registry。
-func (m *Module) Init() error {
+// Module 创建 events 集成模块。
+//
+// 它是该集成唯一的装配入口：把模块加入根模块的 Imports 即可。
+func Module(cfg Config) module.Module {
+	m, err := build(cfg)
+	if err != nil {
+		return module.Failed(err)
+	}
+	return m
+}
+
+func (m *integrationModule) Init() error {
 	if err := m.BaseModule.Init(); err != nil {
 		return err
 	}
-	reg := m.reg
-	if reg == nil {
-		if m.compatSource == "" {
-			return fmt.Errorf("events.Module.Init requires an explicit registry; call SetRegistry(...) before Init or use events.ForRootCompat(...) for standalone/global compatibility")
-		}
-		reg = registry.GlobalWithUsage(m.compatSource)
-	}
+	reg := m.Context().Registry()
 	coreintegration.RegisterContainerBindings(reg,
 		coreintegration.NewBindingEntryFor[*Bus]("EventsBus"),
 		coreintegration.NewBindingEntry("EventsEmitter", reflect.TypeFor[Emitter]()),
@@ -131,10 +84,47 @@ func (m *Module) Init() error {
 }
 
 // Bus 返回当前模块持有的事件总线。
-func (m *Module) Bus() *Bus { return m.bus }
+func (m *integrationModule) Bus() *Bus { return m.bus }
 
 // Config 返回当前模块的配置快照。
-func (m *Module) Config() Config { return m.config }
+func (m *integrationModule) Config() Config { return m.config }
 
-// SetRegistry 注入 registry，供 Init 阶段注册绑定声明。
-func (m *Module) SetRegistry(reg *registry.Registry) { m.reg = reg }
+// Declare 收集实现了 Subscriber 的控制器，并把订阅绑定到事件总线。
+//
+// 与 HTTP 一样，订阅声明归属于控制器所在的模块。
+func (m *integrationModule) Declare(root *module.ModuleRef) error {
+	if root == nil || m.bus == nil {
+		return nil
+	}
+	var errs []error
+	err := module.WalkModules(root.GetRootModule(), func(mod module.Module) error {
+		metadata := mod.Metadata()
+		if metadata == nil {
+			return nil
+		}
+		for _, controller := range metadata.Controllers {
+			instance, err := module.ResolveController(mod, controller)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			subscriber, ok := instance.(Subscriber)
+			if !ok {
+				continue
+			}
+			routes := &Routes{receiver: instance}
+			subscriber.Subscribe(routes)
+			if err := routes.bind(m.bus); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("events subscription failed: %v", errs)
+	}
+	return nil
+}

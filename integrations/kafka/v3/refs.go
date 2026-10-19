@@ -52,20 +52,7 @@ func ClientToken(name string) string {
 	return "kafka:client:" + name
 }
 
-// RegisterNamedBindings 注册 Kafka 相关的命名注入 wrapper。
-func RegisterNamedBindings(reg *registry.Registry) {
-	if reg == nil {
-		RegisterNamedBindingsCompat()
-		return
-	}
-	registerNamedBindings(reg)
-}
-
 // RegisterNamedBindingsCompat 显式保留“写入全局 registry”的兼容命名 binding 注册入口。
-func RegisterNamedBindingsCompat() {
-	registerNamedBindings(registry.GlobalWithUsage("integrations/kafka.RegisterNamedBindingsCompat"))
-}
-
 func registerNamedBindings(reg *registry.Registry) {
 	reg.RegisterBindings(runtime.NewBindingResolvers(
 		registration("KafkaInjectClient", coreintegration.MatchNamedWrapper(packagePath(), "InjectClient"), resolveInjectClient),

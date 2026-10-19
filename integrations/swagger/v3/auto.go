@@ -19,10 +19,6 @@ func BuildFromHTTPRegistry(builder *Builder, reg *registry.Registry) (*Builder, 
 }
 
 // BuildFromHTTPRegistryCompat 会从全局 HTTP registry 声明中自动生成 Swagger 文档内容。
-func BuildFromHTTPRegistryCompat(builder *Builder) *Builder {
-	return buildFromHTTPRegistry(builder, registry.Global())
-}
-
 func buildFromHTTPRegistry(builder *Builder, reg *registry.Registry) *Builder {
 	if builder == nil {
 		return nil

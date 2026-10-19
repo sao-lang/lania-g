@@ -9,17 +9,14 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	coreintegration "github.com/sao-lang/lania-g/kernel/v3/integration"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
 // Module 是 cache integration 对应的模块封装。
-type Module struct {
+type integrationModule struct {
 	*module.BaseModule
 	cache        Cache
 	factory      *factory
 	config       Config
-	reg          *registry.Registry
-	compatSource string
 }
 
 type factory struct {
@@ -30,7 +27,7 @@ type factory struct {
 }
 
 // ForRoot 创建缓存集成模块，并注册默认 cache、命名 cache、工厂与配置。
-func ForRoot(cfg Config) (module.Module, error) {
+func build(cfg Config) (module.Module, error) {
 	cfg = normalizeConfig(cfg)
 	f := newFactory(cfg.Name)
 	cache, err := f.GetOrCreate(cfg.Name, cfg)
@@ -69,85 +66,54 @@ func ForRoot(cfg Config) (module.Module, error) {
 		Providers: []*di.Provider{pCache, pNamedCache, pFactory, pConfigPtr, pConfigValue},
 		Exports:   []interface{}{cacheToken, namedCacheToken, factoryToken, configPtrToken, configValueToken},
 	})
-	return &Module{BaseModule: base, cache: cache, factory: f, config: cfg}, nil
-}
-
-// ForRootCompat 显式保留 standalone Init 写入全局 registry 的兼容语义。
-func ForRootCompat(cfg Config) (module.Module, error) {
-	cfg = normalizeConfig(cfg)
-	f := newFactory(cfg.Name)
-	cache, err := f.GetOrCreate(cfg.Name, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	cacheToken := reflect.TypeFor[Cache]()
-	namedCacheToken := CacheToken(cfg.Name)
-	factoryToken := reflect.TypeFor[Factory]()
-	configPtrToken := reflect.TypeFor[*Config]()
-	configValueToken := reflect.TypeOf(Config{})
-
-	pCache, err := di.ProviderFromInstanceWithToken(cacheToken, cache, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pNamedCache, err := di.ProviderFromInstanceWithToken(namedCacheToken, cache, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pFactory, err := di.ProviderFromInstanceWithToken(factoryToken, Factory(f), di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pConfigPtr, err := di.ProviderFromInstanceWithToken(configPtrToken, &cfg, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-	pConfigValue, err := di.ProviderFromInstanceWithToken(configValueToken, cfg, di.Singleton)
-	if err != nil {
-		return nil, err
-	}
-
-	base := module.New(module.Metadata{
-		Providers: []*di.Provider{pCache, pNamedCache, pFactory, pConfigPtr, pConfigValue},
-		Exports:   []interface{}{cacheToken, namedCacheToken, factoryToken, configPtrToken, configValueToken},
-	})
-	return &Module{compatSource: "integrations/cache.ForRootCompat", BaseModule: base, cache: cache, factory: f, config: cfg}, nil
+	return &integrationModule{BaseModule: base, cache: cache, factory: f, config: cfg}, nil
 }
 
 // Init 初始化缓存模块，并把缓存相关 binding 注册到 registry。
-func (m *Module) Init() error {
+// Module 创建 cache 集成模块。
+//
+// 它是该集成唯一的装配入口：把模块加入根模块的 Imports 即可。
+func Module(cfgs ...Config) module.Module {
+	if len(cfgs) == 0 {
+		return module.Failed(fmt.Errorf("cache.Module requires at least one Config"))
+	}
+	modules := make([]module.Module, 0, len(cfgs))
+	for _, cfg := range cfgs {
+		m, err := build(cfg)
+		if err != nil {
+			return module.Failed(err)
+		}
+		modules = append(modules, m)
+	}
+	if len(modules) == 1 {
+		return modules[0]
+	}
+	return module.New(module.Metadata{Imports: modules})
+}
+
+func (m *integrationModule) Init() error {
 	if err := m.BaseModule.Init(); err != nil {
 		return err
 	}
-	reg := m.reg
-	if reg == nil {
-		if m.compatSource == "" {
-			return fmt.Errorf("cache.Module.Init requires an explicit registry; call SetRegistry(...) before Init or use cache.ForRootCompat(...) for standalone/global compatibility")
-		}
-		reg = registry.GlobalWithUsage(m.compatSource)
-	}
+	reg := m.Context().Registry()
 	coreintegration.RegisterContainerBindings(reg,
 		coreintegration.NewBindingEntry("Cache", reflect.TypeFor[Cache]()),
 		coreintegration.NewBindingEntry("CacheFactory", reflect.TypeFor[Factory]()),
 		coreintegration.NewBindingEntry("CacheConfig", reflect.TypeOf(Config{})),
 		coreintegration.NewBindingEntry("CacheConfigPtr", reflect.TypeFor[*Config]()),
 	)
-	RegisterBindings(reg)
+	registerBindings(reg)
 	return nil
 }
 
 // Cache 返回当前模块持有的默认缓存实例。
-func (m *Module) Cache() Cache { return m.cache }
+func (m *integrationModule) Cache() Cache { return m.cache }
 
 // Factory 返回缓存工厂，用于按名称或配置创建更多缓存实例。
-func (m *Module) Factory() Factory { return m.factory }
+func (m *integrationModule) Factory() Factory { return m.factory }
 
 // Config 返回当前模块使用的缓存配置快照。
-func (m *Module) Config() Config { return cloneConfig(m.config) }
-
-// SetRegistry 注入 registry，供 Init 阶段注册绑定声明。
-func (m *Module) SetRegistry(reg *registry.Registry) { m.reg = reg }
+func (m *integrationModule) Config() Config { return cloneConfig(m.config) }
 
 func normalizeConfig(cfg Config) Config {
 	if cfg.Type == "" {

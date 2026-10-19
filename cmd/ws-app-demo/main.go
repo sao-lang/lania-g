@@ -1,12 +1,13 @@
 package main
 
 import (
+	"log"
 	"os"
 
-	wsadapter "github.com/sao-lang/lania-g/protocol/ws/v3"
-	"github.com/sao-lang/lania-g/application/v3"
+	application "github.com/sao-lang/lania-g/application/v3"
 	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
+	wsadapter "github.com/sao-lang/lania-g/protocol/ws/v3"
 )
 
 type ChatGateway struct{}
@@ -18,32 +19,25 @@ func (g *ChatGateway) Ping() (map[string]string, error) {
 func main() {
 	gateway := &ChatGateway{}
 
-	// WS 的 owner 推导依赖 module controllers 槽位。
-	root := module.New(module.Metadata{Controllers: []any{gateway}})
+	wsModule := wsadapter.Module(wsadapter.Config{Addr: addr.HTTP(":8080")})
+	root := module.New(module.Metadata{
+		Imports:     []module.Module{wsModule},
+		Controllers: []any{gateway},
+	})
 
-	wsAdapter := wsadapter.New(addr.HTTP(":8080"))
-	app, err := application.NewWithOptions(root, application.Options{
-		Registry:        application.NewRegistry(),
-		StartupReporter: os.Stdout,
-	}, wsAdapter)
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	wsAPI := wsAdapter.API().(*wsadapter.API)
+	wsAPI := wsModule.API()
 	builder := wsAPI.Gateway("/ws/chat", gateway)
 	builder.On("ping", gateway.Ping)
 	if _, err := builder.BuildE(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	if _, err := app.CompileDiagnostics(); err != nil {
-		panic(err)
-	}
-	if _, err := app.StartupReport(); err != nil {
-		panic(err)
-	}
 	if err := app.Run(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
