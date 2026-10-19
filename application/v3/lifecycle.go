@@ -6,6 +6,7 @@
 package application
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/sao-lang/lania-g/kernel/v3/di"
@@ -67,17 +68,20 @@ func (a *Application) forEachSubtreeLifecycle(root module.Module, reverse bool, 
 // 这是应用级 lifecycle hook 的真正执行引擎。
 func (a *Application) forEachModulesLifecycle(modules []module.Module, reverse bool, visit func(instance any) error) error {
 	nodes := make([]graph.ModuleNodeInput, 0, len(modules))
-	moduleByType := make(map[reflect.Type]module.Module, len(modules))
+	moduleByKey := make(map[string]module.Module, len(modules))
 	for _, mod := range modules {
 		if mod == nil || mod.Metadata() == nil {
 			continue
 		}
-		t := reflect.TypeOf(mod)
-		moduleByType[t] = mod
-		node := graph.ModuleNodeInput{Type: t}
+		key := fmt.Sprintf("%p", mod)
+		moduleByKey[key] = mod
+		node := graph.ModuleNodeInput{
+			Key:     key,
+			Display: reflect.TypeOf(mod).String(),
+		}
 		for _, imp := range mod.Metadata().Imports {
 			if imp != nil {
-				node.Imports = append(node.Imports, reflect.TypeOf(imp))
+				node.Imports = append(node.Imports, fmt.Sprintf("%p", imp))
 			}
 		}
 		nodes = append(nodes, node)
@@ -91,8 +95,8 @@ func (a *Application) forEachModulesLifecycle(modules []module.Module, reverse b
 			order[i], order[j] = order[j], order[i]
 		}
 	}
-	for _, moduleType := range order {
-		mod := moduleByType[moduleType]
+	for _, moduleKey := range order {
+		mod := moduleByKey[moduleKey]
 		if mod == nil || mod.Container() == nil {
 			continue
 		}

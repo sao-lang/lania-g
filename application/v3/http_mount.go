@@ -10,8 +10,8 @@ import (
 
 // httpMountAdapter 是“支持挂载原生 handler”的适配器能力集。
 type httpMountAdapter interface {
-	MountHandler(pattern string, handler http.Handler)
-	ServeStatic(prefix, root string)
+	HandleHTTP(pattern string, handler http.Handler)
+	Static(prefix, root string)
 }
 
 // Handle 把原生 http.Handler 挂到给定前缀。
@@ -22,7 +22,7 @@ func (a *Application) Handle(pattern string, handler http.Handler) {
 // Static 把本地目录作为静态资源挂到给定前缀。
 func (a *Application) Static(prefix, root string) {
 	if mounter, ok := a.httpMounter(); ok {
-		mounter.ServeStatic(prefix, root)
+		mounter.Static(prefix, root)
 	}
 }
 
@@ -38,7 +38,7 @@ func (a *Application) MountHTTP(pattern string, handler http.Handler) error {
 	if !ok {
 		return fmt.Errorf("no mounted http adapter")
 	}
-	mounter.MountHandler(pattern, handler)
+	mounter.HandleHTTP(pattern, handler)
 	return nil
 }
 

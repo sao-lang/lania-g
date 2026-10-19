@@ -175,6 +175,16 @@ func (a *Adapter) MountHandler(pattern string, handler http.Handler) *Adapter {
 	return a
 }
 
+// HandleHTTP 是 MountHandler 的无返回值形式，供 adapter.Mounter 使用。
+func (a *Adapter) HandleHTTP(pattern string, handler http.Handler) {
+	a.MountHandler(pattern, handler)
+}
+
+// Static 是 ServeStatic 的无返回值形式，供 adapter.Mounter 使用。
+func (a *Adapter) Static(prefix, root string) {
+	a.ServeStatic(prefix, root)
+}
+
 // ServeStatic 把本地目录作为静态资源挂到指定前缀下。
 func (a *Adapter) ServeStatic(prefix, root string) *Adapter {
 	prefix = normalizePrefix(prefix)

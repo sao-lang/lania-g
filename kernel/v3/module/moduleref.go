@@ -19,7 +19,7 @@ import (
 type ModuleRef struct {
 	module    Module
 	container *di.Container
-	modules   map[reflect.Type]Module
+	modules   map[reflect.Type][]Module
 	mu        sync.RWMutex
 }
 
@@ -29,7 +29,7 @@ type ModuleRef struct {
 func NewModuleRef(rootModule Module) *ModuleRef {
 	ref := &ModuleRef{
 		module:  rootModule,
-		modules: make(map[reflect.Type]Module),
+		modules: make(map[reflect.Type][]Module),
 	}
 
 	if rootModule != nil {
@@ -52,7 +52,7 @@ func (r *ModuleRef) collectModules(mod Module) {
 
 	typeKey := reflect.TypeOf(mod)
 	r.mu.Lock()
-	r.modules[typeKey] = mod
+	r.modules[typeKey] = append(r.modules[typeKey], mod)
 	r.mu.Unlock()
 
 	if base, ok := mod.(*BaseModule); ok {
@@ -69,15 +69,21 @@ func (r *ModuleRef) GetModule(moduleType interface{}) (Module, error) {
 	defer r.mu.RUnlock()
 
 	targetType := reflect.TypeOf(moduleType)
-	if mod, ok := r.modules[targetType]; ok {
-		return mod, nil
+	if mods, ok := r.modules[targetType]; ok {
+		for _, mod := range mods {
+			if mod != nil {
+				return mod, nil
+			}
+		}
 	}
 
 	// 若没按精确类型命中，再退回到 AssignableTo，
 	// 兼容接口类型或不同声明姿势下的模块查找。
-	for _, mod := range r.modules {
-		if reflect.TypeOf(mod).AssignableTo(targetType) {
-			return mod, nil
+	for _, mods := range r.modules {
+		for _, mod := range mods {
+			if mod != nil && reflect.TypeOf(mod).AssignableTo(targetType) {
+				return mod, nil
+			}
 		}
 	}
 
@@ -125,8 +131,8 @@ func (r *ModuleRef) GetAllModules() []Module {
 	defer r.mu.RUnlock()
 
 	modules := make([]Module, 0, len(r.modules))
-	for _, mod := range r.modules {
-		modules = append(modules, mod)
+	for _, mods := range r.modules {
+		modules = append(modules, mods...)
 	}
 	return modules
 }
@@ -137,8 +143,13 @@ func (r *ModuleRef) GetAllModulesWithTypes() map[reflect.Type]Module {
 	defer r.mu.RUnlock()
 
 	out := make(map[reflect.Type]Module, len(r.modules))
-	for typ, mod := range r.modules {
-		out[typ] = mod
+	for typ, mods := range r.modules {
+		for _, mod := range mods {
+			if mod != nil {
+				out[typ] = mod
+				break
+			}
+		}
 	}
 	return out
 }
@@ -150,11 +161,16 @@ func (r *ModuleRef) GetModuleContainerByType(moduleType reflect.Type) (*di.Conta
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	mod, ok := r.modules[moduleType]
-	if !ok || mod == nil {
+	mods, ok := r.modules[moduleType]
+	if !ok {
 		return nil, false
 	}
-	return mod.Container(), true
+	for _, mod := range mods {
+		if mod != nil {
+			return mod.Container(), true
+		}
+	}
+	return nil, false
 }
 
 // GetRootModule 返回 root module。

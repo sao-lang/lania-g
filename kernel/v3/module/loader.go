@@ -5,6 +5,7 @@
 package module
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -266,6 +267,28 @@ func (l *ModuleLoader) prepareGlobalModules() {
 	}
 }
 
+// moduleKey 返回模块实例的唯一标识（指针地址）。
+//
+// 使用实例身份而不是 reflect.Type：module.New 创建的多个模块共享 *BaseModule 类型，
+// 用类型做 key 会把它们合并成同一个图节点并产生假环。
+func moduleKey(mod Module) string {
+	if mod == nil {
+		return ""
+	}
+	if base, ok := mod.(interface{ Context() *Context }); ok && base.Context() != nil && base.Context().Key() != "" {
+		return base.Context().Key() + "#" + fmt.Sprintf("%p", mod)
+	}
+	return fmt.Sprintf("%p", mod)
+}
+
+// moduleDisplay 返回模块的可读名称（类型名）。
+func moduleDisplay(mod Module) string {
+	if mod == nil {
+		return "<nil>"
+	}
+	return reflect.TypeOf(mod).String()
+}
+
 // validateGraphs 构建模块/Provider 依赖图并生成诊断信息。
 // 当存在循环依赖等问题时，会返回 KernelError(KindDI) 并附带 diagnostics meta。
 func (l *ModuleLoader) validateGraphs() error {
@@ -275,12 +298,15 @@ func (l *ModuleLoader) validateGraphs() error {
 		if mod == nil || mod.Metadata() == nil {
 			continue
 		}
-		node := graph.ModuleNodeInput{Type: reflect.TypeOf(mod)}
+		node := graph.ModuleNodeInput{
+			Key:     moduleKey(mod),
+			Display: moduleDisplay(mod),
+		}
 		for _, imp := range mod.Metadata().Imports {
 			if imp == nil {
 				continue
 			}
-			node.Imports = append(node.Imports, reflect.TypeOf(imp))
+			node.Imports = append(node.Imports, moduleKey(imp))
 		}
 		nodes = append(nodes, node)
 	}

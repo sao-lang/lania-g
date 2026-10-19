@@ -40,33 +40,45 @@ func (d *Diagnostics) String() string {
 }
 
 // ModuleGraph 表示模块 imports 之间的依赖图。
+//
+// 节点 key 使用字符串而不是 reflect.Type：同一个具体类型可能对应多个模块实例
+// （例如 module.New 返回的 *module.BaseModule），用类型做 key 会把它们误判成同一个节点。
 type ModuleGraph struct {
-	nodes map[reflect.Type]struct{}
-	edges map[reflect.Type][]reflect.Type
+	nodes map[string]struct{}
+	edges map[string][]string
+	names map[string]string
 }
 
 // ModuleNodeInput 是构建 ModuleGraph 时使用的输入结构。
 type ModuleNodeInput struct {
-	Type    reflect.Type
-	Imports []reflect.Type
+	// Key 是模块实例的唯一标识（通常用指针地址）。
+	Key string
+	// Display 是用于诊断输出的可读名称（通常是模块类型名）。
+	Display string
+	// Imports 是 imports 模块的 Key。
+	Imports []string
 }
 
 // NewModuleGraph 根据模块节点输入创建模块依赖图（imports 边）。
 func NewModuleGraph(mods []ModuleNodeInput) *ModuleGraph {
 	g := &ModuleGraph{
-		nodes: make(map[reflect.Type]struct{}),
-		edges: make(map[reflect.Type][]reflect.Type),
+		nodes: make(map[string]struct{}),
+		edges: make(map[string][]string),
+		names: make(map[string]string),
 	}
 	for _, mod := range mods {
-		if mod.Type == nil {
+		if mod.Key == "" {
 			continue
 		}
-		g.nodes[mod.Type] = struct{}{}
+		g.nodes[mod.Key] = struct{}{}
+		if mod.Display != "" {
+			g.names[mod.Key] = mod.Display
+		}
 		for _, imp := range mod.Imports {
-			if imp == nil {
+			if imp == "" {
 				continue
 			}
-			g.edges[mod.Type] = appendUniqueType(g.edges[mod.Type], imp)
+			g.edges[mod.Key] = appendUniqueString(g.edges[mod.Key], imp)
 		}
 	}
 	return g
@@ -74,14 +86,14 @@ func NewModuleGraph(mods []ModuleNodeInput) *ModuleGraph {
 
 // DetectCycles 检测模块 imports 是否存在环，返回所有检测到的环（去重后）。
 // 这里保留“所有命中的环”，比单个报错更适合启动诊断输出。
-func (g *ModuleGraph) DetectCycles() [][]reflect.Type {
-	visited := make(map[reflect.Type]bool)
-	stack := make(map[reflect.Type]bool)
-	var path []reflect.Type
-	var cycles [][]reflect.Type
+func (g *ModuleGraph) DetectCycles() [][]string {
+	visited := make(map[string]bool)
+	stack := make(map[string]bool)
+	var path []string
+	var cycles [][]string
 
-	var dfs func(node reflect.Type)
-	dfs = func(node reflect.Type) {
+	var dfs func(node string)
+	dfs = func(node string) {
 		visited[node] = true
 		stack[node] = true
 		path = append(path, node)
@@ -91,25 +103,51 @@ func (g *ModuleGraph) DetectCycles() [][]reflect.Type {
 				continue
 			}
 			if stack[next] {
-				cycles = append(cycles, extractTypeCycle(path, next))
+				cycles = append(cycles, extractStringCycle(path, next))
 			}
 		}
 		stack[node] = false
 		path = path[:len(path)-1]
 	}
 
-	keys := sortedTypeKeys(g.nodes)
+	keys := sortedStringKeys(g.nodes)
 	for _, key := range keys {
 		if !visited[key] {
 			dfs(key)
 		}
 	}
-	return dedupeTypeCycles(cycles)
+	return g.dedupeCycles(cycles)
+}
+
+// dedupeCycles 按“展示名序列”去重环。
+func (g *ModuleGraph) dedupeCycles(cycles [][]string) [][]string {
+	seen := make(map[string]bool)
+	out := make([][]string, 0, len(cycles))
+	for _, cycle := range cycles {
+		display := make([]string, 0, len(cycle))
+		for _, key := range cycle {
+			display = append(display, g.display(key))
+		}
+		joined := strings.Join(display, "|")
+		if seen[joined] {
+			continue
+		}
+		seen[joined] = true
+		out = append(out, display)
+	}
+	return out
+}
+
+func (g *ModuleGraph) display(key string) string {
+	if name, ok := g.names[key]; ok && name != "" {
+		return name
+	}
+	return key
 }
 
 // TopologicalSort 对模块图做拓扑排序；若存在环则返回错误。
-func (g *ModuleGraph) TopologicalSort() ([]reflect.Type, error) {
-	return topoSortTypes(g.nodes, g.edges)
+func (g *ModuleGraph) TopologicalSort() ([]string, error) {
+	return topoSortStrings(g.nodes, g.edges)
 }
 
 // ProviderGraph 表示 provider 之间的依赖图。
@@ -183,9 +221,7 @@ func (g *ProviderGraph) TopologicalSort() ([]string, error) {
 // 返回 nil 表示没有问题；否则返回包含 cycle 列表的 Diagnostics。
 func BuildDiagnostics(mods []ModuleNodeInput, providers map[interface{}]*di.Provider) *Diagnostics {
 	d := &Diagnostics{}
-	for _, cycle := range NewModuleGraph(mods).DetectCycles() {
-		d.ModuleCycles = append(d.ModuleCycles, stringifyTypes(cycle))
-	}
+	d.ModuleCycles = append(d.ModuleCycles, NewModuleGraph(mods).DetectCycles()...)
 	d.ProviderCycles = append(d.ProviderCycles, NewProviderGraph(providers).DetectCycles()...)
 	if !d.HasIssues() {
 		return nil
