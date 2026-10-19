@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
+	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 )
 
 // Adapter 是 Scheduler 协议的运行期适配器实现。
 type Adapter struct {
 	host adapter.Host
-	api  *API
+	reg  *registry.Registry
 
 	mu           sync.Mutex
 	cancel       stdctx.CancelFunc
@@ -33,7 +34,6 @@ type Adapter struct {
 // 并维护限流、唯一执行、运行历史和指标等调度期状态。
 func New() *Adapter {
 	return &Adapter{
-		api:          NewCompatAPI(),
 		limiters:     make(map[string]chan struct{}),
 		uniqueLocker: NewInMemoryUniqueLocker(),
 		historyLimit: 20,
@@ -49,16 +49,13 @@ func (a *Adapter) ID() string { return AdapterID }
 // Plugins 返回 Scheduler 协议参与编译的插件列表。
 func (a *Adapter) Plugins() []compiler.ProtocolPlugin { return []compiler.ProtocolPlugin{NewPlugin()} }
 
-// API 返回 Scheduler adapter 暴露给应用侧的 DSL API。
-func (a *Adapter) API() any { return a.api }
-
 // Mount 将 Scheduler adapter 挂到应用 host 上，并把 API 绑定到当前 registry。
 func (a *Adapter) Mount(host adapter.Host) error {
 	if host == nil {
 		return fmt.Errorf("scheduler adapter host is nil")
 	}
 	a.host = host
-	a.api = NewAPI(host.Registry())
+	a.reg = host.Registry()
 	return nil
 }
 

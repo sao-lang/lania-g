@@ -100,14 +100,15 @@ func buildRuntimeForTest(t *testing.T) (*runtime.Runtime, *registry.Registry) {
 	moduleRef := module.NewModuleRef(root)
 	reg := registry.New()
 
-	NewAPI(reg).Resolver("User", resolver).
+	routes := newRoutes(reg, resolver)
+	routes.Resolver("User").
 		Query("user", resolver.User).Arg("id").Returns("User").
 		Query("echoComposite", resolver.EchoComposite).Arg("id").
 		Query("echoAuto", resolver.EchoAuto).
 		Query("validateArgs", resolver.ValidateArgs).Arg("id").
 		Query("unbound", resolver.Unbound).
-		Object("displayName", resolver.DisplayName).
-		Build()
+		Object("displayName", resolver.DisplayName)
+	_ = routes.Err()
 
 	compiled, err := compiler.Compile(moduleRef, reg, NewPlugin())
 	if err != nil {
@@ -129,11 +130,12 @@ func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	moduleRef := module.NewModuleRef(root)
 
 	reg := registry.New()
-	NewAPI(reg).Resolver("User", resolver).
+	routes := newRoutes(reg, resolver)
+	routes.Resolver("User").
 		Query("user", resolver.User).
 		Arg("id").
-		Returns("User").
-		Build()
+		Returns("User")
+	_ = routes.Err()
 
 	_, err := (&Plugin{}).Scan(moduleRef, nil)
 	if err == nil {
@@ -294,15 +296,15 @@ func TestCompile_RejectSubscription(t *testing.T) {
 	if err := root.Init(); err != nil {
 		t.Fatalf("init module: %v", err)
 	}
-	moduleRef := module.NewModuleRef(root)
+	_ = module.NewModuleRef(root)
 	reg := registry.New()
 
-	NewAPI(reg).Resolver("User", resolver).
-		Subscription("userSub", resolver.User).
-		Build()
-
-	if _, err := compiler.Compile(moduleRef, reg, NewPlugin()); err == nil || !strings.Contains(err.Error(), "subscription") {
-		t.Fatalf("expected subscription compile error, got %v", err)
+	routes := newRoutes(reg, resolver)
+	routes.Resolver("User").
+		Subscription("userSub", resolver.User)
+	// 订阅在声明阶段就会被拒绝，不再依赖编译期检查。
+	if err := routes.Err(); err == nil || !strings.Contains(err.Error(), "subscription") {
+		t.Fatalf("expected subscription declaration error, got %v", err)
 	}
 }
 

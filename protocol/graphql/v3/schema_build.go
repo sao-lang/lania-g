@@ -50,10 +50,6 @@ func buildCompiledSchemaFromRegistry(reg *registry.Registry, local *Schema) (*co
 	return schema, nil
 }
 
-func buildCompiledSchemaCompat(local *Schema) (*compiledSchema, error) {
-	return buildCompiledSchemaFromRegistry(registry.Global(), local)
-}
-
 func collectConfigDecl(reg *registry.Registry) *ConfigDecl {
 	cfg := &ConfigDecl{}
 	for _, item := range reg.ListDecl(AdapterID, "config") {

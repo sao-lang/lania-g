@@ -19,7 +19,7 @@ import (
 // Adapter 是 MQ 协议的运行期适配器，负责打开 consumer session 并消费消息。
 type Adapter struct {
 	host adapter.Host
-	api  *API
+	reg  *registry.Registry
 
 	driver Driver
 
@@ -35,7 +35,6 @@ type Adapter struct {
 // 连接、轮询、ack/nack 等行为由传入的 Driver 负责。
 func New(driver Driver) *Adapter {
 	return &Adapter{
-		api:      NewCompatAPI(),
 		driver:   driver,
 		sessions: make([]Session, 0),
 	}
@@ -47,16 +46,13 @@ func (a *Adapter) ID() string { return AdapterID }
 // Plugins 返回 MQ 协议参与编译的插件列表。
 func (a *Adapter) Plugins() []compiler.ProtocolPlugin { return []compiler.ProtocolPlugin{NewPlugin()} }
 
-// API 返回 MQ adapter 暴露给应用侧的 DSL API。
-func (a *Adapter) API() any { return a.api }
-
 // Mount 将 MQ adapter 挂到应用 host 上，并把 API 绑定到当前 registry。
 func (a *Adapter) Mount(host adapter.Host) error {
 	if host == nil {
 		return fmt.Errorf("mq adapter host is nil")
 	}
 	a.host = host
-	a.api = NewAPI(host.Registry())
+	a.reg = host.Registry()
 	return nil
 }
 

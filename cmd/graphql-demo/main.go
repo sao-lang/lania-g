@@ -345,9 +345,11 @@ type DeleteResult struct {
 // ===== Resolver 实现 =====
 
 type MutationResolver struct {
+	Store *memoryStore
 }
 
 type QueryResolver struct {
+	Store *memoryStore
 }
 
 type UserResolver struct{}
@@ -502,6 +504,28 @@ func (r *UserResolver) DisplayName(parent gqlbinding.Parent[user], field gqlbind
 	return parent.Value.Name + " (display)", nil
 }
 
+// Declare 声明 GraphQL resolver 字段。
+func (m *MutationResolver) Declare(routes *graphqladapter.Routes) {
+	routes.UseComplexityLimit(200)
+	routes.Resolver("Mutation").
+		Mutation("register", m.Register).Arg("username").Arg("password").Returns("RegisterResult").Description("注册账号（公开接口）").
+		Mutation("login", m.Login).Arg("username").Arg("password").Returns("LoginResult").Description("登录并返回 token（公开接口）").
+		Mutation("createUser", m.CreateUser).Arg("name").Arg("email").Arg("age").Returns("UserResult").UseGuards(graphqlAuthGuard(m.Store)).RequirePermission("user:create").
+		Mutation("updateUser", m.UpdateUser).Arg("id").Arg("name").Arg("email").Arg("age").Returns("UserResult").UseGuards(graphqlAuthGuard(m.Store)).Timeout(5000).
+		Mutation("deleteUser", m.DeleteUser).Arg("id").Returns("DeleteResult").UseGuards(graphqlAuthGuard(m.Store)).Deprecation("演示字段：生产环境建议软删除")
+}
+
+func (q *QueryResolver) Declare(routes *graphqladapter.Routes) {
+	routes.Resolver("Query").
+		Query("me", q.Me).Returns("MeResult").UseGuards(graphqlAuthGuard(q.Store)).CacheControl("private, max-age=0").
+		Query("user", q.UserWithStore).Arg("id").Returns("UserResult").UseGuards(graphqlAuthGuard(q.Store)).
+		Query("users", q.Users).Arg("page").Arg("size").Arg("keyword").Returns("UserListResult").UseGuards(graphqlAuthGuard(q.Store)).RateLimit(20, 1000)
+}
+
+func (u *UserResolver) Declare(routes *graphqladapter.Routes) {
+	routes.Resolver("User").Object("displayName", u.DisplayName)
+}
+
 func main() {
 	store := newMemoryStore()
 	mutation := &MutationResolver{}
@@ -525,29 +549,8 @@ func main() {
 		panic(err)
 	}
 
-	// 全局 GraphQL 配置演示：
-	gqlAPI := gqlModule.API()
-	gqlAPI.UseComplexityLimit(200)
-
-	// 下面的 Query / Mutation / Object 定义刻意比 app demo 更丰富，
-	// 这样可以把 guards、限流、cache-control 和 schema 元数据一起展示出来。
-	gqlAPI.Resolver("Mutation", mutation).
-		Mutation("register", mutation.Register).Arg("username").Arg("password").Returns("RegisterResult").Description("注册账号（公开接口）").
-		Mutation("login", mutation.Login).Arg("username").Arg("password").Returns("LoginResult").Description("登录并返回 token（公开接口）").
-		Mutation("createUser", mutation.CreateUser).Arg("name").Arg("email").Arg("age").Returns("UserResult").UseGuards(graphqlAuthGuard(store)).RequirePermission("user:create").
-		Mutation("updateUser", mutation.UpdateUser).Arg("id").Arg("name").Arg("email").Arg("age").Returns("UserResult").UseGuards(graphqlAuthGuard(store)).Timeout(5000).
-		Mutation("deleteUser", mutation.DeleteUser).Arg("id").Returns("DeleteResult").UseGuards(graphqlAuthGuard(store)).Deprecation("演示字段：生产环境建议软删除").
-		Build()
-
-	gqlAPI.Resolver("Query", query).
-		Query("me", query.Me).Returns("MeResult").UseGuards(graphqlAuthGuard(store)).CacheControl("private, max-age=0").
-		Query("user", query.UserWithStore).Arg("id").Returns("UserResult").UseGuards(graphqlAuthGuard(store)).
-		Query("users", query.Users).Arg("page").Arg("size").Arg("keyword").Returns("UserListResult").UseGuards(graphqlAuthGuard(store)).RateLimit(20, 1000).
-		Build()
-
-	gqlAPI.Resolver("User", user).
-		Object("displayName", user.DisplayName).
-		Build()
+	// 全局 GraphQL 配置由模块声明
+	_ = gqlModule
 
 	if err := app.Run(); err != nil {
 		panic(err)

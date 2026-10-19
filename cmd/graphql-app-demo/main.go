@@ -16,6 +16,11 @@ func (r *QueryResolver) Ping() (map[string]string, error) {
 	return map[string]string{"ok": "true"}, nil
 }
 
+// Declare 声明 GraphQL resolver 字段。
+func (r *QueryResolver) Declare(routes *graphqladapter.Routes) {
+	routes.Resolver("Query").Query("ping", r.Ping)
+}
+
 func main() {
 	query := &QueryResolver{}
 
@@ -27,13 +32,6 @@ func main() {
 
 	app, err := application.New(root, application.Options{Logger: os.Stdout})
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	gqlAPI := gqlModule.API()
-	builder := gqlAPI.Resolver("Query", query)
-	builder.Query("ping", query.Ping)
-	if _, err := builder.BuildE(); err != nil {
 		log.Fatal(err)
 	}
 

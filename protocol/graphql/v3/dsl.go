@@ -45,118 +45,85 @@ func WithDefault(value any) ArgOption {
 	}
 }
 
-// Resolver 提供一个全局 DSL 兼容入口，用于声明某个 GraphQL resolver。
+// Controller 由需要声明 GraphQL resolver 的控制器实现。
+type Controller interface {
+	Declare(*Routes)
+}
+
+// Routes 收集一个控制器声明的全部 GraphQL resolver 与 schema 配置。
 //
-// 它默认通过 `NewCompatAPI()` 写入全局 registry。
-// 新业务代码更推荐通过 mounted adapter 暴露的 `adapter.API()` 在应用实例上注册声明。
-func Resolver(name string, resolver any) *ResolverBuilder {
-	return globalCompatAPI("graphql.Resolver").Resolver(name, resolver)
+// 它是 GraphQL 唯一的声明入口：控制器在所属模块内完成注册，无需手动 Build。
+type Routes struct {
+	reg      *registry.Registry
+	resolver any
+	current  *ResolverBuilder
+	err      error
 }
 
-// UseSchema 为当前全局 DSL 写入 schema 配置。
-func UseSchema(schema *Schema) *API {
-	return globalCompatAPI("graphql.UseSchema").UseSchema(schema)
+func newRoutes(reg *registry.Registry, resolver any) *Routes {
+	return &Routes{reg: reg, resolver: resolver}
 }
 
-// WithSchema 与 UseSchema 等价，保留链式风格。
-func WithSchema(schema *Schema) *API {
-	return globalCompatAPI("graphql.WithSchema").WithSchema(schema)
+// Resolver 开始声明一个 GraphQL resolver。
+func (r *Routes) Resolver(name string) *ResolverBuilder {
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
+	}
+	b := newResolverBuilder(name, r.resolver, r)
+	r.current = b
+	return b
 }
 
-// DisableIntrospection 关闭 GraphQL introspection。
-func DisableIntrospection() *API {
-	return globalCompatAPI("graphql.DisableIntrospection").DisableIntrospection()
+// UseSchema 为当前模块声明 GraphQL schema 配置。
+func (r *Routes) UseSchema(schema *Schema) *Routes {
+	if schema != nil && r.reg != nil {
+		r.reg.RegisterDecl(AdapterID, "config", &ConfigDecl{Schema: schema})
+	}
+	return r
+}
+
+// DisableIntrospection 关闭 introspection。
+func (r *Routes) DisableIntrospection() *Routes {
+	if r.reg != nil {
+		r.reg.RegisterDecl(AdapterID, "config", &ConfigDecl{DisableIntrospection: true})
+	}
+	return r
 }
 
 // UseExtensions 注册 GraphQL 扩展能力。
-func UseExtensions(extensions ...Extension) *API {
-	return globalCompatAPI("graphql.UseExtensions").UseExtensions(extensions...)
-}
-
-// UseComplexityLimit 配置查询复杂度上限。
-func UseComplexityLimit(limit int) *API {
-	return globalCompatAPI("graphql.UseComplexityLimit").UseComplexityLimit(limit)
-}
-
-// API 是 GraphQL DSL 对 registry 的轻量封装入口。
-type API struct {
-	reg            *registry.Registry
-	fallbackSource string
-}
-
-// NewAPI 创建一个 GraphQL DSL 入口。
-//
-// 推荐：使用挂载到应用实例后的 adapter API，或显式传入实例级 registry。
-// 兼容：历史上允许 `NewAPI(nil)`，当前等价于 `NewCompatAPI()`。
-func NewAPI(reg *registry.Registry) *API {
-	if reg == nil {
-		// 保留历史兼容行为：nil registry 等价于显式使用全局 registry。
-		return NewCompatAPI()
+func (r *Routes) UseExtensions(extensions ...Extension) *Routes {
+	if len(extensions) > 0 && r.reg != nil {
+		r.reg.RegisterDecl(AdapterID, "config", &ConfigDecl{Extensions: extensions})
 	}
-	return &API{reg: reg}
-}
-
-// NewCompatAPI 创建一个显式保留给迁移场景的全局 DSL 入口，不作为新代码默认入口。
-func NewCompatAPI() *API {
-	return globalCompatAPI("graphql.NewCompatAPI()")
-}
-
-func globalCompatAPI(source string) *API {
-	return &API{reg: registry.Global(), fallbackSource: source}
-}
-
-// Resolver 创建一个 resolver 声明构建器。
-func (api *API) Resolver(name string, resolver any) *ResolverBuilder {
-	return newResolverBuilder(name, resolver, api.reg, api.fallbackSource)
-}
-
-// UseSchema 为当前 registry 写入 schema 配置。
-func (api *API) UseSchema(schema *Schema) *API {
-	return api.WithSchema(schema)
-}
-
-// WithSchema 与 UseSchema 等价，保留链式配置风格。
-func (api *API) WithSchema(schema *Schema) *API {
-	if schema != nil {
-		if api.fallbackSource != "" {
-			api.reg.RecordFallbackUsage(api.fallbackSource)
-		}
-		// GraphQL 的 schema/config 也是通过 declaration 写入 registry，
-		// 这样编译阶段就能和 resolver 声明一起读取。
-		api.reg.RegisterDecl(AdapterID, "config", &ConfigDecl{Schema: schema})
-	}
-	return api
-}
-
-// DisableIntrospection 为当前 registry 写入“关闭 introspection”的配置。
-func (api *API) DisableIntrospection() *API {
-	if api.fallbackSource != "" {
-		api.reg.RecordFallbackUsage(api.fallbackSource)
-	}
-	api.reg.RegisterDecl(AdapterID, "config", &ConfigDecl{DisableIntrospection: true})
-	return api
-}
-
-// UseExtensions 为当前 registry 注册 GraphQL 扩展能力。
-func (api *API) UseExtensions(extensions ...Extension) *API {
-	if len(extensions) > 0 {
-		if api.fallbackSource != "" {
-			api.reg.RecordFallbackUsage(api.fallbackSource)
-		}
-		api.reg.RegisterDecl(AdapterID, "config", &ConfigDecl{Extensions: extensions})
-	}
-	return api
+	return r
 }
 
 // UseComplexityLimit 设置查询复杂度上限。
-func (api *API) UseComplexityLimit(limit int) *API {
-	if limit > 0 {
-		if api.fallbackSource != "" {
-			api.reg.RecordFallbackUsage(api.fallbackSource)
-		}
-		api.reg.RegisterDecl(AdapterID, "config", &ConfigDecl{ComplexityLimit: limit})
+func (r *Routes) UseComplexityLimit(limit int) *Routes {
+	if limit > 0 && r.reg != nil {
+		r.reg.RegisterDecl(AdapterID, "config", &ConfigDecl{ComplexityLimit: limit})
 	}
-	return api
+	return r
+}
+
+// Err 结束声明并返回累计错误。
+func (r *Routes) Err() error {
+	if r == nil {
+		return nil
+	}
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
+	}
+	return r.err
+}
+
+func (r *Routes) sealCurrent() error {
+	if r == nil || r.current == nil {
+		return nil
+	}
+	b := r.current
+	r.current = nil
+	return b.seal()
 }
 
 // ResolverBuilder 用于声明一个 resolver 及其字段集合。
@@ -170,8 +137,7 @@ type ResolverBuilder struct {
 	pipes          []any
 	paramPipes     map[int][]any
 	filters        []any
-	registry       *registry.Registry
-	fallbackSource string
+	routes         *Routes
 	sealed         bool
 	err            error
 	mu             sync.RWMutex
@@ -203,17 +169,13 @@ type FieldBuilder struct {
 
 // newResolverBuilder 创建一个可继续链式追加字段声明的 builder。
 // 如果没有显式传入 registry，则回退到全局 registry，以兼容旧 DSL 用法。
-func newResolverBuilder(name string, resolver any, reg *registry.Registry, fallbackSource string) *ResolverBuilder {
-	if reg == nil {
-		reg = registry.Global()
-	}
+func newResolverBuilder(name string, resolver any, routes *Routes) *ResolverBuilder {
 	return &ResolverBuilder{
-		name:           name,
-		resolver:       resolver,
-		fields:         make([]*FieldBuilder, 0),
-		paramPipes:     make(map[int][]any),
-		registry:       reg,
-		fallbackSource: fallbackSource,
+		name:       name,
+		resolver:   resolver,
+		fields:     make([]*FieldBuilder, 0),
+		paramPipes: make(map[int][]any),
+		routes:     routes,
 	}
 }
 
@@ -310,35 +272,23 @@ func (rb *ResolverBuilder) addField(fieldType FieldType, fieldName string, handl
 	return fb
 }
 
-// Build 完成 resolver 声明并写入 registry；忽略构建错误。
-func (rb *ResolverBuilder) Build() []*ResolverDefinition {
+// seal 完成 resolver 声明并写入 registry。
+func (rb *ResolverBuilder) seal() error {
 	rb.mu.Lock()
 	defer rb.mu.Unlock()
-	rb.sealed = true
-	return rb.buildAndRegisterLocked()
-}
-
-// BuildE 完成 resolver 声明并写入 registry；如果声明不合法则返回错误。
-func (rb *ResolverBuilder) BuildE() ([]*ResolverDefinition, error) {
-	rb.mu.Lock()
-	defer rb.mu.Unlock()
+	if rb.sealed {
+		return rb.err
+	}
 	rb.sealed = true
 	if err := rb.validateLocked(); err != nil {
 		rb.err = err
-		return nil, err
+		return err
 	}
-	return rb.buildAndRegisterLocked(), nil
-}
-
-// buildAndRegisterLocked 负责把链式声明收敛成 registry declaration。
-// GraphQL 一个 resolver 会写成一条 ResolverDefinition，其中内部再挂多个 FieldDefinition。
-func (rb *ResolverBuilder) buildAndRegisterLocked() []*ResolverDefinition {
-	defs := make([]*ResolverDefinition, 0, 1)
 	fields := make([]*FieldDefinition, 0, len(rb.fields))
 	for _, fb := range rb.fields {
 		fields = append(fields, fb.build())
 	}
-	defs = append(defs, &ResolverDefinition{
+	def := &ResolverDefinition{
 		Name:         rb.name,
 		Resolver:     rb.resolver,
 		Fields:       fields,
@@ -348,17 +298,11 @@ func (rb *ResolverBuilder) buildAndRegisterLocked() []*ResolverDefinition {
 		Pipes:        append([]any{}, rb.pipes...),
 		ParamPipes:   coreadapter.MergeParamPipes(rb.paramPipes, nil),
 		Filters:      append([]any{}, rb.filters...),
-	})
-
-	items := make([]any, 0, len(defs))
-	for _, def := range defs {
-		items = append(items, def)
 	}
-	if rb.fallbackSource != "" {
-		rb.registry.RecordFallbackUsage(rb.fallbackSource)
+	if rb.routes != nil && rb.routes.reg != nil {
+		rb.routes.reg.RegisterDecl(AdapterID, "resolvers", def)
 	}
-	rb.registry.RegisterDecl(AdapterID, "resolvers", items...)
-	return defs
+	return nil
 }
 
 // Err 返回 DSL 构建过程中记录下来的错误。
@@ -495,16 +439,6 @@ func (fb *FieldBuilder) Subscription(fieldName string, handler any) *FieldBuilde
 // Object 在当前 resolver 下继续声明一个 Object 字段。
 func (fb *FieldBuilder) Object(fieldName string, handler any) *FieldBuilder {
 	return fb.resolverBuilder.Object(fieldName, handler)
-}
-
-// Build 完成当前 resolver 声明并写入 registry；忽略构建错误。
-func (fb *FieldBuilder) Build() []*ResolverDefinition {
-	return fb.resolverBuilder.Build()
-}
-
-// BuildE 完成当前 resolver 声明并写入 registry；如果声明不合法则返回错误。
-func (fb *FieldBuilder) BuildE() ([]*ResolverDefinition, error) {
-	return fb.resolverBuilder.BuildE()
 }
 
 func (fb *FieldBuilder) build() *FieldDefinition {

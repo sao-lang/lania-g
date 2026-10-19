@@ -56,7 +56,7 @@ type scanResult struct {
 // 真正的 handler 编译、AOP 合并、路由树安装都留在 Compile 阶段完成。
 func (p *Plugin) Scan(moduleRef *module.ModuleRef, reg *registry.Registry) (any, error) {
 	routes, err := compiler.ScanResolvedRegistryItems(AdapterID, moduleRef, reg,
-		"http plugin scan requires an explicit registry; pass the application registry instance or registry.Global() explicitly for compatibility",
+		"http plugin scan requires an explicit registry",
 		compiler.SnapshotOwnerOptions{Controllers: true},
 		"routes",
 		func(raw any) (*RouteDefinition, bool) {

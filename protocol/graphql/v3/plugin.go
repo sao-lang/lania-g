@@ -58,7 +58,7 @@ type scanResult struct {
 // Scan 扫描 registry 中的 GraphQL 声明，并解析每个 resolver/field 的归属模块与容器。
 func (p *Plugin) Scan(moduleRef *module.ModuleRef, reg *registry.Registry) (any, error) {
 	fields, err := compiler.ScanResolvedRegistryItems(AdapterID, moduleRef, reg,
-		"graphql plugin scan requires an explicit registry; pass the application registry instance or registry.Global() explicitly for compatibility",
+		"graphql plugin scan requires an explicit registry",
 		compiler.SnapshotOwnerOptions{
 			Controllers: true,
 			Resolvers:   true,

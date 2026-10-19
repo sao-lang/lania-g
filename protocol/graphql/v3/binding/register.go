@@ -56,15 +56,9 @@ func RegisterDefaults(rt *runtime.Runtime) {
 // 如果 reg 为空，则回退到全局 registry。
 func RegisterDefaultsToRegistry(reg *coreregistry.Registry) {
 	if reg == nil {
-		RegisterDefaultsCompat()
 		return
 	}
 	registerDefaultsToRegistry(reg)
-}
-
-// RegisterDefaultsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterDefaultsCompat() {
-	registerDefaultsToRegistry(coreregistry.GlobalWithUsage("binding/graphql.RegisterDefaultsCompat"))
 }
 
 func registerDefaultsToRegistry(reg *coreregistry.Registry) {

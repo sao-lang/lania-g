@@ -55,7 +55,7 @@ type scanResult struct {
 // - 若缺失 owner 或 owner 歧义，会返回 KernelError(KindDI) 以便用户修复模块声明
 func (p *Plugin) Scan(moduleRef *module.ModuleRef, reg *registry.Registry) (any, error) {
 	handlers, err := compiler.ScanResolvedRegistryItems(AdapterID, moduleRef, reg,
-		"ws plugin scan requires an explicit registry; pass the application registry instance or registry.Global() explicitly for compatibility",
+		"ws plugin scan requires an explicit registry",
 		compiler.SnapshotOwnerOptions{
 			Controllers: true,
 			Resolvers:   true,

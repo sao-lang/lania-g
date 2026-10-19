@@ -11,53 +11,60 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
-// Job 提供一个全局 DSL 兼容入口，用于声明一个定时任务：
-//
-//	scheduler.Job("cleanup", svc).Every(time.Minute, svc.Run).Build()
-//
-// 它默认通过 `NewCompatAPI()` 写入全局 registry。
-// 新业务代码更推荐通过 mounted adapter 暴露的 `adapter.API()` 在应用实例上注册声明。
-func Job(name string, receiver any) *JobBuilder {
-	return globalCompatAPI("scheduler.Job").Job(name, receiver)
+// Controller 由需要声明定时任务的控制器实现。
+type Controller interface {
+	Declare(*Routes)
 }
 
-// API 是 scheduler adapter 对 registry 的轻量封装入口。
-type API struct {
-	reg            *registry.Registry
-	fallbackSource string
+// Routes 收集一个控制器声明的全部定时任务。
+//
+// 它是 scheduler 唯一的声明入口：控制器在所属模块内完成注册，无需手动 Build。
+type Routes struct {
+	reg      *registry.Registry
+	receiver any
+	current  *JobBuilder
+	err      error
 }
 
-// NewAPI 创建一个 scheduler DSL 入口。
-//
-// 推荐：使用挂载到应用实例后的 adapter API，或显式传入实例级 registry。
-// 兼容：历史上允许 `NewAPI(nil)`，当前等价于 `NewCompatAPI()`。
-func NewAPI(reg *registry.Registry) *API {
-	if reg == nil {
-		return NewCompatAPI()
+func newRoutes(reg *registry.Registry, receiver any) *Routes {
+	return &Routes{reg: reg, receiver: receiver}
+}
+
+// Job 开始声明一个定时任务。
+func (r *Routes) Job(name string) *JobBuilder {
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
 	}
-	return &API{reg: reg}
+	b := newJobBuilder(name, r.receiver, r)
+	r.current = b
+	return b
 }
 
-// NewCompatAPI 创建一个显式保留给迁移场景的全局 DSL 入口，不作为新代码默认入口。
-func NewCompatAPI() *API {
-	return globalCompatAPI("scheduler.NewCompatAPI()")
+// Err 结束声明并返回累计错误。
+func (r *Routes) Err() error {
+	if r == nil {
+		return nil
+	}
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
+	}
+	return r.err
 }
 
-func globalCompatAPI(source string) *API {
-	return &API{reg: registry.Global(), fallbackSource: source}
-}
-
-// Job 创建一个任务声明构建器。
-func (api *API) Job(name string, receiver any) *JobBuilder {
-	return newJobBuilder(name, receiver, api.reg, api.fallbackSource)
+func (r *Routes) sealCurrent() error {
+	if r == nil || r.current == nil {
+		return nil
+	}
+	b := r.current
+	r.current = nil
+	return b.seal()
 }
 
 // JobBuilder 用于声明一个定时任务及其调度策略。
 type JobBuilder struct {
 	name           string
 	receiver       any
-	registry       *registry.Registry
-	fallbackSource string
+	routes         *Routes
 	definition     *JobDefinition
 	paramBindings  map[int]string
 	sealed         bool
@@ -65,16 +72,12 @@ type JobBuilder struct {
 	mu             sync.RWMutex
 }
 
-func newJobBuilder(name string, receiver any, reg *registry.Registry, fallbackSource string) *JobBuilder {
-	if reg == nil {
-		reg = registry.Global()
-	}
+func newJobBuilder(name string, receiver any, routes *Routes) *JobBuilder {
 	return &JobBuilder{
-		name:           name,
-		receiver:       receiver,
-		registry:       reg,
-		fallbackSource: fallbackSource,
-		paramBindings:  make(map[int]string),
+		name:          name,
+		receiver:      receiver,
+		routes:        routes,
+		paramBindings: make(map[int]string),
 	}
 }
 
@@ -174,23 +177,21 @@ func (b *JobBuilder) Misfire(policy MisfirePolicy) *JobBuilder {
 }
 
 // Build 完成当前任务声明并写入 registry；忽略构建错误。
-func (b *JobBuilder) Build() *JobDefinition {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.sealed = true
-	return b.buildAndRegisterLocked()
-}
-
 // BuildE 完成当前任务声明并写入 registry；如果声明不合法则返回错误。
-func (b *JobBuilder) BuildE() (*JobDefinition, error) {
+// seal 完成当前任务声明并写入 registry。
+func (b *JobBuilder) seal() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.sealed {
+		return b.err
+	}
 	b.sealed = true
 	if err := b.validateLocked(); err != nil {
 		b.err = err
-		return nil, err
+		return err
 	}
-	return b.buildAndRegisterLocked(), nil
+	b.buildAndRegisterLocked()
+	return nil
 }
 
 func (b *JobBuilder) buildAndRegisterLocked() *JobDefinition {
@@ -198,10 +199,7 @@ func (b *JobBuilder) buildAndRegisterLocked() *JobDefinition {
 		return nil
 	}
 	b.definition.ParamBindings = coreadapter.CopyIntStringMap(b.paramBindings)
-	if b.fallbackSource != "" {
-		b.registry.RecordFallbackUsage(b.fallbackSource)
-	}
-	b.registry.RegisterDecl(AdapterID, "jobs", b.definition)
+	b.routes.reg.RegisterDecl(AdapterID, "jobs", b.definition)
 	return b.definition
 }
 

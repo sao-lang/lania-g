@@ -41,15 +41,9 @@ func RegisterDefaults(rt *runtime.Runtime) {
 // RegisterDefaultsToRegistry 将内置 HTTP binding resolver 注册到 registry。
 func RegisterDefaultsToRegistry(reg *coreregistry.Registry) {
 	if reg == nil {
-		RegisterDefaultsCompat()
 		return
 	}
 	registerDefaultsToRegistry(reg)
-}
-
-// RegisterDefaultsCompat 显式保留“写入全局 registry”的兼容 binding 注册入口。
-func RegisterDefaultsCompat() {
-	registerDefaultsToRegistry(coreregistry.GlobalWithUsage("binding/http.RegisterDefaultsCompat"))
 }
 
 func registerDefaultsToRegistry(reg *coreregistry.Registry) {

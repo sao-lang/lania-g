@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 )
@@ -12,16 +13,8 @@ import (
 type Config struct {
 }
 
-// ProtocolModule 是 Scheduler 协议模块的句柄。
-//
-// 它既是 module.Module，也暴露该协议的声明 API。
-type ProtocolModule interface {
-	module.Module
-	API() *API
-}
-
 // Module 创建 Scheduler 协议模块。
-func Module(cfg Config) ProtocolModule {
+func Module(cfg Config) module.Module {
 	a := New()
 	m := &protocolModule{BaseModule: module.New(module.Metadata{})}
 	m.adapter = a
@@ -36,7 +29,44 @@ type protocolModule struct {
 // Adapter 返回模块持有的适配器，供应用在装配阶段收集。
 func (m *protocolModule) Adapter() adapter.Adapter { return m.adapter }
 
-// API 返回该协议的声明入口。
-func (m *protocolModule) API() *API { return m.adapter.api }
-
 var _ adapter.ModuleAdapter = (*protocolModule)(nil)
+
+// Declare 收集实现了 scheduler.Controller 的任务声明。
+func (m *protocolModule) Declare(root *module.ModuleRef) error {
+	if root == nil || m.adapter == nil || m.adapter.reg == nil {
+		return nil
+	}
+	reg := m.adapter.reg
+	reg.ClearDecl(AdapterID, "jobs")
+	var errs []error
+	err := module.WalkModules(root.GetRootModule(), func(mod module.Module) error {
+		metadata := mod.Metadata()
+		if metadata == nil {
+			return nil
+		}
+		for _, controller := range metadata.Controllers {
+			instance, err := module.ResolveController(mod, controller)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			declarer, ok := instance.(Controller)
+			if !ok {
+				continue
+			}
+			routes := newRoutes(reg, instance)
+			declarer.Declare(routes)
+			if err := routes.Err(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("scheduler declaration failed: %v", errs)
+	}
+	return nil
+}

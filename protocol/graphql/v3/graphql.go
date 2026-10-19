@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
+	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	gqlbinding "github.com/sao-lang/lania-g/protocol/graphql/v3/binding"
 
@@ -71,7 +72,7 @@ type ExecutionInfo struct {
 
 // Adapter 是 GraphQL 协议的运行期适配器，负责挂载 HTTP handler 并把请求分发到 runtime.Execute。
 type Adapter struct {
-	api *API
+	reg *registry.Registry
 
 	host   adapter.Host
 	path   string
@@ -102,7 +103,6 @@ var _ adapter.Adapter = (*Adapter)(nil)
 // 这是该 adapter 唯一的公开端口绑定入口。
 func New(addr ...string) *Adapter {
 	a := &Adapter{
-		api:               NewCompatAPI(),
 		path:              "/graphql",
 		addr:              "",
 		playgroundPath:    "/playground",
@@ -122,9 +122,6 @@ func Listen(addr string) *Adapter { return New(addr) }
 
 // ID 返回 adapter ID。
 func (a *Adapter) ID() string { return AdapterID }
-
-// API 返回该协议的 DSL 入口（用于声明 resolver/schema 等）。
-func (a *Adapter) API() any { return a.api }
 
 // Plugins 返回该协议需要安装的编译插件。
 func (a *Adapter) Plugins() []compiler.ProtocolPlugin {
@@ -223,7 +220,7 @@ func (a *Adapter) WithContextFactory(fn func(*http.Request) *gqlbinding.GraphQLC
 // Mount 将 GraphQL adapter 挂到应用 host 上，并尝试挂载到共享 HTTP adapter。
 func (a *Adapter) Mount(host adapter.Host) error {
 	a.host = host
-	a.api = NewAPI(host.Registry())
+	a.reg = host.Registry()
 	if err := a.refreshSchema(); err != nil {
 		return err
 	}

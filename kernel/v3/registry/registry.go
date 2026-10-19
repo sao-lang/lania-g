@@ -64,24 +64,6 @@ func New() *Registry {
 	}
 }
 
-var global = New()
-
-// Global 返回全局单例 Registry。
-//
-// 应用层 DSL/装饰器通常向 Global() 写入声明，随后 application/compiler 从这里汇总并编译。
-func Global() *Registry { return global }
-
-// GlobalWithUsage 返回全局 Registry，并记录一次兼容入口的使用来源。
-//
-// 该方法只用于“真正写入全局 registry 的兼容路径”打点，例如包级 DSL / NewCompatAPI()。
-func GlobalWithUsage(source string) *Registry {
-	global.RecordFallbackUsage(source)
-	return global
-}
-
-// ResetGlobal 重置全局单例 Registry（主要用于测试隔离或热重载场景）。
-func ResetGlobal() { global = New() }
-
 // RecordFallbackUsage 记录一次全局 registry 兼容入口使用。
 func (r *Registry) RecordFallbackUsage(source string) {
 	if r == nil || source == "" {

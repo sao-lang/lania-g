@@ -43,7 +43,7 @@ type scanResult struct {
 // 因此 owner 解析同样需要覆盖三类模块槽位。
 func (p *Plugin) Scan(moduleRef *module.ModuleRef, reg *registry.Registry) (any, error) {
 	routes, err := compiler.ScanResolvedRegistryItems(AdapterID, moduleRef, reg,
-		"mq plugin scan requires an explicit registry; pass the application registry instance or registry.Global() explicitly for compatibility",
+		"mq plugin scan requires an explicit registry",
 		compiler.SnapshotOwnerOptions{
 			Controllers: true,
 			Resolvers:   true,

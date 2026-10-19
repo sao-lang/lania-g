@@ -45,7 +45,7 @@ type scanResult struct {
 // 因此这里同样复用通用 owner 解析 helper。
 func (p *Plugin) Scan(moduleRef *module.ModuleRef, reg *registry.Registry) (any, error) {
 	routes, err := compiler.ScanResolvedRegistryItems(AdapterID, moduleRef, reg,
-		"scheduler plugin scan requires an explicit registry; pass the application registry instance or registry.Global() explicitly for compatibility",
+		"scheduler plugin scan requires an explicit registry",
 		compiler.SnapshotOwnerOptions{
 			Controllers: true,
 			Resolvers:   true,

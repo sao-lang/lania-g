@@ -5,7 +5,6 @@ import (
 
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
 type contextAwareModule struct {
@@ -31,9 +30,6 @@ func TestNew_CreatesInstanceRegistryAndModuleContext(t *testing.T) {
 	}
 	if app.Registry() == nil {
 		t.Fatalf("application registry is nil")
-	}
-	if app.Registry() == registry.Global() {
-		t.Fatalf("application must not use the global registry")
 	}
 	if root.got == nil {
 		t.Fatalf("module context was not injected")

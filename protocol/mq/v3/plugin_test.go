@@ -86,7 +86,9 @@ func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	moduleRef := module.NewModuleRef(root)
 
 	reg := registry.New()
-	NewAPI(reg).Consumer("default", consumer).On("user.created", consumer.Handle).Build()
+	routes := newRoutes(reg, consumer)
+	routes.Consumer("default").On("user.created", consumer.Handle)
+	_ = routes.Err()
 
 	_, err := (&Plugin{}).Scan(moduleRef, nil)
 	if err == nil {
@@ -139,12 +141,13 @@ func TestMQAdapter_CompileAndConsume(t *testing.T) {
 	reg := registry.New()
 	observedPayload = make(chan testPayload, 2)
 	defer func() { observedPayload = nil }()
-	NewAPI(reg).
-		Consumer("default", consumer).
+	routes := newRoutes(reg, consumer)
+	routes.
+		Consumer("default").
 		Group("g1").
 		On("user.created", consumer.Handle).
-		BindParam(3, "x-trace-id").
-		Build()
+		BindParam(3, "x-trace-id")
+	_ = routes.Err()
 
 	compiled, err := compiler.Compile(moduleRef, reg, NewPlugin())
 	if err != nil {
@@ -248,12 +251,13 @@ func TestMQRuntime_Execute(t *testing.T) {
 	moduleRef := module.NewModuleRef(root)
 
 	reg := registry.New()
-	NewAPI(reg).
-		Consumer("default", consumer).
+	routes := newRoutes(reg, consumer)
+	routes.
+		Consumer("default").
 		Group("g1").
 		On("user.created", consumer.Handle).
-		BindParam(3, "x-trace-id").
-		Build()
+		BindParam(3, "x-trace-id")
+	_ = routes.Err()
 
 	compiled, err := compiler.Compile(moduleRef, reg, NewPlugin())
 	if err != nil {
@@ -291,7 +295,9 @@ func TestMQPlugin_OwnerErrorsUseUnifiedMeta(t *testing.T) {
 
 	reg := registry.New()
 	receiver := &testConsumer{}
-	NewAPI(reg).Consumer("default", receiver).On("user.created", receiver.Handle).Build()
+	routes := newRoutes(reg, receiver)
+	routes.Consumer("default").On("user.created", receiver.Handle)
+	_ = routes.Err()
 
 	_, err := compiler.Compile(module.NewModuleRef(root), reg, NewPlugin())
 	if err == nil {

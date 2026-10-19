@@ -22,15 +22,9 @@ import (
 // 常见用途：将一些“上下文对象/服务对象”直接作为 handler 入参注入。
 func RegisterContainerBindings(reg *registry.Registry, entries ...BindingEntry) {
 	if reg == nil {
-		RegisterContainerBindingsCompat(entries...)
 		return
 	}
 	registerContainerBindings(reg, entries...)
-}
-
-// RegisterContainerBindingsCompat 显式保留“写入全局 registry”的兼容容器 binding 注册入口。
-func RegisterContainerBindingsCompat(entries ...BindingEntry) {
-	registerContainerBindings(registry.GlobalWithUsage("core/integration.RegisterContainerBindingsCompat"), entries...)
 }
 
 func registerContainerBindings(reg *registry.Registry, entries ...BindingEntry) {

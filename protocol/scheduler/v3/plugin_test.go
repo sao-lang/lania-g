@@ -108,7 +108,9 @@ func TestPluginScan_RequiresExplicitRegistry(t *testing.T) {
 	moduleRef := module.NewModuleRef(root)
 
 	reg := registry.New()
-	NewAPI(reg).Job("after-job", svc).After(20*time.Millisecond, svc.RunAfter).Build()
+	routes := newRoutes(reg, svc)
+	routes.Job("after-job").After(20*time.Millisecond, svc.RunAfter)
+	_ = routes.Err()
 
 	_, err := (&Plugin{}).Scan(moduleRef, nil)
 	if err == nil {
@@ -142,8 +144,12 @@ func TestSchedulerAdapter_CompileAndTrigger(t *testing.T) {
 	moduleRef := module.NewModuleRef(root)
 
 	reg := registry.New()
-	NewAPI(reg).Job("after-job", svc).After(20*time.Millisecond, svc.RunAfter).Build()
-	NewAPI(reg).Job("every-job", svc).Every(40*time.Millisecond, svc.RunEvery).Build()
+	routes := newRoutes(reg, svc)
+	routes.Job("after-job").After(20*time.Millisecond, svc.RunAfter)
+	_ = routes.Err()
+	routes = newRoutes(reg, svc)
+	routes.Job("every-job").Every(40*time.Millisecond, svc.RunEvery)
+	_ = routes.Err()
 
 	compiled, err := compiler.Compile(moduleRef, reg, NewPlugin())
 	if err != nil {
@@ -191,15 +197,24 @@ func TestSchedulerRouteKey(t *testing.T) {
 
 func TestSchedulerBuilder_AdvancedOptions(t *testing.T) {
 	svc := &testSchedulerService{}
-	def := NewAPI(registry.New()).
-		Job("advanced", svc).
+	reg := registry.New()
+	routes := newRoutes(reg, svc)
+	routes.
+		Job("advanced").
 		Every(time.Second, svc.RunEvery).
 		Retry(2, 10*time.Millisecond).
 		MaxConcurrency(3).
 		Unique("advanced-key").
 		WithTimeout(time.Second).
-		Misfire(MisfireSkip).
-		Build()
+		Misfire(MisfireSkip)
+	if err := routes.Err(); err != nil {
+		t.Fatalf("declare: %v", err)
+	}
+	items := reg.ListDecl(AdapterID, "jobs")
+	if len(items) != 1 {
+		t.Fatalf("jobs = %d, want 1", len(items))
+	}
+	def, _ := items[0].(*JobDefinition)
 	if def == nil {
 		t.Fatalf("definition is nil")
 	}
@@ -228,8 +243,12 @@ func TestSchedulerAdapter_RetryAndUnique(t *testing.T) {
 	moduleRef := module.NewModuleRef(root)
 
 	reg := registry.New()
-	NewAPI(reg).Job("retry-job", svc).After(10*time.Millisecond, svc.RunRetry).Retry(2, 5*time.Millisecond).Build()
-	NewAPI(reg).Job("unique-job", svc).Every(10*time.Millisecond, svc.RunUnique).MaxConcurrency(2).Unique().Misfire(MisfireSkip).Build()
+	routes := newRoutes(reg, svc)
+	routes.Job("retry-job").After(10*time.Millisecond, svc.RunRetry).Retry(2, 5*time.Millisecond)
+	_ = routes.Err()
+	routes = newRoutes(reg, svc)
+	routes.Job("unique-job").Every(10*time.Millisecond, svc.RunUnique).MaxConcurrency(2).Unique().Misfire(MisfireSkip)
+	_ = routes.Err()
 
 	compiled, err := compiler.Compile(moduleRef, reg, NewPlugin())
 	if err != nil {
@@ -313,7 +332,9 @@ func TestSchedulerPlugin_OwnerErrorsUseUnifiedMeta(t *testing.T) {
 	}
 
 	reg := registry.New()
-	NewAPI(reg).Job("missing-job", receiver).After(time.Second, receiver.RunRetry).Build()
+	routes := newRoutes(reg, receiver)
+	routes.Job("missing-job").After(time.Second, receiver.RunRetry)
+	_ = routes.Err()
 
 	_, err := compiler.Compile(module.NewModuleRef(root), reg, NewPlugin())
 	if err == nil {

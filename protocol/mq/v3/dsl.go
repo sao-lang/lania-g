@@ -10,45 +10,53 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
-// Consumer 提供一个全局 DSL 兼容入口，用于声明某个消息消费者：
-//
-//	mq.Consumer("default", svc).Group("g1").On("topic", svc.Handle).Build()
-//
-// 它会把声明写入 `core/registry.Global()`。
-// 新业务代码更推荐通过 mounted adapter 暴露的 `adapter.API()` 在应用实例上注册声明。
-func Consumer(name string, receiver any) *ConsumerBuilder {
-	return globalCompatAPI("mq.Consumer").Consumer(name, receiver)
+// Controller 由需要声明 MQ 消费者的控制器实现。
+type Controller interface {
+	Declare(*Routes)
 }
 
-// API 是 MQ adapter 的 DSL 入口封装，用于把声明写入 registry。
-type API struct {
-	reg            *registry.Registry
-	fallbackSource string
+// Routes 收集一个控制器声明的全部 MQ 消费者。
+//
+// 它是 MQ 唯一的声明入口：控制器在所属模块内完成注册，无需手动 Build。
+type Routes struct {
+	reg      *registry.Registry
+	receiver any
+	current  *ConsumerBuilder
+	err      error
 }
 
-// NewAPI 创建一个 DSL API。
-//
-// 推荐：使用挂载到应用实例后的 adapter API，或显式传入实例级 registry。
-// 兼容：历史上允许 `NewAPI(nil)`，当前等价于 `NewCompatAPI()`。
-func NewAPI(reg *registry.Registry) *API {
-	if reg == nil {
-		return NewCompatAPI()
+func newRoutes(reg *registry.Registry, receiver any) *Routes {
+	return &Routes{reg: reg, receiver: receiver}
+}
+
+// Consumer 开始声明一个消费者。
+func (r *Routes) Consumer(name string) *ConsumerBuilder {
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
 	}
-	return &API{reg: reg}
+	b := newConsumerBuilder(name, r.receiver, r)
+	r.current = b
+	return b
 }
 
-// NewCompatAPI 创建一个显式保留给迁移场景的全局 DSL 入口，不作为新代码默认入口。
-func NewCompatAPI() *API {
-	return globalCompatAPI("mq.NewCompatAPI()")
+// Err 结束声明并返回累计错误。
+func (r *Routes) Err() error {
+	if r == nil {
+		return nil
+	}
+	if err := r.sealCurrent(); err != nil && r.err == nil {
+		r.err = err
+	}
+	return r.err
 }
 
-func globalCompatAPI(source string) *API {
-	return &API{reg: registry.Global(), fallbackSource: source}
-}
-
-// Consumer 创建一个消息消费者声明构建器。
-func (api *API) Consumer(name string, receiver any) *ConsumerBuilder {
-	return newConsumerBuilder(name, receiver, api.reg, api.fallbackSource)
+func (r *Routes) sealCurrent() error {
+	if r == nil || r.current == nil {
+		return nil
+	}
+	b := r.current
+	r.current = nil
+	return b.seal()
 }
 
 // ConsumerBuilder 用于构建一个消费者及其订阅声明。
@@ -57,8 +65,7 @@ type ConsumerBuilder struct {
 	group          string
 	concurrency    int
 	receiver       any
-	registry       *registry.Registry
-	fallbackSource string
+	routes         *Routes
 	subscriptions  []*SubscriptionBuilder
 	sealed         bool
 	err            error
@@ -74,18 +81,14 @@ type SubscriptionBuilder struct {
 	paramBindings   map[int]string
 }
 
-func newConsumerBuilder(name string, receiver any, reg *registry.Registry, fallbackSource string) *ConsumerBuilder {
-	if reg == nil {
-		reg = registry.Global()
-	}
+func newConsumerBuilder(name string, receiver any, routes *Routes) *ConsumerBuilder {
 	return &ConsumerBuilder{
 		consumer:       name,
 		group:          "",
 		concurrency:    1,
-		receiver:       receiver,
-		registry:       reg,
-		fallbackSource: fallbackSource,
-		subscriptions:  make([]*SubscriptionBuilder, 0),
+		receiver:      receiver,
+		routes:        routes,
+		subscriptions: make([]*SubscriptionBuilder, 0),
 	}
 }
 
@@ -145,40 +148,25 @@ func (sb *SubscriptionBuilder) On(topic string, handler any) *SubscriptionBuilde
 	return sb.consumerBuilder.On(topic, handler)
 }
 
-// Build 完成当前 consumer 声明并写入 registry；忽略构建错误。
-func (sb *SubscriptionBuilder) Build() []*SubscriptionDefinition { return sb.consumerBuilder.Build() }
-
-// BuildE 完成当前 consumer 声明并写入 registry；如果声明不合法则返回错误。
-func (sb *SubscriptionBuilder) BuildE() ([]*SubscriptionDefinition, error) {
-	return sb.consumerBuilder.BuildE()
-}
-
-// Build 完成当前消费者声明并写入 registry；忽略构建错误。
-func (b *ConsumerBuilder) Build() []*SubscriptionDefinition {
+// seal 完成当前消费者声明并写入 registry。
+func (b *ConsumerBuilder) seal() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.sealed = true
-	return b.buildAndRegisterLocked()
-}
-
-// BuildE 完成当前消费者声明并写入 registry；如果声明不合法则返回错误。
-func (b *ConsumerBuilder) BuildE() ([]*SubscriptionDefinition, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	if b.sealed {
+		return b.err
+	}
 	b.sealed = true
 	if err := b.validateLocked(); err != nil {
 		b.err = err
-		return nil, err
+		return err
 	}
-	return b.buildAndRegisterLocked(), nil
+	b.buildAndRegisterLocked()
+	return nil
 }
 
 func (b *ConsumerBuilder) buildAndRegisterLocked() []*SubscriptionDefinition {
-	if b.fallbackSource != "" {
-		b.registry.RecordFallbackUsage(b.fallbackSource)
-	}
 	// 这是供 transport 使用的 consumer 级声明
-	b.registry.RegisterDecl(AdapterID, "consumers", &ConsumerDefinition{
+	b.routes.reg.RegisterDecl(AdapterID, "consumers", &ConsumerDefinition{
 		Consumer:    b.consumer,
 		Group:       b.group,
 		Concurrency: b.concurrency,
@@ -196,12 +184,11 @@ func (b *ConsumerBuilder) buildAndRegisterLocked() []*SubscriptionDefinition {
 			ParamBindings: coreadapter.CopyIntStringMap(sb.paramBindings),
 		})
 	}
-
 	items := make([]any, 0, len(defs))
 	for _, def := range defs {
 		items = append(items, def)
 	}
-	b.registry.RegisterDecl(AdapterID, "subscriptions", items...)
+	b.routes.reg.RegisterDecl(AdapterID, "subscriptions", items...)
 	return defs
 }
 

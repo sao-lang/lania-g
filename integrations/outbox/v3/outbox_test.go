@@ -6,14 +6,11 @@ import (
 	"testing"
 
 	"gorm.io/gorm"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/integrations/events/v3"
 	ormintegration "github.com/sao-lang/lania-g/integrations/orm/v3"
 )
 
 func TestPublishFlushAndReceive(t *testing.T) {
-	registry.ResetGlobal()
-	defer registry.ResetGlobal()
 
 	bus, err := events.New(events.Config{})
 	if err != nil {

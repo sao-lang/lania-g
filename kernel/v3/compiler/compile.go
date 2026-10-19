@@ -45,7 +45,6 @@ type CompiledApp struct {
 // - 最后做跨协议 routeKey 冲突检测，并汇总诊断信息
 //
 // 推荐：显式传入实例级 registry。
-// 兼容：若明确需要从全局 registry 读取声明，优先使用 `CompileCompat(...)`。
 func Compile(moduleRef *module.ModuleRef, reg *registry.Registry, plugins ...ProtocolPlugin) (*CompiledApp, error) {
 	if moduleRef == nil {
 		return nil, recordCompileError(nil, fmt.Errorf("moduleRef is nil"))
@@ -58,7 +57,7 @@ func Compile(moduleRef *module.ModuleRef, reg *registry.Registry, plugins ...Pro
 		RuntimeFallbacks:  knownRuntimeFallbacks(),
 	}
 	if reg == nil {
-		return nil, recordCompileError(diag, fmt.Errorf("compiler.Compile requires an explicit registry; use compiler.CompileCompat(...) to read declarations from registry.Global()"))
+		return nil, recordCompileError(diag, fmt.Errorf("compiler.Compile requires an explicit registry"))
 	}
 	if len(orderedPlugins) == 0 {
 		return nil, recordCompileError(nil, fmt.Errorf("no protocol plugins registered"))
@@ -159,11 +158,6 @@ func Compile(moduleRef *module.ModuleRef, reg *registry.Registry, plugins ...Pro
 	return compiled, nil
 }
 
-// CompileCompat 显式保留“未传 registry 时从全局 registry 读取声明”的兼容语义。
-func CompileCompat(moduleRef *module.ModuleRef, plugins ...ProtocolPlugin) (*CompiledApp, error) {
-	return Compile(moduleRef, registry.Global(), plugins...)
-}
-
 func summarizeRouteOwners(routes map[string]*runtime.Handler) []ModuleRouteDiagnostics {
 	if len(routes) == 0 {
 		return nil
@@ -230,31 +224,6 @@ func knownRuntimeFallbacks() []RuntimeFallbackDiagnostics {
 
 func knownRegistryFallbacks() []RegistryFallbackDiagnostics {
 	return []RegistryFallbackDiagnostics{
-		{
-			Key:      "application_global_compat",
-			Category: "compat",
-			Summary:  "application.New(...) and application.NewCompat(...) build applications from registry.Global() as a compatibility path; new code should prefer application.NewWithOptions(..., Options{Registry: application.NewRegistry()})",
-		},
-		{
-			Key:      "compile_registry_global_compat",
-			Category: "compat",
-			Summary:  "compiler.CompileCompat(...) reads declarations from registry.Global() as a compatibility path; new code should prefer compiler.Compile(moduleRef, reg, ...)",
-		},
-		{
-			Key:      "graphql_schema_global_read",
-			Category: "read-fallback",
-			Summary:  "adapter/graphql.buildCompiledSchemaCompat(...) reads GraphQL config and resolver declarations from registry.Global() for compatibility helpers",
-		},
-		{
-			Key:      "events_attach_global_read",
-			Category: "read-fallback",
-			Summary:  "integrations/events.AttachRegisteredHandlersCompat(...) reads handler declarations from registry.Global() for compatibility hooks/helpers",
-		},
-		{
-			Key:      "swagger_http_registry_global_read",
-			Category: "read-fallback",
-			Summary:  "integrations/swagger.BuildFromHTTPRegistryCompat(...) reads HTTP route declarations from registry.Global() for compatibility helpers",
-		},
 	}
 }
 

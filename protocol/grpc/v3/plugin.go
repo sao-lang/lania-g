@@ -54,7 +54,7 @@ type scanResult struct {
 // 所以 owner 解析时把三类模块槽位都纳入候选。
 func (p *Plugin) Scan(moduleRef *module.ModuleRef, reg *registry.Registry) (any, error) {
 	methods, err := compiler.ScanResolvedRegistryItems(AdapterID, moduleRef, reg,
-		"grpc plugin scan requires an explicit registry; pass the application registry instance or registry.Global() explicitly for compatibility",
+		"grpc plugin scan requires an explicit registry",
 		compiler.SnapshotOwnerOptions{
 			Controllers: true,
 			Resolvers:   true,
