@@ -81,6 +81,16 @@ filter 返回 nil 表示已消费，此时由 filter 自己设置 `ctx.Response.
 | 路由/字段 | 链式 `Get(...).UseInterceptors(...)` |
 | 参数级 Pipe | `UseParamPipes(index, pipes...)` |
 
+`Use*` 既可以接收 `aop.GuardFunc` / `aop.InterceptorFunc` 这类具名类型，
+也可以直接接收**同签名的裸函数**（编译器会自动转换），因此下面两种写法等价：
+
+```go
+func timingInterceptor(ctx *aop.ExecutionContext, next aop.CallHandler) (any, error) { ... }
+
+r.Get("/users", ctrl.List).UseInterceptors(timingInterceptor)
+r.Get("/users", ctrl.List).UseInterceptors(aop.InterceptorFunc(timingInterceptor))
+```
+
 ## 4. 内置 Pipe
 
 ```go

@@ -506,6 +506,8 @@ func convertMiddlewares(items []any) []aop.MiddlewareFunc {
 			if mw := v(); mw != nil {
 				out = append(out, func(ctx *aop.ExecutionContext, next func() error) error { return mw.Use(ctx, next) })
 			}
+		case func(*aop.ExecutionContext, func() error) error:
+			out = append(out, aop.MiddlewareFunc(v))
 		}
 	}
 	return out
@@ -524,6 +526,8 @@ func convertGuards(items []any) []aop.GuardFunc {
 			if g := v(); g != nil {
 				out = append(out, aop.WrapGuard(g))
 			}
+		case func(*aop.ExecutionContext) (bool, error):
+			out = append(out, aop.GuardFunc(v))
 		}
 	}
 	return out
@@ -542,6 +546,8 @@ func convertInterceptors(items []any) []aop.InterceptorFunc {
 			if it := v(); it != nil {
 				out = append(out, aop.WrapInterceptor(it))
 			}
+		case func(*aop.ExecutionContext, aop.CallHandler) (interface{}, error):
+			out = append(out, aop.InterceptorFunc(v))
 		}
 	}
 	return out
@@ -560,6 +566,8 @@ func convertPipes(items []any) []aop.PipeFunc {
 			if p := v(); p != nil {
 				out = append(out, aop.WrapPipe(p))
 			}
+		case func(interface{}, interface{}) (interface{}, error):
+			out = append(out, aop.PipeFunc(v))
 		}
 	}
 	return out
@@ -578,6 +586,8 @@ func convertFilters(items []any) []aop.ExceptionFilterFunc {
 			if f := v(); f != nil {
 				out = append(out, func(exception any, ctx *aop.ExecutionContext) error { return f.Catch(exception, ctx) })
 			}
+		case func(interface{}, *aop.ExecutionContext) error:
+			out = append(out, aop.ExceptionFilterFunc(v))
 		}
 	}
 	return out
