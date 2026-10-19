@@ -26,7 +26,7 @@ type factory struct {
 	caches       map[string]Cache
 }
 
-// ForRoot 创建缓存集成模块，并注册默认 cache、命名 cache、工厂与配置。
+// build 创建缓存集成模块，并注册默认 cache、命名 cache、工厂与配置。
 func build(cfg Config) (module.Module, error) {
 	cfg = normalizeConfig(cfg)
 	f := newFactory(cfg.Name)

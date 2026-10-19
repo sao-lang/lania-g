@@ -19,7 +19,7 @@ type integrationModule struct {
 	config       Config
 }
 
-// ForRoot 创建 gRPC 客户端集成模块，并把默认 client、连接、配置与工厂注册到容器中。
+// build 创建 gRPC 客户端集成模块，并把默认 client、连接、配置与工厂注册到容器中。
 func build(cfg Config) (module.Module, error) {
 	client, err := New(cfg)
 	if err != nil {

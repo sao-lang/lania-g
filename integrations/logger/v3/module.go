@@ -17,7 +17,7 @@ type integrationModule struct {
 	config       Config
 }
 
-// ForRoot 创建日志集成模块，并把默认 logger、命名 logger、配置与工厂注册到容器中。
+// build 创建日志集成模块，并把默认 logger、命名 logger、配置与工厂注册到容器中。
 //
 // 对业务代码来说，这是最常见的日志接入入口。
 func build(cfg Config) (module.Module, error) {

@@ -25,7 +25,7 @@ type integrationModule struct {
 	config       Config
 }
 
-// ForRoot 创建一个启用 OpenTelemetry 的模块。
+// build 创建一个启用 OpenTelemetry 的模块。
 //
 // 返回的 module 会导出：
 // - `*Telemetry`（默认与按 name 的 token 版本）

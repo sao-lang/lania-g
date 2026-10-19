@@ -18,7 +18,7 @@ type integrationModule struct {
 	config       Config
 }
 
-// ForRoot 创建认证集成模块，并注册默认服务、命名服务、配置与工厂。
+// build 创建认证集成模块，并注册默认服务、命名服务、配置与工厂。
 func build(cfg Config) (module.Module, error) {
 	service, err := New(cfg)
 	if err != nil {

@@ -17,7 +17,7 @@ type integrationModule struct {
 	config       Config
 }
 
-// ForRoot 创建事件集成模块，并注册事件总线、发射器、配置和工厂。
+// build 创建事件集成模块，并注册事件总线、发射器、配置和工厂。
 func build(cfg Config) (module.Module, error) {
 	bus, err := New(cfg)
 	if err != nil {

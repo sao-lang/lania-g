@@ -16,7 +16,7 @@ type integrationModule struct {
 	config       Config
 }
 
-// ForRoot 创建配置集成模块，并把配置加载器与配置对象注册到 DI 容器中。
+// build 创建配置集成模块，并把配置加载器与配置对象注册到 DI 容器中。
 //
 // 导出的常见依赖包括：
 // - `*Loader`

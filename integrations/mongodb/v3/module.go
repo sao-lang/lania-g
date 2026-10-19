@@ -12,7 +12,7 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 )
 
-// ForRoot 创建 MongoDB 集成模块，并注册数据库、客户端、配置与工厂。
+// build 创建 MongoDB 集成模块，并注册数据库、客户端、配置与工厂。
 func build(cfg Config) (module.Module, error) {
 	cfg = normalizeConfig(cfg)
 	f := &factory{dbs: map[string]*mongo.Database{}, clients: map[string]*mongo.Client{}}

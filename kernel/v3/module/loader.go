@@ -96,7 +96,7 @@ func (l *ModuleLoader) LoadMultiple(roots ...Module) (*LoadResult, error) {
 // 规则：
 // - 0 个 root：清空 root 与 moduleRef
 // - 1 个 root：直接使用该 module
-// - >1 个 root：创建聚合 root（CreateModule）
+// - >1 个 root：创建聚合 root（module.New）
 func (l *ModuleLoader) setRootModules(roots []Module) {
 	l.mu.Lock()
 	l.loadedModules = make(map[reflect.Type]Module)

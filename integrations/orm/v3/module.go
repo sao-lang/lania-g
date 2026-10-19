@@ -140,7 +140,6 @@ func buildMulti(cfg MultiConfig) (module.Module, error) {
 	return &integrationModule{BaseModule: base, db: defaultDB, factory: f, config: defaultConfig}, nil
 }
 
-// ForRootMultiCompat 显式保留 standalone Init 写入全局 registry 的兼容语义。
 // Init 初始化 ORM 模块，并把 ORM 相关 binding 注册到 registry。
 // Module 创建 orm 集成模块。
 //

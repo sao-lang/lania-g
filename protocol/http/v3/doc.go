@@ -19,7 +19,7 @@
 //
 // 一个常见的调用顺序是：
 //
-//	声明路由 -> application.NewWithOptions(..., application.Options{Registry: application.NewRegistry()}, ...) -> CompileDiagnostics() -> Listen(":8080")
+//	声明路由 -> application.New(root, application.Options{Logger: os.Stdout}) -> app.Run()
 //
 // 另外，controller 级别的 `UseGuards/UsePipes/UseInterceptors/...` 应在声明第一条路由前调用；
 // 一旦开始 `Get/Post/...`，后续再改 controller 级配置会返回错误。

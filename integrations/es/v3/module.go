@@ -19,7 +19,7 @@ type integrationModule struct {
 	config       Config
 }
 
-// ForRoot 基于配置创建一个 Elasticsearch 模块。
+// build 基于配置创建一个 Elasticsearch 模块。
 func build(cfg Config) (module.Module, error) {
 	client, err := New(cfg)
 	if err != nil {

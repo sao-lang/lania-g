@@ -17,7 +17,7 @@ type integrationModule struct {
 	uiConfig     *UIConfig
 }
 
-// ForRoot 创建 Swagger 集成模块，并注册文档构建器、配置、UI 配置与工厂。
+// build 创建 Swagger 集成模块，并注册文档构建器、配置、UI 配置与工厂。
 func build(cfg Config, ui ...*UIConfig) (module.Module, error) {
 	builder, err := New(cfg)
 	if err != nil {

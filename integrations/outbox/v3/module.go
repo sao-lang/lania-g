@@ -10,7 +10,7 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 )
 
-// ForRoot 创建 Outbox 集成模块，并注册服务、存储、分发器、配置与工厂。
+// build 创建 Outbox 集成模块，并注册服务、存储、分发器、配置与工厂。
 func build(cfg Config) (module.Module, error) {
 	service, err := New(cfg)
 	if err != nil {

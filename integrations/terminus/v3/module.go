@@ -43,7 +43,7 @@ type integrationModule struct {
 	config       Config
 }
 
-// ForRoot 创建健康检查集成模块，并注册 HealthService、配置与工厂。
+// build 创建健康检查集成模块，并注册 HealthService、配置与工厂。
 func build(cfg Config) (module.Module, error) {
 	f := &healthFactory{}
 	service, err := f.New(cfg)
