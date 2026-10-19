@@ -133,6 +133,20 @@ func (r *Registry) RegisterDecl(pluginID, kind string, items ...any) {
 	kinds[kind] = append(kinds[kind], items...)
 }
 
+// ClearDecl 清空某个插件某类声明。
+//
+// 声明阶段是幂等的：热加载重新收集前会先清空，避免重复声明。
+func (r *Registry) ClearDecl(pluginID, kind string) {
+	if r == nil || pluginID == "" || kind == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if kinds := r.decls[pluginID]; kinds != nil {
+		delete(kinds, kind)
+	}
+}
+
 // ListDecl 返回某个插件某类声明的快照。
 //
 // 返回的是切片快照（copy），避免调用方修改内部状态。

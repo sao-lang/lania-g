@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
@@ -30,9 +29,6 @@ type StartupReport struct {
 	ProtocolCount            int                                      `json:"protocolCount"`
 	RouteCount               int                                      `json:"routeCount"`
 	BindingResolverCount     int                                      `json:"bindingResolverCount"`
-	RegistrySource           string                                   `json:"registrySource"`
-	CompatFallbackCategories []compiler.CompatFallbackCategorySummary `json:"compatFallbackCategories"`
-	CompatFallbackSources    []compiler.CompatFallbackSourceSummary   `json:"compatFallbackSources"`
 	GlobalAOP                compiler.AOPDiagnostics                  `json:"globalAOP"`
 	RegistryFallbacks        []compiler.RegistryFallbackDiagnostics   `json:"registryFallbacks"`
 	RuntimeFallbacks         []compiler.RuntimeFallbackDiagnostics    `json:"runtimeFallbacks"`
@@ -41,11 +37,6 @@ type StartupReport struct {
 	Protocols                []ProtocolStartupReport                  `json:"protocols"`
 	Integrations             []string                                 `json:"integrations"`
 	Warnings                 []string                                 `json:"warnings"`
-}
-
-// HasCompatFallbacks 返回当前启动报告中是否存在 compat fallback 聚合结果。
-func (r *StartupReport) HasCompatFallbacks() bool {
-	return r != nil && (len(r.CompatFallbackCategories) > 0 || len(r.CompatFallbackSources) > 0)
 }
 
 // ModuleStartupReport 描述单个模块在启动汇总中的统计项。
@@ -62,7 +53,6 @@ type ModuleStartupReport struct {
 // AdapterStartupReport 描述单个 adapter 的启动信息摘要。
 type AdapterStartupReport struct {
 	ID             string `json:"id"`
-	SharedListener bool   `json:"sharedListener"`
 }
 
 // ProtocolStartupReport 描述单个协议在启动汇总中的编译结果摘要。
@@ -118,9 +108,6 @@ func (a *Application) buildStartupReport() *StartupReport {
 			continue
 		}
 		item := AdapterStartupReport{ID: adp.ID()}
-		if cfg, ok := adp.(adapter.SharedListenerConfigurator); ok {
-			item.SharedListener = cfg.RequiresSharedListen()
-		}
 		report.Adapters = append(report.Adapters, item)
 	}
 	slices.SortFunc(report.Adapters, func(a, b AdapterStartupReport) int {
@@ -133,9 +120,6 @@ func (a *Application) buildStartupReport() *StartupReport {
 		return report
 	}
 	report.BindingResolverCount = diag.BindingResolverCount
-	report.RegistrySource = diag.RegistrySource
-	report.CompatFallbackCategories = append([]compiler.CompatFallbackCategorySummary{}, diag.CompatFallbackCategories...)
-	report.CompatFallbackSources = append([]compiler.CompatFallbackSourceSummary{}, diag.CompatFallbackSources...)
 	report.GlobalAOP = diag.GlobalAOP
 	report.RegistryFallbacks = append([]compiler.RegistryFallbackDiagnostics{}, diag.RegistryFallbacks...)
 	report.RuntimeFallbacks = append([]compiler.RuntimeFallbackDiagnostics{}, diag.RuntimeFallbacks...)
@@ -187,17 +171,7 @@ func (r *StartupReport) String() string {
 	lines := []string{
 		"startup report:",
 		fmt.Sprintf("  modules=%d adapters=%d protocols=%d routes=%d bindings=%d", r.ModuleCount, r.AdapterCount, r.ProtocolCount, r.RouteCount, r.BindingResolverCount),
-		fmt.Sprintf("  registry=%s", strings.TrimSpace(defaultIfEmpty(r.RegistrySource, "unknown"))),
 		fmt.Sprintf("  globalAOP middleware=%d guard=%d interceptor=%d pipe=%d filter=%d", r.GlobalAOP.Middlewares, r.GlobalAOP.Guards, r.GlobalAOP.Interceptors, r.GlobalAOP.Pipes, r.GlobalAOP.Filters),
-	}
-	if r.HasCompatFallbacks() {
-		lines = append(lines, "  compatFallbacks:")
-		if categories := formatCompatFallbackCategories(r.CompatFallbackCategories); categories != "" {
-			lines = append(lines, fmt.Sprintf("    - fallbackCategories=%s", categories))
-		}
-		if sources := formatCompatFallbackSources(r.CompatFallbackSources); sources != "" {
-			lines = append(lines, fmt.Sprintf("    - fallbackSources=%s", sources))
-		}
 	}
 	if len(r.Integrations) > 0 {
 		lines = append(lines, fmt.Sprintf("  integrations=%s", strings.Join(r.Integrations, ", ")))
@@ -205,11 +179,7 @@ func (r *StartupReport) String() string {
 	if len(r.Adapters) > 0 {
 		lines = append(lines, "  adapters:")
 		for _, item := range r.Adapters {
-			mode := "standalone"
-			if item.SharedListener {
-				mode = "shared-listener"
-			}
-			lines = append(lines, fmt.Sprintf("    - %s (%s)", item.ID, mode))
+			lines = append(lines, fmt.Sprintf("    - %s", item.ID))
 		}
 	}
 	if len(r.Protocols) > 0 {

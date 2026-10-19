@@ -7,8 +7,11 @@ import (
 	httpadapter "github.com/sao-lang/lania-g/protocol/http/v3"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
+
+func newHTTPTestModule() module.Module {
+	return httpadapter.Module(httpadapter.Config{})
+}
 
 type hotLoadBaseController struct{}
 
@@ -16,10 +19,18 @@ func (c *hotLoadBaseController) Ping() (string, error) {
 	return "base", nil
 }
 
+func (c *hotLoadBaseController) Register(r *httpadapter.Routes) {
+	r.Prefix("/base").Get("/ping", c.Ping)
+}
+
 type hotLoadExtraController struct{}
 
 func (c *hotLoadExtraController) Ping() (string, error) {
 	return "extra", nil
+}
+
+func (c *hotLoadExtraController) Register(r *httpadapter.Routes) {
+	r.Prefix("/extra").Get("/ping", c.Ping)
 }
 
 type hotLoadBootstrapProvider struct {
@@ -38,6 +49,7 @@ type hotLoadRootModule struct {
 func newHotLoadRootModule(ctrl *hotLoadBaseController) module.Module {
 	return &hotLoadRootModule{
 		BaseModule: module.New(module.Metadata{
+			Imports:     []module.Module{newHTTPTestModule()},
 			Controllers: []any{ctrl},
 		}),
 	}
@@ -72,27 +84,21 @@ func newHotLoadBootstrapModule(provider *hotLoadBootstrapProvider) (module.Modul
 }
 
 func TestHotLoad_RecompilesRuntimeWithNewModule(t *testing.T) {
-	reg := registry.New()
 	baseCtrl := &hotLoadBaseController{}
 	extraCtrl := &hotLoadExtraController{}
 
 	root := newHotLoadRootModule(baseCtrl)
-	app, err := NewWithOptions(root, Options{Registry: reg}, httpadapter.New())
+	app, err := New(root, Options{})
 	if err != nil {
 		t.Fatalf("new application: %v", err)
 	}
 
-	api := mustTestAdapterAPI[*httpadapter.API](t, app, "http")
-	api.Controller("/base", baseCtrl).Get("/ping", baseCtrl.Ping).Build()
-
-	if _, err := app.CompileDiagnostics(); err != nil {
-		t.Fatalf("compile diagnostics: %v", err)
+	if err := app.ensureCompiled(); err != nil {
+		t.Fatalf("compile: %v", err)
 	}
 	if got := executeTestHTTPPing(t, app, "/base/ping"); got != "base" {
 		t.Fatalf("base response = %q, want %q", got, "base")
 	}
-
-	api.Controller("/extra", extraCtrl).Get("/ping", extraCtrl.Ping).Build()
 
 	hotModule := newHotLoadExtraModule(extraCtrl)
 	if err := app.HotLoad(hotModule); err != nil {
@@ -108,10 +114,9 @@ func TestHotLoad_RecompilesRuntimeWithNewModule(t *testing.T) {
 }
 
 func TestHotLoad_BootstrapsNewModuleWhenApplicationAlreadyBootstrapped(t *testing.T) {
-	app, err := NewWithOptions(
-		module.New(module.Metadata{}),
-		Options{Registry: registry.New()},
-		httpadapter.New(),
+	app, err := New(
+		module.New(module.Metadata{Imports: []module.Module{newHTTPTestModule()}}),
+		Options{},
 	)
 	if err != nil {
 		t.Fatalf("new application: %v", err)

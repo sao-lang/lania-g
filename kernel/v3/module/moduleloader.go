@@ -71,10 +71,11 @@ func (l *ModuleLoader) LoadModule(mod Module) error {
 	l.mu.Unlock()
 
 	if l.rootModule != nil && l.rootModule != mod {
-		if rootBase, ok := l.rootModule.(*BaseModule); ok {
-			if !hasImportedModule(rootBase.metadata.Imports, mod) {
-				rootBase.metadata.Imports = append(rootBase.metadata.Imports, mod)
+		if rootMetadata := l.rootModule.Metadata(); rootMetadata != nil {
+			if !hasImportedModule(rootMetadata.Imports, mod) {
+				rootMetadata.Imports = append(rootMetadata.Imports, mod)
 			}
+			rootContainer := l.rootModule.Container()
 			for _, exportToken := range exportedTokens(mod) {
 				instance, err := mod.Container().Get(exportToken)
 				if err != nil {
@@ -82,7 +83,7 @@ func (l *ModuleLoader) LoadModule(mod Module) error {
 				}
 				// 动态加载后把新模块导出的 token 也补进 root container，
 				// 这样全局解析路径能立刻看到新依赖。
-				rootBase.container.RegisterValue(exportToken, instance)
+				rootContainer.RegisterValue(exportToken, instance)
 			}
 		}
 	}

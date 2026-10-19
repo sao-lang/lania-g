@@ -194,10 +194,24 @@ func (l *ModuleLoader) attachContext(mod Module) {
 	}
 }
 
-// collectAOP 汇总所有模块在 Init 阶段贡献的全局 AOP。
+// collectAOP 汇总所有模块贡献的全局 AOP。
+//
+// 来源有两处：
+//   - Metadata.AOP：装配期静态声明
+//   - Context.Use：Init 阶段由模块动态追加
 func (l *ModuleLoader) collectAOP() AOP {
 	var out AOP
 	for _, mod := range l.getModulesList() {
+		if mod == nil {
+			continue
+		}
+		if metadata := mod.Metadata(); metadata != nil {
+			out.Middlewares = append(out.Middlewares, metadata.AOP.Middlewares...)
+			out.Guards = append(out.Guards, metadata.AOP.Guards...)
+			out.Interceptors = append(out.Interceptors, metadata.AOP.Interceptors...)
+			out.Pipes = append(out.Pipes, metadata.AOP.Pipes...)
+			out.Filters = append(out.Filters, metadata.AOP.Filters...)
+		}
 		aware, ok := mod.(ModuleContextAware)
 		if !ok {
 			continue

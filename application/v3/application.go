@@ -1,13 +1,15 @@
-// application.go 定义 v3 应用入口，以及“模块树 + runtime + adapters + registry”的总装配逻辑。
+// application.go 组装并驱动一个 lania-g 应用。
 //
-// 如果说 module/runtime/compiler 是框架内部骨架，
-// 那 Application 就是把这些骨架真正组装成一个可启动实例的外层门面。
+// 唯一的装配入口是 New：它从根模块出发完成
+//
+//	加载模块树 → Init → 发现适配器 → 挂载适配器 → 声明协议路由 → 合并全局 AOP
+//
+// 唯一的运行入口是 Run：它完成编译、启动适配器并阻塞到 Stop。
 package application
 
 import (
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
@@ -16,21 +18,13 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	"sync"
 )
 
-// Application 是 v3 的应用入口，负责把以下部分装配起来：
-// - module loader（模块树与 DI 容器）
-// - runtime（router/binding/pipeline/executor）
-// - adapters（协议适配器与协议插件）
-// - registry（各 adapter 写入的声明）
-//
-// 它本身不承载 Controller/Gateway 这类协议 DSL，
-// 这些声明入口应放在对应的 adapter 中。
+// Application 持有模块树、声明仓库、适配器与运行期状态。
 type Application struct {
 	runtime         *runtime.Runtime
 	registry        *registry.Registry
-	registrySource  string
-	explicitCompat  bool
 	moduleLoader    *module.ModuleLoader
 	moduleRef       *module.ModuleRef
 	adapters        map[string]adapter.Adapter
@@ -40,6 +34,8 @@ type Application struct {
 	plugins         []compiler.ProtocolPlugin
 	startupReporter io.Writer
 	bootstrapped    bool
+	prepared        bool
+	mounted         bool
 
 	stopCh   chan struct{}
 	stopOnce sync.Once
@@ -47,45 +43,19 @@ type Application struct {
 
 // Options 描述创建 Application 时的基础选项。
 type Options struct {
-	Registry        *Registry
-	StartupReporter io.Writer
+	// Logger 非空时输出启动报告。
+	Logger io.Writer
 }
 
-// New 基于根模块创建一个 Application，并挂载传入的 adapters。
+// New 基于根模块创建应用。
 //
-// 这是一个便捷入口；新业务代码更推荐使用 `NewWithOptions(...)` 并显式注入
-// 实例级 `application.NewRegistry()`。返回的应用已经完成模块加载与 adapter 挂载，
-// 但还没有开始监听端口或启动对外服务。
-func New(root module.Module, adapters ...adapter.Adapter) (*Application, error) {
-	return newWithOptions(root, Options{Registry: registry.Global()}, false, adapters...)
-}
-
-// NewCompat 基于根模块创建一个 Application，并显式保留“默认回退到全局 registry”的兼容语义。
-func NewCompat(root module.Module, adapters ...adapter.Adapter) (*Application, error) {
-	return newWithOptions(root, Options{Registry: registry.Global()}, true, adapters...)
-}
-
-// NewWithOptions 与 New 类似，但允许显式传入基础设施级选项。
-//
-// 常见用途：
-// - 显式注入 Registry，而不是使用 registry.Global()
-// - 打开 StartupReporter，观察编译结果与启动汇总
-//
-// 推荐：通过 `Options{Registry: NewRegistry()}` 显式注入实例级 registry。
-// 兼容：若明确需要保留默认全局 registry 语义，优先使用 `NewCompat(...)`。
-func NewWithOptions(root module.Module, opts Options, adapters ...adapter.Adapter) (*Application, error) {
-	return newWithOptions(root, opts, false, adapters...)
-}
-
-func newWithOptions(root module.Module, opts Options, explicitCompat bool, adapters ...adapter.Adapter) (*Application, error) {
-	reg := opts.Registry
-	registrySource := "instance"
-	if reg == nil {
-		return nil, fmt.Errorf("application.NewWithOptions requires an explicit registry; use application.NewCompat(...) to keep registry.Global() compatibility")
+// root 是唯一的装配入口：协议适配器、集成模块、控制器都必须挂在它下面。
+func New(root module.Module, opts Options) (*Application, error) {
+	if root == nil {
+		return nil, fmt.Errorf("application.New requires a root module")
 	}
-	if reg == registry.Global() {
-		registrySource = "global-default"
-	}
+
+	reg := registry.New()
 	loader := module.NewModuleLoader()
 	loader.SetRegistry(reg)
 	if _, err := loader.LoadMultiple(root); err != nil {
@@ -94,44 +64,57 @@ func newWithOptions(root module.Module, opts Options, explicitCompat bool, adapt
 
 	rt := runtime.NewRuntime()
 	if ref := loader.GetModuleRef(); ref != nil {
-		// 把 root container 提前接给 runtime.Executor，
-		// 这样后续请求执行时 child container 就都从同一棵模块容器树派生。
 		rt.GetExecutor().SetRootContainer(ref.GetContainer())
 	}
 
 	app := &Application{
 		runtime:         rt,
 		registry:        reg,
-		registrySource:  registrySource,
-		explicitCompat:  explicitCompat,
 		moduleLoader:    loader,
 		moduleRef:       loader.GetModuleRef(),
 		adapters:        make(map[string]adapter.Adapter),
 		adapterList:     make([]adapter.Adapter, 0),
-		startupReporter: opts.StartupReporter,
+		startupReporter: opts.Logger,
 		stopCh:          make(chan struct{}),
 	}
 
-	for _, adp := range adapters {
-		if err := app.UseAdapter(adp); err != nil {
-			return nil, err
-		}
+	// 模块在 Init 阶段贡献的全局 AOP 与 registry 上的全局 AOP 合并成一份。
+	contribution := loader.GetAOP()
+	reg.UseGlobalMiddlewares(contribution.Middlewares...)
+	reg.UseGlobalGuards(contribution.Guards...)
+	reg.UseGlobalInterceptors(contribution.Interceptors...)
+	reg.UseGlobalPipes(contribution.Pipes...)
+	reg.UseGlobalFilters(contribution.Filters...)
+
+	if err := app.mountModuleAdapters(root); err != nil {
+		return nil, err
 	}
 	return app, nil
+}
+
+// mountModuleAdapters 从模块树中发现并挂载适配器。
+func (a *Application) mountModuleAdapters(root module.Module) error {
+	return module.WalkModules(root, func(mod module.Module) error {
+		provider, ok := mod.(adapter.ModuleAdapter)
+		if !ok {
+			return nil
+		}
+		return a.useAdapter(provider.Adapter())
+	})
 }
 
 // Runtime 返回当前应用使用的 runtime 实例。
 func (a *Application) Runtime() *runtime.Runtime { return a.runtime }
 
-// Registry 返回当前应用使用的声明注册表。
-func (a *Application) Registry() *Registry { return a.registry }
+// Registry 返回当前应用的声明仓库。
+//
+// 它主要供集成与协议内部使用；业务代码不应依赖。
+func (a *Application) Registry() *registry.Registry { return a.registry }
 
-// ModuleRef 返回已加载完成的根 ModuleRef 树。
+// ModuleRef 返回根 ModuleRef 树。
 func (a *Application) ModuleRef() *module.ModuleRef { return a.moduleRef }
 
 // GraphDiagnostics 返回模块加载图的诊断信息。
-//
-// 当你排查循环依赖、provider 缺失或模块归属异常时，这个信息会比较有用。
 func (a *Application) GraphDiagnostics() *graph.Diagnostics {
 	if a.moduleLoader == nil {
 		return nil
@@ -139,9 +122,7 @@ func (a *Application) GraphDiagnostics() *graph.Diagnostics {
 	return a.moduleLoader.GetDiagnostics()
 }
 
-// LastCompileDiagnostics 返回最近一次保存的编译诊断快照。
-//
-// 如果应用尚未触发编译，或者当前还没有可用诊断信息，则返回 nil。
+// LastCompileDiagnostics 返回最近一次编译诊断快照。
 func (a *Application) LastCompileDiagnostics() *compiler.CompileDiagnostics {
 	if a == nil || a.lastDiagnostics == nil {
 		return nil
@@ -149,40 +130,22 @@ func (a *Application) LastCompileDiagnostics() *compiler.CompileDiagnostics {
 	return a.lastDiagnostics.Clone()
 }
 
-// CompileDiagnostics 在需要时触发编译，并返回一份诊断快照。
-//
-// 这很适合作为启动前预检查：在 Run 或 Listen 前先调用一次，
-// 让路由冲突、binding 问题、声明错误尽早暴露出来。
-func (a *Application) CompileDiagnostics() (*compiler.CompileDiagnostics, error) {
-	if a == nil {
-		return nil, fmt.Errorf("application is nil")
-	}
-	if err := a.ensureCompiled(); err != nil {
-		return a.LastCompileDiagnostics(), err
-	}
-	return a.LastCompileDiagnostics(), nil
+// Diagnostics 返回最近一次编译诊断快照。
+func (a *Application) Diagnostics() *compiler.CompileDiagnostics {
+	return a.LastCompileDiagnostics()
 }
 
-// RegisterPlugin 向应用追加额外的协议插件。
-//
-// 大多数业务代码不需要直接调用它，因为 adapter 通常会在 UseAdapter 时
-// 自动暴露自己的协议插件。这个方法主要面向框架扩展场景。
+// RegisterPlugin 追加额外的协议插件。
 func (a *Application) RegisterPlugin(plugins ...compiler.ProtocolPlugin) {
 	for _, p := range plugins {
 		if p != nil {
-			// plugin 列表允许 adapter 和外部扩展同时追加；
-			// 真正编译时会再做稳定排序和去 nil。
 			a.plugins = append(a.plugins, p)
 		}
 	}
 }
 
-// UseAdapter 将一个 adapter 挂载到应用上。
-//
-// 挂载过程中，adapter 可能会写入声明、暴露 adapter 专属 API，
-// 并为后续编译阶段提供协议插件。但它不会立刻启动；
-// 真正启动仍发生在 Run 或 Listen 中。
-func (a *Application) UseAdapter(adp adapter.Adapter) error {
+// useAdapter 挂载一个 adapter 并登记它暴露的协议插件。
+func (a *Application) useAdapter(adp adapter.Adapter) error {
 	if adp == nil {
 		return fmt.Errorf("adapter is nil")
 	}
@@ -201,26 +164,16 @@ func (a *Application) UseAdapter(adp adapter.Adapter) error {
 	if pp, ok := adp.(interface {
 		Plugins() []compiler.ProtocolPlugin
 	}); ok {
-		// 让 adapter 自己声明“它暴露哪些协议插件”，
-		// Application 不需要了解每种 adapter 的内部细节。
 		a.RegisterPlugin(pp.Plugins()...)
 	}
 	return nil
 }
 
-// API 返回某个已挂载 adapter 暴露出来的专属 API 对象。
-//
-// 当调用方需要在挂载后使用某些 adapter 专属能力时，可以通过这里获取，
-// 例如 HTTP adapter 提供的辅助方法。
-func (a *Application) API(adapterID string) (any, bool) {
+// Adapter 返回某个已挂载的适配器。
+func (a *Application) Adapter(adapterID string) (adapter.Adapter, bool) {
 	adp, ok := a.adapters[adapterID]
-	if !ok {
-		return nil, false
-	}
-	return adp.API(), true
+	return adp, ok
 }
-
-// ===== v2 兼容糖封装（仍通过接口断言保留插件架构） =====
 
 // UseGlobalMiddlewares 注册全局 middlewares（对所有协议路由生效）。
 func (a *Application) UseGlobalMiddlewares(mws ...aop.MiddlewareFunc) {
@@ -245,15 +198,4 @@ func (a *Application) UseGlobalPipes(ps ...aop.PipeFunc) {
 // UseGlobalFilters 注册全局 exception filters（对所有协议路由生效）。
 func (a *Application) UseGlobalFilters(fs ...aop.ExceptionFilterFunc) {
 	a.registry.UseGlobalFilters(fs...)
-}
-
-// SetGlobalPrefix 为已挂载的 HTTP adapter 配置全局路由前缀。
-func (a *Application) SetGlobalPrefix(prefix string) {
-	adp, ok := a.adapters["http"]
-	if !ok {
-		return
-	}
-	if setter, ok := adp.(interface{ SetGlobalPrefix(string) }); ok {
-		setter.SetGlobalPrefix(prefix)
-	}
 }

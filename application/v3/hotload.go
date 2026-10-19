@@ -34,6 +34,12 @@ func (a *Application) HotLoad(mod module.Module) error {
 
 	previous := a.snapshotState()
 	a.moduleRef = a.moduleLoader.GetModuleRef()
+	a.invalidatePreparation()
+	if err := a.prepare(); err != nil {
+		_ = a.moduleLoader.UnloadModule(mod)
+		a.restoreState(previous)
+		return err
+	}
 	rt, compiled, diag, err := a.buildCompiledRuntime()
 	if err != nil {
 		// 热加载失败时尽量恢复到旧状态，避免应用卡在“半新半旧”的中间态。

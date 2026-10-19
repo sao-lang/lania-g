@@ -13,7 +13,6 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
-	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
 const (
@@ -21,55 +20,14 @@ const (
 	AdapterID = "http"
 )
 
-// API 是 HTTP adapter 对 registry 的轻量封装入口。
-// 它只负责“把声明写入哪里”和“是否支持 mount 一个原生 http.Handler”，不直接承接请求。
-type API struct {
-	reg            *registry.Registry
-	mountHandler   func(prefix string, handler http.Handler)
-	fallbackSource string
-}
-
-// NewAPI 创建一个 HTTP DSL 入口。
+// API 已移除：路由声明请使用 Controller + Routes。
 //
-// 推荐：使用挂载到应用实例后的 adapter API，或显式传入实例级 registry。
-// 兼容：历史上允许 `NewAPI(nil, ...)`，当前等价于 `NewCompatAPI(...)`。
-func NewAPI(reg *registry.Registry, mountHandler func(prefix string, handler http.Handler)) *API {
-	if reg == nil {
-		return NewCompatAPI(mountHandler)
-	}
-	return &API{reg: reg, mountHandler: mountHandler}
-}
-
-// NewCompatAPI 创建一个显式保留给迁移场景的全局 DSL 入口，不作为新代码默认入口。
-func NewCompatAPI(mountHandler func(prefix string, handler http.Handler)) *API {
-	return globalCompatAPI("http.NewCompatAPI()", mountHandler)
-}
-
-func globalCompatAPI(source string, mountHandler func(prefix string, handler http.Handler)) *API {
-	return &API{reg: registry.Global(), mountHandler: mountHandler, fallbackSource: source}
-}
-
-// Controller 创建一个 controller 级路由声明构建器。
-func (api *API) Controller(prefix string, controller any) *ControllerBuilder {
-	return newControllerBuilder(prefix, controller, api.reg, api.fallbackSource)
-}
-
-// MountHandler 把一个 `net/http` handler 挂载到给定前缀下。
-func (api *API) MountHandler(prefix string, handler http.Handler) {
-	if api.mountHandler == nil {
-		return
-	}
-	api.mountHandler(prefix, handler)
-}
-
 // Adapter 是框架的 HTTP 协议适配器。
 // 除了作为 `http.Handler` 对外服务，它还承担挂载子 handler、注入 renderer/validator、
-// 以及共享监听/独立监听两种启动模式的协调。
+// 以及启动/停止监听等职责。
 type Adapter struct {
-	api          *API
 	host         adapter.Host
 	addr         string
-	standalone   bool
 	basePath     string
 	server       *http.Server
 	nextHandler  http.Handler
@@ -86,54 +44,55 @@ type Adapter struct {
 
 var _ adapter.Adapter = (*Adapter)(nil)
 
-// New 创建一个 HTTP adapter。
-//
-// - `New()` 使用 shared listen 模式，地址由 `app.Listen(addr)` 提供
-// - `New(":8080")` 使用 standalone 模式，由 adapter 自行监听端口
-func New(addr ...string) *Adapter {
+// newAdapter 根据配置构造适配器。
+func newAdapter(cfg Config) *Adapter {
 	a := &Adapter{
-		api:          NewCompatAPI(nil),
-		addr:         "",
-		basePath:     "",
+		addr:         strings.TrimSpace(cfg.Addr),
+		basePath:     cfg.BasePath,
 		nextHandler:  http.NotFoundHandler(),
 		maxBodyBytes: 10 << 20,
 		mounted:      make([]mountedHandler, 0),
 		middlewares:  make([]func(*httpbinding.HttpContext) error, 0),
 	}
-	if len(addr) > 0 && strings.TrimSpace(addr[0]) != "" {
-		a.standalone = true
-		a.addr = addr[0]
+	if cfg.MaxBodyBytes > 0 {
+		a.maxBodyBytes = cfg.MaxBodyBytes
 	}
+	if cfg.Renderer != nil {
+		a.renderer = cfg.Renderer
+	}
+	if cfg.ValidatorImpl != nil {
+		a.validator = cfg.ValidatorImpl
+	} else if cfg.Validator {
+		a.validator = httpbinding.NewValidatorV10()
+	}
+	if cfg.NotFound != nil {
+		a.nextHandler = cfg.NotFound
+	}
+	if cfg.CORS != nil {
+		a.cors = cfg.CORS
+	}
+	if cfg.Helmet != nil {
+		a.helmet = cfg.Helmet
+	}
+	a.middlewares = append(a.middlewares, cfg.Middlewares...)
 	return a
 }
 
-// Listen 保留用于向后兼容。
-// Deprecated: use http.New(":addr") instead.
-func Listen(addr string) *Adapter { return New(addr) }
-
 // ID 返回 adapter 标识。
 func (a *Adapter) ID() string { return AdapterID }
-
-// API 返回当前 adapter 暴露给应用层使用的 DSL 入口。
-func (a *Adapter) API() any { return a.api }
 
 // Plugins 返回 HTTP 协议编译插件集合。
 func (a *Adapter) Plugins() []compiler.ProtocolPlugin {
 	return []compiler.ProtocolPlugin{NewPlugin()}
 }
 
-// Mount 把 adapter 挂到宿主应用上，并接入 registry 与 handler 挂载能力。
+// Mount 把 adapter 挂到宿主应用上，并记录宿主引用。
 func (a *Adapter) Mount(host adapter.Host) error {
 	a.host = host
-	a.api = NewAPI(host.Registry(), func(prefix string, handler http.Handler) {
-		a.MountHandler(prefix, handler)
-	})
 	return nil
 }
 
-// Start 启动 HTTP 服务。
-// shared-listen 模式下，addr 由应用通过 `ConfigureSharedListen` 预先注入；
-// standalone 模式下，addr 则来自 `http.New(":addr")`。
+// Start 启动 HTTP 服务，监听地址来自 Config.Addr。
 func (a *Adapter) Start() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -142,10 +101,7 @@ func (a *Adapter) Start() error {
 		return fmt.Errorf("http adapter not mounted")
 	}
 	if strings.TrimSpace(a.addr) == "" {
-		if a.standalone {
-			return fmt.Errorf("http standalone adapter requires addr")
-		}
-		return fmt.Errorf("http adapter requires app.Listen(addr) or http.New(\":addr\")")
+		return fmt.Errorf("http.Module requires http.Config{Addr: \":8080\"}")
 	}
 	if a.server == nil {
 		a.server = &http.Server{
@@ -177,55 +133,10 @@ func (a *Adapter) Stop() error {
 	return a.server.Shutdown(ctx)
 }
 
-// WithAddr 保留用于向后兼容。
-// Deprecated: use http.New(":addr") instead.
-func (a *Adapter) WithAddr(addr string) *Adapter {
-	a.standalone = true
-	a.addr = addr
-	return a
-}
-
-// AsStandalone 保留用于向后兼容。
-// Deprecated: use http.New(":addr") instead.
-func (a *Adapter) AsStandalone(addr string) *Adapter {
-	a.standalone = true
-	a.addr = addr
-	return a
-}
-
-// Listen 保留用于向后兼容。
-// Deprecated: use app.Run() with http.New(":addr") or app.Listen(":addr") with http.New().
-func (a *Adapter) Listen(addr string) error {
-	a.AsStandalone(addr)
-	return a.Start()
-}
-
 // WithBasePath 为 adapter 设置统一的路由前缀。
 func (a *Adapter) WithBasePath(prefix string) *Adapter {
 	a.basePath = prefix
 	return a
-}
-
-// SetGlobalPrefix 保留 v2 兼容命名，在当前 adapter 中等价于设置 basePath。
-func (a *Adapter) SetGlobalPrefix(prefix string) {
-	a.WithBasePath(prefix)
-}
-
-// RequiresSharedListen 返回当前 adapter 是否依赖应用层提供共享监听地址。
-func (a *Adapter) RequiresSharedListen() bool {
-	return !a.standalone
-}
-
-// ConfigureSharedListen 为 shared listen 模式设置监听地址。
-func (a *Adapter) ConfigureSharedListen(addr string) error {
-	if a.standalone {
-		return nil
-	}
-	if strings.TrimSpace(addr) == "" {
-		return fmt.Errorf("shared listen addr is empty")
-	}
-	a.addr = addr
-	return nil
 }
 
 // EnableCors 启用内建 CORS 处理（`net/http` 层）。

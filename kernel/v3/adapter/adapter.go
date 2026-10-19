@@ -32,7 +32,6 @@ type Adapter interface {
 	Mount(host Host) error
 	Start() error
 	Stop() error
-	API() any
 }
 
 // SharedListenerConfigurator 由那些需要共享监听地址的 adapter 实现。
@@ -51,4 +50,34 @@ type SharedListenerConfigurator interface {
 // 它通常由 Application（或类似宿主）实现，底层再委托给已经挂载的 HTTP adapter。
 type HTTPMountHost interface {
 	MountHTTP(pattern string, handler http.Handler) error
+}
+
+// Mounter 是挂载阶段暴露给模块的最小能力集。
+type Mounter interface {
+	Handle(pattern string, handler http.Handler)
+	Static(prefix, root string)
+}
+
+// HTTPMountRequest 是模块挂载原生 HTTP handler 时收到的上下文。
+//
+// Host 提供 runtime/registry/moduleRef 只读视图，Mounter 提供挂载能力。
+// 两者都由 Application 在挂载阶段提供，模块无需依赖 Application 的具体类型。
+type HTTPMountRequest struct {
+	Host    Host
+	Mounter Mounter
+}
+
+// ModuleAdapter 由“协议即模块”的适配器模块实现。
+//
+// Application 通过它从模块树中发现并挂载适配器，
+// 因此应用构造不再需要显式传入 adapters。
+type ModuleAdapter interface {
+	Adapter() Adapter
+}
+
+// HTTPMounterProvider 由需要在 HTTP 上挂载额外 handler 的模块实现。
+//
+// swagger / terminus 等模块通过它注册 /docs、/health 之类的端点。
+type HTTPMounterProvider interface {
+	MountHTTP(HTTPMountRequest) error
 }

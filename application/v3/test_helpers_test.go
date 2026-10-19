@@ -8,15 +8,15 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
 )
 
-func mustTestAdapterAPI[T any](t *testing.T, app *Application, adapterID string) T {
+func mustTestAdapter[T any](t *testing.T, app *Application, adapterID string) T {
 	t.Helper()
-	api, ok := app.API(adapterID)
+	adp, ok := app.Adapter(adapterID)
 	if !ok {
-		t.Fatalf("adapter api not found: %s", adapterID)
+		t.Fatalf("adapter not found: %s", adapterID)
 	}
-	typed, ok := api.(T)
+	typed, ok := adp.(T)
 	if !ok {
-		t.Fatalf("adapter api %s has unexpected type %T", adapterID, api)
+		t.Fatalf("adapter %s has unexpected type %T", adapterID, adp)
 	}
 	return typed
 }
