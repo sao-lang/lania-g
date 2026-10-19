@@ -204,6 +204,36 @@ func (p *Pipeline) Run(ctx *HandlerContext, handler *Handler, args []reflect.Val
 	return result, err
 }
 
+// HandleError 在 handler 之外的阶段（例如参数解析/校验）失败时运行异常过滤器。
+//
+// 与 Run 中的过滤器语义保持一致：返回 nil 表示错误已被消费（过滤器通常已自行写出响应），
+// 返回非 nil 表示继续向上抛出。
+func (p *Pipeline) HandleError(ctx *HandlerContext, handler *Handler, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var filters []aop.ExceptionFilterFunc
+	if handler.Meta.CompiledAOP != nil {
+		filters = handler.Meta.CompiledAOP.Filters
+	} else {
+		filters = p.collectFilters(handler)
+	}
+	if len(filters) == 0 {
+		return err
+	}
+
+	execCtx := p.newExecutionContext(ctx, handler)
+	for _, filter := range filters {
+		filterErr := filter(err, execCtx)
+		if filterErr == nil {
+			return nil
+		}
+		err = filterErr
+	}
+	return err
+}
+
 // collectMiddlewares 收集某个 handler 实际生效的 Middlewares 列表。
 //
 // 规则：全局在前、handler 局部在后（即“越靠后越靠近 handler 本体”）。

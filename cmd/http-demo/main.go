@@ -456,6 +456,43 @@ func extractBearerToken(header string) (string, error) {
 	return parts[1], nil
 }
 
+// envelopeExceptionFilter 处理发生在拦截器之外的错误。
+//
+// 参数绑定与校验在进入 interceptor 链之前就会失败（等价于 NestJS 中
+// ValidationPipe 抛出的异常），因此需要 ExceptionFilter 把它们也整形为统一 envelope。
+func envelopeExceptionFilter(exception interface{}, ctx *aop.ExecutionContext) error {
+	err, ok := exception.(error)
+	if !ok || err == nil {
+		return nil
+	}
+
+	hc, ok := ctx.HandlerContext.(*runtime.HandlerContext)
+	if !ok || hc == nil {
+		return err
+	}
+	httpCtx, ok := httpContextOf(hc)
+	if !ok {
+		return err
+	}
+
+	status, msg := statusAndMessageFromError(err)
+	httpCtx.JSON(status, apiEnvelope{Msg: msg, Code: status, Data: nil, Success: false})
+	return nil
+}
+
+// httpContextOf 从请求上下文取出 HTTP 绑定上下文。
+func httpContextOf(hc *runtime.HandlerContext) (*httpbinding.HttpContext, bool) {
+	value, ok := hc.Get(httpbinding.MetadataKeyContext)
+	if !ok {
+		return nil, false
+	}
+	httpCtx, ok := value.(*httpbinding.HttpContext)
+	if !ok || httpCtx == nil {
+		return nil, false
+	}
+	return httpCtx, true
+}
+
 // statusAndMessageFromError 把内核错误 / HTTP 异常映射成状态码与文案。
 func statusAndMessageFromError(err error) (int, string) {
 	status := http.StatusInternalServerError
@@ -534,6 +571,8 @@ func main() {
 
 	// 全局 AOP：先整形响应，再校验身份（顺序即执行顺序）。
 	app.UseGlobalInterceptors(responseEnvelopeInterceptor, authInterceptor(store))
+	// 绑定/校验失败发生在拦截器之外，交给全局 ExceptionFilter 兜底。
+	app.UseGlobalFilters(envelopeExceptionFilter)
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

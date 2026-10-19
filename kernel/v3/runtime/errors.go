@@ -15,6 +15,7 @@ var (
 	ErrRouteNotFound       = kerrors.ErrRouteNotFound
 	ErrInvalidProtocol     = kerrors.ErrInvalidProtocol
 	ErrBindingNotFound     = kerrors.ErrBindingNotFound
+	ErrBindingFailed       = kerrors.ErrBindingFailed
 	ErrBindingNotSupported = kerrors.ErrBindingNotSupported
 	ErrInvalidHandler      = kerrors.ErrInvalidHandler
 	ErrExecutionFailed     = kerrors.ErrExecutionFailed

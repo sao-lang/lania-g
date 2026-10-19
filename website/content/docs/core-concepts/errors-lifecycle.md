@@ -74,6 +74,16 @@ func errorFilter(ctx *aop.ExecutionContext, err error) (any, error) {
 
 返回 `nil` 表示错误已被消费，上层不再继续抛出。
 
+过滤器覆盖两种来源：
+
+| 来源 | 何时发生 | Kind |
+|------|----------|------|
+| 参数绑定 / 校验 | 进入 interceptor 之前 | `Binding` / `Validation` |
+| handler / guard / interceptor | 执行链内部 | `Execution` / `Unauthorized` / `Forbidden` |
+
+未分类的 binding 错误会被补上 `ErrBindingFailed` 语义，最终归类为 `Binding`（HTTP 映射 400），
+因此 `Param[int]` 拿到 `abc` 这类输入不会再变成 500。
+
 ## 5. 生命周期
 
 ```text

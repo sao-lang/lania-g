@@ -75,6 +75,7 @@ func NormalizeWithMeta(protocol, routeKey, moduleKey string, paramIndex int, met
 	case errors.Is(err, ErrRouteNotFound):
 		ke.Kind = KindRouteNotFound
 	case errors.Is(err, ErrBindingNotFound),
+		errors.Is(err, ErrBindingFailed),
 		errors.Is(err, ErrBindingNotSupported),
 		errors.Is(err, ErrInvalidParamType):
 		ke.Kind = KindBinding

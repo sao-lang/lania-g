@@ -19,6 +19,8 @@ var (
 	ErrBindingNotFound     = stderrors.New("binding resolver not found for type")
 	// ErrBindingNotSupported 表示某个 binding resolver 命中类型但不支持当前协议。
 	ErrBindingNotSupported = stderrors.New("binding not supported for protocol")
+	// ErrBindingFailed 表示 binding resolver 解析失败（例如 path/query 取值转换错误）。
+	ErrBindingFailed       = stderrors.New("binding failed")
 	// ErrInvalidHandler 表示 handler 定义不合法（例如 token 类型不对、方法签名异常等）。
 	ErrInvalidHandler      = stderrors.New("invalid handler")
 	// ErrExecutionFailed 表示执行链路发生非预期失败（例如 panic 被 recover，或 handler 调用失败）。

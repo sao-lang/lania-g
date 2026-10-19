@@ -9,6 +9,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -120,7 +121,9 @@ func (e *Executor) Execute(ctx *HandlerContext) (interface{}, error) {
 
 	args, err := e.resolveArguments(ctx, handler)
 	if err != nil {
-		return nil, err
+		// 参数解析/校验发生在 pipeline 之前，但异常过滤器仍应看到这些错误，
+		// 否则参数错误会绕过统一错误响应形态。
+		return nil, e.pipeline.HandleError(ctx, handler, e.normalizeError(ctx, err))
 	}
 
 	result, err := e.pipeline.Run(ctx, handler, args)
@@ -159,7 +162,11 @@ func (e *Executor) resolveArgument(ctx *HandlerContext, handler *Handler, paramT
 	value, err := e.bindingRegistry.Resolve(ctx, handler, paramType, paramIndex)
 	if err != nil {
 		if err != ErrBindingNotFound {
-			return reflect.Value{}, err
+			// 解析器返回的原始错误（如 strconv 转换失败）本身没有分类，
+			// 这里补一层 binding 语义，让上层能稳定映射成 4xx 而不是 5xx。
+			return reflect.Value{}, e.normalizeErrorWithMeta(ctx, markBindingError(err), paramIndex, map[string]interface{}{
+				"stage": "binding_resolve",
+			})
 		}
 
 		if ctx.Container != nil {
@@ -257,6 +264,23 @@ func (e *Executor) RegisterBinding(resolver BindingResolver) {
 // RegisterBindingFunc 以函数形式注册一个简单的 binding 规则（见 Runtime.RegisterBindingFunc）。
 func (e *Executor) RegisterBindingFunc(matcher func(reflect.Type) bool, resolve func(ctx *HandlerContext, paramType reflect.Type) (interface{}, error)) {
 	e.bindingRegistry.RegisterFunc(matcher, resolve)
+}
+
+// markBindingError 给未分类的 binding 错误补上 ErrBindingFailed 语义。
+//
+// 已经是 KernelError 的错误保留原分类（例如 Validation），避免覆盖更精确的 Kind。
+func markBindingError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var kernelErr *kerrors.KernelError
+	if errors.As(err, &kernelErr) {
+		return err
+	}
+	if errors.Is(err, ErrBindingFailed) {
+		return err
+	}
+	return fmt.Errorf("%w: %w", ErrBindingFailed, err)
 }
 
 // normalizeError 将普通 error 归一化为 KernelError（或保持/包装为框架约定的错误模型）。

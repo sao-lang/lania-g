@@ -63,7 +63,14 @@ ExceptionFilter 捕获整条链路的错误
 
 - 任一 Guard 返回 `false` → 拒绝
 - 任一环节返回 error → 交给 Filter（若有），否则向上抛
+- 参数绑定/校验失败发生在 interceptor 之前，同样会交给 Filter（Executor 的 `HandleError`）
 - handler panic → 被 recover 为 `ErrExecutionFailed`
+
+{{< callout type="warning" >}}
+`ValidationPipe` 那一类错误（`Body[T]` 的 `validate` 标签、`Param[int]` 转换失败）
+不会进入 Interceptor 链。想让它们也走统一响应形态，必须用 ExceptionFilter：
+filter 返回 nil 表示已消费，此时由 filter 自己设置 `ctx.Response.Status` / `Body`。
+{{< /callout >}}
 
 ## 3. 挂载级别
 

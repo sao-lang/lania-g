@@ -28,3 +28,6 @@ bin/
 
 # Project local generated stats
 .VSCodeCounter/
+
+# Windows build artifacts
+*.exe
