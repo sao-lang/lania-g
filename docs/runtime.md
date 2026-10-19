@@ -1,5 +1,18 @@
 # lania-g Runtime
 
+> **注：本文写于 API 收敛之前。** 文中出现的 `ForRoot` / `CreateModule` / `BuildE()` /
+> `adapter.API()` / `CompileDiagnostics()` 等入口已在收敛中移除，替换关系如下：
+>
+> | 旧写法 | 现写法 |
+> |---|---|
+> | `module.CreateModule(...)` / `CreateGlobalModule(...)` | `module.New(Metadata{...})` / `module.AsGlobal(Metadata{...})` |
+> | `X.ForRoot(cfg)` | `X.Module(cfg)` |
+> | `adapter.API().Controller(...)....BuildE()` | 控制器实现 `Declare(*Routes)` |
+> | `app.CompileDiagnostics()` | `app.Run()` 返回 error / `app.Diagnostics()` |
+> | `application.NewWithOptions(...)` + `app.Listen()` | `application.New(root, Options{})` + `app.Run()` |
+>
+> 正文保留当时的设计讨论与推理过程，阅读时请对照当前 API。
+
 本文档描述 `kernel/v3/runtime` 的实际实现与协作方式。该包属于内部基础设施层，业务代码通常不应直接依赖它，而应通过 `application/v3` + `protocol/*/v3` + `protocol/*/v3/binding` 完成接入与扩展。
 
 ## 1. Runtime 的定位

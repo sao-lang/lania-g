@@ -1,5 +1,18 @@
 # gRPC 四种模式支持实现说明
 
+> **注：本文写于 API 收敛之前。** 文中出现的 `ForRoot` / `CreateModule` / `BuildE()` /
+> `adapter.API()` / `CompileDiagnostics()` 等入口已在收敛中移除，替换关系如下：
+>
+> | 旧写法 | 现写法 |
+> |---|---|
+> | `module.CreateModule(...)` / `CreateGlobalModule(...)` | `module.New(Metadata{...})` / `module.AsGlobal(Metadata{...})` |
+> | `X.ForRoot(cfg)` | `X.Module(cfg)` |
+> | `adapter.API().Controller(...)....BuildE()` | 控制器实现 `Declare(*Routes)` |
+> | `app.CompileDiagnostics()` | `app.Run()` 返回 error / `app.Diagnostics()` |
+> | `application.NewWithOptions(...)` + `app.Listen()` | `application.New(root, Options{})` + `app.Run()` |
+>
+> 正文保留当时的设计讨论与推理过程，阅读时请对照当前 API。
+
 ## 1. 文档目的
 
 本文档用于说明 `lania-g` 当前 gRPC 四种调用模式的实现现状、公开能力以及主要设计取舍。
