@@ -1040,7 +1040,7 @@ github.com/sao-lang/lania-g/kernel/v3/di
   method Container.StrictInjection() bool
   method InjectionRecord.String() string
   type  ConstructorFinder func(typ reflect.Type) (reflect.Value, bool)
-  type  Container struct{providers map[interface{}]*Provider; instances map[interface{}]interface{}; resolving map[interface{}]bool; mu sync.RWMutex; instancesMu sync.Mutex; parent *Container; constructorFinder ConstructorFinder; auditMu sync.Mutex; audit []InjectionRecord; strict bool; auditOn bool}
+  type  Container struct{providers map[interface{}]*Provider; instances map[interface{}]interface{}; resolving map[interface{}]bool; mu sync.RWMutex; instancesMu sync.Mutex; parent *Container; constructorFinder ConstructorFinder; auditMu sync.Mutex; audit []InjectionRecord; strict sync/atomic.Bool; auditOn sync/atomic.Bool}
   type  Injectable interface{Inject(container *Container) error}
   type  InjectionRecord struct{Token reflect.Type; TargetType reflect.Type; Field string; Status InjectionStatus; Reason string; Candidates []reflect.Type}
   type  InjectionStatus string

@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/sao-lang/lania-g/kernel/v3/metadata"
 )
@@ -84,10 +85,12 @@ type Container struct {
 	constructorFinder ConstructorFinder
 
 	// 注入审计：记录每一次字段注入尝试，供 Diagnostics 暴露。
-	auditMu   sync.Mutex
-	audit     []InjectionRecord
-	strict    bool
-	auditOn   bool
+	auditMu sync.Mutex
+	audit   []InjectionRecord
+	// strict / auditOn 是「启动期设置、运行期只读」的开关。
+	// 用原子变量保存，避免每次字段注入都去抢 auditMu（并行解析时那会变成全局竞争点）。
+	strict  atomic.Bool
+	auditOn atomic.Bool
 }
 
 // NewContainer 创建一个新的 DI 容器实例。
@@ -97,9 +100,9 @@ type Container struct {
 // - constructorFinder 默认 nil，表示只走“默认构造 + Injectable.Inject”路径
 // - 注入审计默认开启（内存开销可忽略），严格模式默认关闭
 func NewContainer() *Container {
-	return &Container{
-		auditOn: true,
-	}
+	c := &Container{}
+	c.auditOn.Store(true)
+	return c
 }
 
 // ensureProvidersLocked 懒初始化 providers 表。调用方必须已持有写锁（c.mu）。
@@ -144,8 +147,8 @@ func (c *Container) NewChild() *Container {
 	child.parent = c
 	child.constructorFinder = c.constructorFinder
 	// 严格模式与审计配置随容器树继承，避免"设置了却不生效"。
-	child.strict = c.StrictInjection()
-	child.auditOn = c.injectionAuditEnabled()
+	child.strict.Store(c.StrictInjection())
+	child.auditOn.Store(c.injectionAuditEnabled())
 	return child
 }
 
@@ -166,7 +169,21 @@ func (c *Container) Register(provider *Provider) {
 // requester 用于 Request scope 的缓存：通常传入“当前请求的 child container”，
 // 使得 request scope 的实例落在该 child 上，而不是落在 provider 定义所在的 container 上。
 func (c *Container) Get(token interface{}) (interface{}, error) {
-	return c.get(token, make(map[interface{}]bool), c)
+	resolving := resolvingPool.Get().(map[interface{}]bool)
+	defer func() {
+		clear(resolving)
+		resolvingPool.Put(resolving)
+	}()
+	return c.get(token, resolving, c)
+}
+
+// resolvingPool 复用「循环依赖检测栈」。
+//
+// 每次 Get 都需要一个空的 set；解析结束后清空并归还，避免每次请求都分配一张 map。
+var resolvingPool = sync.Pool{
+	New: func() interface{} {
+		return make(map[interface{}]bool)
+	},
 }
 
 // RegisterClass 便捷注册一个“Class provider”：
@@ -375,95 +392,109 @@ func (c *Container) injectFields(instance interface{}, resolving map[interface{}
 	}
 
 	targetType := rv.Type()
+	// 两个开关都是原子读，循环内不再反复查询（也就不再反复抢锁）。
+	auditOn := c.injectionAuditEnabled()
 	strict := c.StrictInjection()
 
-	for i := 0; i < rv.NumField(); i++ {
-		ft := rv.Type().Field(i)
-		fv := rv.Field(i)
-
-		skip, optional := fieldInjectionMode(ft.Tag.Get("di"))
-		if skip {
-			c.recordInjection(InjectionRecord{
-				Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionSkipped,
-			})
+	for _, target := range injectionPlanFor(targetType) {
+		if target.Skip {
+			if auditOn {
+				c.recordInjection(InjectionRecord{
+					Token: target.Type, TargetType: targetType, Field: target.Name, Status: InjectionSkipped,
+				})
+			}
 			continue
 		}
-		if !ft.IsExported() {
-			if fv.IsZero() {
+
+		fv := rv.Field(target.Index)
+
+		if !target.Exported {
+			if auditOn && fv.IsZero() {
 				c.recordInjection(InjectionRecord{
-					Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionUnexported,
+					Token: target.Type, TargetType: targetType, Field: target.Name, Status: InjectionUnexported,
 				})
 			}
 			continue
 		}
 		if !fv.IsZero() {
-			c.recordInjection(InjectionRecord{
-				Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionAlreadySet,
-			})
+			if auditOn {
+				c.recordInjection(InjectionRecord{
+					Token: target.Type, TargetType: targetType, Field: target.Name, Status: InjectionAlreadySet,
+				})
+			}
 			continue
 		}
 		// 非指针 struct（例如以值 token 注册的 value provider）不可寻址，
 		// 写入副本没有意义且会 panic，直接跳过。
 		if !fv.CanSet() {
-			c.recordInjection(InjectionRecord{
-				Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionNotSettable,
-			})
+			if auditOn {
+				c.recordInjection(InjectionRecord{
+					Token: target.Type, TargetType: targetType, Field: target.Name, Status: InjectionNotSettable,
+				})
+			}
 			continue
 		}
 
-		dep, err := c.get(ft.Type, resolving, requester)
+		dep, err := c.get(target.Type, resolving, requester)
 		if err != nil || dep == nil {
-			c.recordMissing(targetType, ft, optional, err)
-			if strict && !optional {
-				return c.injectionError(targetType, ft, err)
+			// recordMissing 会做 injectionCandidates（遍历 provider 链，较贵），仅在审计开启时执行。
+			if auditOn {
+				c.recordMissing(targetType, target, err)
+			}
+			if strict && !target.Optional {
+				return c.injectionError(targetType, target, err)
 			}
 			continue
 		}
 
 		depValue := reflect.ValueOf(dep)
-		if !depValue.IsValid() || !depValue.Type().AssignableTo(ft.Type) {
-			c.recordInjection(InjectionRecord{
-				Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionTypeMismatch,
-				Reason:     fmt.Sprintf("resolved %s", typeName(depValue.Type())),
-				Candidates: c.injectionCandidates(ft.Type),
-			})
+		if !depValue.IsValid() || !depValue.Type().AssignableTo(target.Type) {
+			if auditOn {
+				c.recordInjection(InjectionRecord{
+					Token: target.Type, TargetType: targetType, Field: target.Name, Status: InjectionTypeMismatch,
+					Reason:     fmt.Sprintf("resolved %s", typeName(depValue.Type())),
+					Candidates: c.injectionCandidates(target.Type),
+				})
+			}
 			if strict {
-				return c.injectionError(targetType, ft, nil)
+				return c.injectionError(targetType, target, nil)
 			}
 			continue
 		}
 
 		fv.Set(depValue)
-		c.recordInjection(InjectionRecord{
-			Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionInjected,
-		})
+		if auditOn {
+			c.recordInjection(InjectionRecord{
+				Token: target.Type, TargetType: targetType, Field: target.Name, Status: InjectionInjected,
+			})
+		}
 	}
 	return nil
 }
 
 // recordMissing 记录一次"没解析到依赖"。
-func (c *Container) recordMissing(targetType reflect.Type, field reflect.StructField, optional bool, cause error) {
+func (c *Container) recordMissing(targetType reflect.Type, target injectionTarget, cause error) {
 	status := InjectionMissingProvider
 	reason := ""
-	if optional {
+	if target.Optional {
 		status = InjectionOptional
 	}
 	if cause != nil {
 		reason = cause.Error()
 	}
 	c.recordInjection(InjectionRecord{
-		Token:      field.Type,
+		Token:      target.Type,
 		TargetType: targetType,
-		Field:      field.Name,
+		Field:      target.Name,
 		Status:     status,
 		Reason:     reason,
-		Candidates: c.injectionCandidates(field.Type),
+		Candidates: c.injectionCandidates(target.Type),
 	})
 }
 
 // injectionError 构造带可操作提示的严格模式错误。
-func (c *Container) injectionError(targetType reflect.Type, field reflect.StructField, cause error) error {
-	candidates := c.injectionCandidates(field.Type)
+func (c *Container) injectionError(targetType reflect.Type, target injectionTarget, cause error) error {
+	candidates := c.injectionCandidates(target.Type)
 	hint := ""
 	if len(candidates) > 0 {
 		names := make([]string, 0, len(candidates))
@@ -473,7 +504,7 @@ func (c *Container) injectionError(targetType reflect.Type, field reflect.Struct
 		hint = fmt.Sprintf("; nearest registered tokens: %s", strings.Join(names, ", "))
 	}
 	message := fmt.Sprintf("di: cannot inject %s.%s (%s): provider not found%s",
-		targetName(targetType), field.Name, typeName(field.Type), hint)
+		targetName(targetType), target.Name, typeName(target.Type), hint)
 	if cause != nil && !strings.Contains(cause.Error(), "provider not found") {
 		message += ": " + cause.Error()
 	}

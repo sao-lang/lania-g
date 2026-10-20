@@ -5,7 +5,7 @@
 //	BenchHTTP_StaticJSON   最小 HTTP 链路（路由匹配 + 执行 + JSON 序列化）
 //	BenchHTTP_AOPDepth10   10 层中间件，验证链式无分配放大
 //	BenchHTTP_BindValidate Body 解码 + validator，验证 binding 层成本
-//	BenchDI_ResolveNested  5 层依赖解析，验证容器性能
+//	BenchDI_ResolveNested  5 层依赖解析，验证容器性能（审计关闭 / 审计开启各一条）
 //
 // 基线文件在 test/bench/baseline.txt，用 tools/benchcheck 做回归门禁。
 //
@@ -13,7 +13,7 @@
 // 前面 benchmark 留下的堆/GC 状态影响（实测漂移 10%~20%，足以让门禁误报）：
 //
 //	cd test
-//	for b in BenchmarkHTTP_StaticJSON BenchmarkHTTP_AOPDepth10 BenchmarkHTTP_BindValidate BenchmarkDI_ResolveNested; do
+//	for b in BenchmarkHTTP_StaticJSON BenchmarkHTTP_AOPDepth10 BenchmarkHTTP_BindValidate BenchmarkDI_ResolveNested BenchmarkDI_ResolveNestedAuditOn; do
 //		go test -run XXX -bench "^$b$" -benchmem -count 6 ./bench/ | grep '^Benchmark'
 //	done > bench/baseline.txt
 //
@@ -161,6 +161,31 @@ type benchL2 struct{ One *benchL1 }
 type benchL3 struct{ Two *benchL2 }
 type benchL4 struct{ Three *benchL3 }
 type benchL5 struct{ Four *benchL4 }
+
+// BenchmarkDI_ResolveNestedAuditOn 是**默认配置**下的同一场景（注入审计默认开启）。
+//
+// 单独一条基准的意义：审计记录会走审计缓冲区，是生产默认路径，
+// 不能只看"关掉审计"的数字来判断 DI 性能。
+func BenchmarkDI_ResolveNestedAuditOn(b *testing.B) {
+	container := di.NewContainer()
+	container.RegisterClass(reflect.TypeFor[*benchL1](), reflect.TypeFor[benchL1](), di.Transient)
+	container.RegisterClass(reflect.TypeFor[*benchL2](), reflect.TypeFor[benchL2](), di.Transient)
+	container.RegisterClass(reflect.TypeFor[*benchL3](), reflect.TypeFor[benchL3](), di.Transient)
+	container.RegisterClass(reflect.TypeFor[*benchL4](), reflect.TypeFor[benchL4](), di.Transient)
+	container.RegisterClass(reflect.TypeFor[*benchL5](), reflect.TypeFor[benchL5](), di.Transient)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		value, err := container.Get(reflect.TypeFor[*benchL5]())
+		if err != nil {
+			b.Fatalf("resolve: %v", err)
+		}
+		if value == nil {
+			b.Fatalf("nil instance")
+		}
+	}
+}
 
 // BenchmarkDI_ResolveNested 衡量 5 层字段注入的解析成本（每次都是新实例）。
 func BenchmarkDI_ResolveNested(b *testing.B) {

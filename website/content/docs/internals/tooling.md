@@ -105,7 +105,7 @@ type Guard interface {
 cd test
 # 每项 benchmark 独立进程采集：同进程内后跑的 benchmark 会受前面留下的堆/GC 状态影响，
 # 实测漂移可达 10%~20%，足以让 10% 阈值的门禁误报。
-for b in BenchmarkHTTP_StaticJSON BenchmarkHTTP_AOPDepth10 BenchmarkHTTP_BindValidate BenchmarkDI_ResolveNested; do
+for b in BenchmarkHTTP_StaticJSON BenchmarkHTTP_AOPDepth10 BenchmarkHTTP_BindValidate BenchmarkDI_ResolveNested BenchmarkDI_ResolveNestedAuditOn; do
   go test -run XXX -bench "^$b$" -benchmem -count 6 ./bench/ | grep '^Benchmark'
 done > bench/current.txt
 
@@ -118,7 +118,8 @@ go run ./cmd/benchcheck -write -baseline ../test/bench/baseline.txt -current ../
 `allocs/op` 是确定值，比 ns/op 更稳，建议优先拿它当回归信号。
 基线本身也会被 `test/bench` 里的测试校验可解析，避免格式漂移导致门禁形同虚设。
 
-现有基准覆盖四条最容易劣化的路径：静态 JSON 响应、10 层中间件栈、绑定+校验、嵌套依赖注入。
+现有基准覆盖五条最容易劣化的路径：静态 JSON 响应、10 层中间件栈、绑定+校验、
+嵌套依赖注入（审计关闭）、嵌套依赖注入（审计开启，即生产默认）。
 
 ### 热路径上刻意保留的约束
 

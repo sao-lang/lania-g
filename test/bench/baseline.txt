@@ -3,34 +3,40 @@
 #
 # 重新生成（仓库根目录）：
 #   cd test
-#   for b in BenchmarkHTTP_StaticJSON BenchmarkHTTP_AOPDepth10 BenchmarkHTTP_BindValidate BenchmarkDI_ResolveNested; do
+#   for b in BenchmarkHTTP_StaticJSON BenchmarkHTTP_AOPDepth10 BenchmarkHTTP_BindValidate BenchmarkDI_ResolveNested BenchmarkDI_ResolveNestedAuditOn; do
 #     go test -run XXX -bench "^$b$" -benchmem -count 6 ./bench/ | grep '^Benchmark'
 #   done > bench/baseline.txt
 #
 # 接受新基线：cd tools && go run ./cmd/benchcheck -write -baseline ../test/bench/baseline.txt -current ../test/bench/baseline.txt
 #
 # 指标说明：ns/op 为耗时；B/op、allocs/op 为内存与分配次数（数值稳定，最适合当回归信号）。
-BenchmarkHTTP_StaticJSON-16    	  368062	      3844 ns/op	    1859 B/op	      23 allocs/op
-BenchmarkHTTP_StaticJSON-16    	  307195	      3585 ns/op	    1859 B/op	      23 allocs/op
-BenchmarkHTTP_StaticJSON-16    	  345358	      3418 ns/op	    1859 B/op	      23 allocs/op
-BenchmarkHTTP_StaticJSON-16    	  351404	      3743 ns/op	    1859 B/op	      23 allocs/op
-BenchmarkHTTP_StaticJSON-16    	  339344	      3575 ns/op	    1859 B/op	      23 allocs/op
-BenchmarkHTTP_StaticJSON-16    	  324886	      3952 ns/op	    1859 B/op	      23 allocs/op
-BenchmarkHTTP_AOPDepth10-16    	  259681	      3985 ns/op	    1939 B/op	      26 allocs/op
-BenchmarkHTTP_AOPDepth10-16    	  290496	      3944 ns/op	    1939 B/op	      26 allocs/op
-BenchmarkHTTP_AOPDepth10-16    	  302750	      4112 ns/op	    1939 B/op	      26 allocs/op
-BenchmarkHTTP_AOPDepth10-16    	  318610	      4054 ns/op	    1939 B/op	      26 allocs/op
-BenchmarkHTTP_AOPDepth10-16    	  306780	      4045 ns/op	    1939 B/op	      26 allocs/op
-BenchmarkHTTP_AOPDepth10-16    	  260692	      4081 ns/op	    1939 B/op	      26 allocs/op
-BenchmarkHTTP_BindValidate-16    	   92620	     13732 ns/op	    8733 B/op	      58 allocs/op
-BenchmarkHTTP_BindValidate-16    	   87034	     13767 ns/op	    8749 B/op	      58 allocs/op
-BenchmarkHTTP_BindValidate-16    	   87871	     13859 ns/op	    8748 B/op	      58 allocs/op
-BenchmarkHTTP_BindValidate-16    	   85989	     13869 ns/op	    8749 B/op	      58 allocs/op
-BenchmarkHTTP_BindValidate-16    	   85131	     16054 ns/op	    8743 B/op	      58 allocs/op
-BenchmarkHTTP_BindValidate-16    	   90220	     14167 ns/op	    8743 B/op	      58 allocs/op
-BenchmarkDI_ResolveNested-16    	  398643	      2922 ns/op	     176 B/op	      12 allocs/op
-BenchmarkDI_ResolveNested-16    	  418119	      3394 ns/op	     176 B/op	      12 allocs/op
-BenchmarkDI_ResolveNested-16    	  239673	      4450 ns/op	     176 B/op	      12 allocs/op
-BenchmarkDI_ResolveNested-16    	  361412	      2892 ns/op	     176 B/op	      12 allocs/op
-BenchmarkDI_ResolveNested-16    	  416773	      2908 ns/op	     176 B/op	      12 allocs/op
-BenchmarkDI_ResolveNested-16    	  403932	      3001 ns/op	     176 B/op	      12 allocs/op
+BenchmarkHTTP_StaticJSON-16    	  317596	      3712 ns/op	    1860 B/op	      23 allocs/op
+BenchmarkHTTP_StaticJSON-16    	  312802	      3823 ns/op	    1860 B/op	      23 allocs/op
+BenchmarkHTTP_StaticJSON-16    	  309704	      3840 ns/op	    1860 B/op	      23 allocs/op
+BenchmarkHTTP_StaticJSON-16    	  326637	      3762 ns/op	    1860 B/op	      23 allocs/op
+BenchmarkHTTP_StaticJSON-16    	  304418	      3779 ns/op	    1860 B/op	      23 allocs/op
+BenchmarkHTTP_StaticJSON-16    	  317664	      3882 ns/op	    1860 B/op	      23 allocs/op
+BenchmarkHTTP_AOPDepth10-16    	  261327	      4031 ns/op	    1940 B/op	      26 allocs/op
+BenchmarkHTTP_AOPDepth10-16    	  305103	      3944 ns/op	    1940 B/op	      26 allocs/op
+BenchmarkHTTP_AOPDepth10-16    	  287172	      3891 ns/op	    1940 B/op	      26 allocs/op
+BenchmarkHTTP_AOPDepth10-16    	  311308	      3980 ns/op	    1940 B/op	      26 allocs/op
+BenchmarkHTTP_AOPDepth10-16    	  275328	      4310 ns/op	    1940 B/op	      26 allocs/op
+BenchmarkHTTP_AOPDepth10-16    	  298176	      3960 ns/op	    1940 B/op	      26 allocs/op
+BenchmarkHTTP_BindValidate-16    	   91455	     13653 ns/op	    8747 B/op	      58 allocs/op
+BenchmarkHTTP_BindValidate-16    	   91174	     13397 ns/op	    8749 B/op	      58 allocs/op
+BenchmarkHTTP_BindValidate-16    	   91510	     14178 ns/op	    8762 B/op	      58 allocs/op
+BenchmarkHTTP_BindValidate-16    	   90721	     13559 ns/op	    8748 B/op	      58 allocs/op
+BenchmarkHTTP_BindValidate-16    	   87687	     14292 ns/op	    8757 B/op	      58 allocs/op
+BenchmarkHTTP_BindValidate-16    	   85006	     13420 ns/op	    8749 B/op	      58 allocs/op
+BenchmarkDI_ResolveNested-16    	  766268	      1517 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNested-16    	  795972	      1574 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNested-16    	  824186	      1567 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNested-16    	  827271	      1525 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNested-16    	  792015	      1504 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNested-16    	  822080	      1534 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNestedAuditOn-16    	  489745	      2378 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNestedAuditOn-16    	  453709	      2399 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNestedAuditOn-16    	  506259	      2444 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNestedAuditOn-16    	  428517	      3389 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNestedAuditOn-16    	  376316	      3000 ns/op	      96 B/op	       7 allocs/op
+BenchmarkDI_ResolveNestedAuditOn-16    	  514590	      2348 ns/op	      96 B/op	       7 allocs/op

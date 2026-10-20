@@ -72,11 +72,11 @@ func (c *Container) SetInjectionAudit(enabled bool) {
 	if c == nil {
 		return
 	}
-	c.auditMu.Lock()
-	defer c.auditMu.Unlock()
-	c.auditOn = enabled
+	c.auditOn.Store(enabled)
 	if !enabled {
+		c.auditMu.Lock()
 		c.audit = nil
+		c.auditMu.Unlock()
 	}
 }
 
@@ -85,9 +85,7 @@ func (c *Container) injectionAuditEnabled() bool {
 	if c == nil {
 		return true
 	}
-	c.auditMu.Lock()
-	defer c.auditMu.Unlock()
-	return c.auditOn
+	return c.auditOn.Load()
 }
 
 // SetStrictInjection 开启严格注入模式。
@@ -99,9 +97,7 @@ func (c *Container) SetStrictInjection(enabled bool) {
 	if c == nil {
 		return
 	}
-	c.auditMu.Lock()
-	defer c.auditMu.Unlock()
-	c.strict = enabled
+	c.strict.Store(enabled)
 }
 
 // StrictInjection 返回当前是否开启严格模式。
@@ -109,12 +105,13 @@ func (c *Container) StrictInjection() bool {
 	if c == nil {
 		return false
 	}
-	c.auditMu.Lock()
-	defer c.auditMu.Unlock()
-	return c.strict
+	return c.strict.Load()
 }
 
 // InjectionReport 返回本容器（含 parent 链）的注入审计快照。
+//
+// 每个容器最多保留 maxInjectionRecords 条（超出部分丢弃），避免 request-scoped 依赖
+// 在高频请求下让审计缓冲区无界增长。
 func (c *Container) InjectionReport() []InjectionRecord {
 	if c == nil {
 		return nil
@@ -140,13 +137,23 @@ func (c *Container) InjectionProblems() []InjectionRecord {
 	return out
 }
 
+// maxInjectionRecords 限制单个容器的审计记录条数。
+//
+// 审计是诊断信息，不能无界增长：request-scoped / transient provider 每个请求都会产生记录，
+// 若不设上限，长跑进程的内存会持续上涨。超过上限后只保留最初的记录（启动期那批最有诊断价值）。
+const maxInjectionRecords = 512
+
 func (c *Container) recordInjection(record InjectionRecord) {
 	if c == nil {
 		return
 	}
+	// 热路径快路径：审计关闭时不碰锁。
+	if !c.auditOn.Load() {
+		return
+	}
 	c.auditMu.Lock()
 	defer c.auditMu.Unlock()
-	if !c.auditOn {
+	if !c.auditOn.Load() || len(c.audit) >= maxInjectionRecords {
 		return
 	}
 	c.audit = append(c.audit, record)
