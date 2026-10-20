@@ -164,7 +164,9 @@ main#content table {
   border-spacing: 0;
   border: 1px solid var(--lg-border);
   border-radius: 10px;
-  overflow: hidden;
+  /* 圆角需要的裁剪只作用于纵向；横向保留主题的滚动，窄屏才能看到右侧列 */
+  overflow-x: auto;
+  overflow-y: hidden;
   font-size: 14px;
 }
 
