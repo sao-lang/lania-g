@@ -93,16 +93,26 @@ type Container struct {
 // NewContainer 创建一个新的 DI 容器实例。
 //
 // 默认行为：
-// - providers/instances/resolving 都初始化为空 map
+// - providers/instances 延迟到首次写入时才分配（请求级子容器通常全程只读，因此可省掉 3 次 map 分配）
 // - constructorFinder 默认 nil，表示只走“默认构造 + Injectable.Inject”路径
 // - 注入审计默认开启（内存开销可忽略），严格模式默认关闭
 func NewContainer() *Container {
 	return &Container{
-		providers:         make(map[interface{}]*Provider),
-		instances:         make(map[interface{}]interface{}),
-		resolving:         make(map[interface{}]bool),
-		constructorFinder: nil,
-		auditOn:           true,
+		auditOn: true,
+	}
+}
+
+// ensureProvidersLocked 懒初始化 providers 表。调用方必须已持有写锁（c.mu）。
+func (c *Container) ensureProvidersLocked() {
+	if c.providers == nil {
+		c.providers = make(map[interface{}]*Provider)
+	}
+}
+
+// ensureInstancesLocked 懒初始化实例缓存表。调用方必须已持有写锁（instancesMu）。
+func (c *Container) ensureInstancesLocked() {
+	if c.instances == nil {
+		c.instances = make(map[interface{}]interface{})
 	}
 }
 
@@ -147,6 +157,7 @@ func (c *Container) NewChild() *Container {
 func (c *Container) Register(provider *Provider) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.ensureProvidersLocked()
 	c.providers[provider.Token] = provider
 }
 
@@ -260,6 +271,7 @@ func (c *Container) get(token interface{}, resolving map[interface{}]bool, reque
 
 	// 重新加锁写缓存（可能已被其他 goroutine 写入，覆盖也无妨，相同 token 的实例应是幂等的）。
 	cacheContainer.instancesMu.Lock()
+	cacheContainer.ensureInstancesLocked()
 	cacheContainer.instances[token] = instance
 	cacheContainer.instancesMu.Unlock()
 

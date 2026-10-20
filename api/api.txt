@@ -1304,7 +1304,7 @@ github.com/sao-lang/lania-g/kernel/v3/runtime
   type  Response struct{Status int; Headers map[string]string; Body interface{}; Raw interface{}}
   type  RouteKey struct{Protocol Protocol; Method string; Path string}
   type  RouteMatcher interface{Match(ctx *HandlerContext) (*Handler, map[string]string)}
-  type  Router struct{routes map[string]*Handler; matchers map[Protocol]RouteMatcher; mu sync.RWMutex}
+  type  Router struct{routes map[string]*Handler; matchers map[Protocol]RouteMatcher; staticIndex map[Protocol]map[string]map[string]*Handler; mu sync.RWMutex}
   type  Runtime struct{router *Router; pipeline *Pipeline; executor *Executor}
   type  WrapperDescriptor struct{BindingName string; Kind string; WrapperType reflect.Type; InnerType reflect.Type; ParamIndex int}
   var   ErrBindingFailed error

@@ -58,7 +58,10 @@ func BuildRouteKey(protocol Protocol, method, path string) string {
 type Router struct {
 	routes   map[string]*Handler
 	matchers map[Protocol]RouteMatcher
-	mu       sync.RWMutex
+	// staticIndex 是 routes 的三层拆解索引（protocol → method → path）。
+	// 精确匹配因此不再每请求拼一次 `protocol:method:path` 字符串（省 2~3 次分配）。
+	staticIndex map[Protocol]map[string]map[string]*Handler
+	mu          sync.RWMutex
 }
 
 // NewRouter 创建一个空 Router。
@@ -66,8 +69,9 @@ type Router struct {
 // 默认仅支持精确 routeKey 匹配；协议可通过 SetMatcher 安装自定义 matcher（例如 HTTP 模板路由）。
 func NewRouter() *Router {
 	return &Router{
-		routes:   make(map[string]*Handler),
-		matchers: make(map[Protocol]RouteMatcher),
+		routes:      make(map[string]*Handler),
+		matchers:    make(map[Protocol]RouteMatcher),
+		staticIndex: make(map[Protocol]map[string]map[string]*Handler),
 	}
 }
 
@@ -103,7 +107,29 @@ func (r *Router) Register(routeKey string, handler *Handler) {
 	if rk, err := ParseRouteKey(routeKey); err == nil {
 		handler.Meta.RouteKey = routeKey
 		handler.Meta.Protocol = rk.Protocol
+		r.indexStaticLocked(rk, handler)
 	}
+}
+
+// indexStaticLocked 把一条路由写入精确匹配索引。调用方必须已持有写锁。
+//
+// 能进入 routes 且能被 Match 命中的 routeKey 一定是合法格式（`protocol:method:path`），
+// 因此索引与 routes 的命中集合完全一致，不存在"索引漏掉合法路由"的情况。
+func (r *Router) indexStaticLocked(rk RouteKey, handler *Handler) {
+	if r.staticIndex == nil {
+		r.staticIndex = make(map[Protocol]map[string]map[string]*Handler)
+	}
+	byMethod := r.staticIndex[rk.Protocol]
+	if byMethod == nil {
+		byMethod = make(map[string]map[string]*Handler)
+		r.staticIndex[rk.Protocol] = byMethod
+	}
+	byPath := byMethod[rk.Method]
+	if byPath == nil {
+		byPath = make(map[string]*Handler)
+		byMethod[rk.Method] = byPath
+	}
+	byPath[rk.Path] = handler
 }
 
 // Match 根据 ctx（协议/方法/路径）匹配到 Handler，并返回路由参数（如 path params）。
@@ -120,11 +146,14 @@ func (r *Router) Match(ctx *HandlerContext) (*Handler, map[string]string, error)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	routeKey := BuildRouteKey(ctx.Protocol, ctx.Request.Method, ctx.Request.Path)
-
 	// 1) 精确匹配：最快路径，也是静态路由的最高优先级。
-	if handler, ok := r.routes[routeKey]; ok {
-		return handler, nil, nil
+	// 走三层索引而不是拼 routeKey 字符串，避免每请求 2~3 次分配。
+	if byMethod := r.staticIndex[ctx.Protocol]; byMethod != nil {
+		if byPath := byMethod[ctx.Request.Method]; byPath != nil {
+			if handler := byPath[ctx.Request.Path]; handler != nil {
+				return handler, nil, nil
+			}
+		}
 	}
 
 	// 2) matcher 匹配：由具体协议实现（如 HTTP 的 path template 匹配）。
@@ -176,6 +205,7 @@ func (r *Router) InstallCompiledProtocol(protocol Protocol, matcher RouteMatcher
 		if rk, err := ParseRouteKey(k); err == nil && v != nil {
 			v.Meta.RouteKey = k
 			v.Meta.Protocol = rk.Protocol
+			r.indexStaticLocked(rk, v)
 		}
 	}
 	return nil
@@ -196,6 +226,28 @@ func (r *Router) Remove(routeKey string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.routes, routeKey)
+	if rk, err := ParseRouteKey(routeKey); err == nil {
+		r.removeStaticLocked(rk)
+	}
+}
+
+// removeStaticLocked 从精确匹配索引中摘除一条路由。调用方必须已持有写锁。
+func (r *Router) removeStaticLocked(rk RouteKey) {
+	byMethod := r.staticIndex[rk.Protocol]
+	if byMethod == nil {
+		return
+	}
+	byPath := byMethod[rk.Method]
+	if byPath == nil {
+		return
+	}
+	delete(byPath, rk.Path)
+	if len(byPath) == 0 {
+		delete(byMethod, rk.Method)
+	}
+	if len(byMethod) == 0 {
+		delete(r.staticIndex, rk.Protocol)
+	}
 }
 
 // AllRoutes 返回当前所有已注册 routes 的快照（浅拷贝 map）。

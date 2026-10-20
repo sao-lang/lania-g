@@ -108,7 +108,11 @@ func (a *Adapter) buildHandlerContext(w http.ResponseWriter, r *http.Request, pa
 	ctx.Request.Path = path
 	copyHeaderValues(ctx.Request.Headers, ctx.Request.HeadersMulti, r.Header)
 	ctx.Request.Headers["Host"] = r.Host
-	ctx.Request.Query, ctx.Request.QueryMulti = queryValues(r.URL.Query())
+	// 空 query 时完全跳过：HandlerContext 是池化复用的，Query/QueryMulti 已经是清空后的 map，
+	// 再构造一次只会白白覆盖成两个新 map（并丢掉池化收益）。
+	if r.URL.RawQuery != "" {
+		ctx.Request.Query, ctx.Request.QueryMulti = queryValues(r.URL.Query())
+	}
 
 	if shouldReadBody(r) {
 		// 这里在入口一次性受限读取 body，后续 binding 层统一消费缓存的 bodyBytes。
@@ -139,32 +143,40 @@ func (a *Adapter) buildHandlerContext(w http.ResponseWriter, r *http.Request, pa
 	return ctx, httpCtx, nil
 }
 
-func (a *Adapter) executeMiddlewareChain(ctx *runtime.HandlerContext, httpCtx *httpbinding.HttpContext, w http.ResponseWriter, r *http.Request, path string) (any, bool, bool, error) {
-	executed := false
-	var result any
-	var execErr error
+// httpChainState 保存一次请求在 preRouting 链上的可变状态。
+//
+// 这些字段都会被 next 闭包捕获。集中到同一个结构体后，整个请求只逃逸这一个对象，
+// 而不是让 result/execErr/index 各自逃逸（原来 4 次分配 → 现在 1 次）。
+type httpChainState struct {
+	result               any
+	execErr              error
+	executed             bool
+	nextDownstreamCalled bool
+	downstreamOnce       sync.Once
+	index                int
+}
 
-	nextDownstreamCalled := false
-	var downstreamOnce sync.Once
-	index := -1
+func (a *Adapter) executeMiddlewareChain(ctx *runtime.HandlerContext, httpCtx *httpbinding.HttpContext, w http.ResponseWriter, r *http.Request, path string) (any, bool, bool, error) {
+	state := &httpChainState{index: -1}
+
 	nextFn := func() error {
 		if httpCtx != nil && httpCtx.Aborted() {
 			// 兼容 gin/echo 风格的“中止链路”语义：一旦 abort，后续 middleware/handler 都不再继续。
 			return nil
 		}
-		index++
-		if index < len(a.preRouting) {
-			return a.preRouting[index](httpCtx)
+		state.index++
+		if state.index < len(a.preRouting) {
+			return a.preRouting[state.index](httpCtx)
 		}
-		if !executed {
+		if !state.executed {
 			// 首次穿过 middleware 链时进入 runtime.Execute；
 			// 后续再调用 next() 则意味着业务想把请求继续交给下游 http.Handler。
-			executed = true
-			result, execErr = a.host.Runtime().Execute(ctx)
-			return execErr
+			state.executed = true
+			state.result, state.execErr = a.host.Runtime().Execute(ctx)
+			return state.execErr
 		}
-		downstreamOnce.Do(func() {
-			nextDownstreamCalled = true
+		state.downstreamOnce.Do(func() {
+			state.nextDownstreamCalled = true
 			if a.nextHandler != nil {
 				a.nextHandler.ServeHTTP(w, cloneRequestWithPath(r, path))
 			}
@@ -172,12 +184,13 @@ func (a *Adapter) executeMiddlewareChain(ctx *runtime.HandlerContext, httpCtx *h
 		return nil
 	}
 
-	ctx.Set(httpbinding.MetadataKeyNext, func() error { return nextFn() })
+	// MetadataKeyNext 只接受 func() error，直接存 nextFn 即可，无需再包一层闭包。
+	ctx.Set(httpbinding.MetadataKeyNext, nextFn)
 	if err := nextFn(); err != nil {
-		return result, executed, nextDownstreamCalled, err
+		return state.result, state.executed, state.nextDownstreamCalled, err
 	}
-	if execErr != nil {
-		return result, executed, nextDownstreamCalled, execErr
+	if state.execErr != nil {
+		return state.result, state.executed, state.nextDownstreamCalled, state.execErr
 	}
-	return result, executed, nextDownstreamCalled, nil
+	return state.result, state.executed, state.nextDownstreamCalled, nil
 }

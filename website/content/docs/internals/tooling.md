@@ -103,7 +103,11 @@ type Guard interface {
 
 ```bash
 cd test
-go test -run XXX -bench . -benchtime 200x -count 6 ./bench/ > current.txt
+# 每项 benchmark 独立进程采集：同进程内后跑的 benchmark 会受前面留下的堆/GC 状态影响，
+# 实测漂移可达 10%~20%，足以让 10% 阈值的门禁误报。
+for b in BenchmarkHTTP_StaticJSON BenchmarkHTTP_AOPDepth10 BenchmarkHTTP_BindValidate BenchmarkDI_ResolveNested; do
+  go test -run XXX -bench "^$b$" -benchmem -count 6 ./bench/ | grep '^Benchmark'
+done > bench/current.txt
 
 cd ../tools
 go run ./cmd/benchcheck -baseline ../test/bench/baseline.txt -current ../test/bench/current.txt
@@ -111,9 +115,23 @@ go run ./cmd/benchcheck -write -baseline ../test/bench/baseline.txt -current ../
 ```
 
 默认阈值：ns/op 回退超过 10%、allocs/op 增加超过 1 即失败。
+`allocs/op` 是确定值，比 ns/op 更稳，建议优先拿它当回归信号。
 基线本身也会被 `test/bench` 里的测试校验可解析，避免格式漂移导致门禁形同虚设。
 
 现有基准覆盖四条最容易劣化的路径：静态 JSON 响应、10 层中间件栈、绑定+校验、嵌套依赖注入。
+
+### 热路径上刻意保留的约束
+
+以下四点是「每请求零/低分配」的关键，改动时请连同 `benchcheck` 一起核对：
+
+1. **静态路由走三层索引**（`Router.staticIndex`：protocol → method → path），
+   不再每请求拼 `protocol:method:path` 字符串；新增/删除路由必须同时维护索引。
+2. **`HandlerContext` 池化**：空 query 时完全跳过 `queryValues`，让池里的 map 继续复用。
+3. **每请求只构造一个 `aop.ExecutionContext`**，middleware/guard/interceptor/filter 共享，
+   因此各层看到的上下文对象一定相同。
+4. **`di.Container` 的 providers/instances 懒分配**：请求级子容器通常全程只读，
+   因此只付一次结构体分配，不付三张 map 的分配。
+
 
 ## 6. 推荐执行顺序
 

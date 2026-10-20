@@ -113,7 +113,7 @@ func (p *Pipeline) Run(ctx *HandlerContext, handler *Handler, args []reflect.Val
 
 	execCtx := p.newExecutionContext(ctx, handler)
 
-	middlewareHandler := p.buildMiddlewareChain(middlewares, func() error {
+	middlewareHandler := p.buildMiddlewareChain(middlewares, execCtx, func() error {
 		// Guards 在进入 handler 之前执行；任意 guard 返回 error 或 false 都会中断。
 		for _, guard := range guards {
 			canActivate, guardErr := guard(execCtx)
@@ -184,9 +184,9 @@ func (p *Pipeline) Run(ctx *HandlerContext, handler *Handler, args []reflect.Val
 		}
 
 		// Interceptors 包裹 interceptorHandler，通常用于 tracing / metrics / cache / retry 等。
-		result, err = p.buildInterceptorChain(interceptors, interceptorHandler, ctx)
+		result, err = p.buildInterceptorChain(interceptors, interceptorHandler, execCtx)
 		return err
-	}, ctx, handler)
+	})
 
 	err = middlewareHandler()
 
@@ -289,8 +289,9 @@ func (p *Pipeline) collectFilters(handler *Handler) []aop.ExceptionFilterFunc {
 // 为什么这样实现：
 // - 使用“迭代 + 单个 next 闭包”而不是递归嵌套闭包，减少分配与调用栈深度
 // - middleware 约定为：middleware(execCtx, next)；middleware 可选择不调用 next 来中断执行
-func (p *Pipeline) buildMiddlewareChain(middlewares []aop.MiddlewareFunc, finalHandler func() error, ctx *HandlerContext, routeHandler *Handler) func() error {
-	execCtx := p.newExecutionContext(ctx, routeHandler)
+// - execCtx 由调用方传入并全程复用：同一请求内 middleware/guard/interceptor/filter 看到的是
+//   同一个 ExecutionContext，既省掉重复构造，也避免"各层看到不同上下文"的隐蔽不一致
+func (p *Pipeline) buildMiddlewareChain(middlewares []aop.MiddlewareFunc, execCtx *aop.ExecutionContext, finalHandler func() error) func() error {
 	if len(middlewares) == 0 {
 		return finalHandler
 	}
@@ -318,22 +319,20 @@ func (p *Pipeline) buildMiddlewareChain(middlewares []aop.MiddlewareFunc, finalH
 // - interceptor 关注“包裹 handler 调用并处理结果”（返回 (result, error)）
 //
 // 这里同样使用迭代方式，避免递归/深层闭包带来的额外开销。
-func (p *Pipeline) buildInterceptorChain(interceptors []aop.InterceptorFunc, finalHandler func() (interface{}, error), ctx *HandlerContext) (interface{}, error) {
+func (p *Pipeline) buildInterceptorChain(interceptors []aop.InterceptorFunc, finalHandler func() (interface{}, error), execCtx *aop.ExecutionContext) (interface{}, error) {
 	if len(interceptors) == 0 {
 		return finalHandler()
 	}
 
 	// 这里用迭代式状态机维护拦截器链，避免递归链带来的额外闭包和栈深。
 	type chainHandler struct {
-		p            *Pipeline
-		ctx          *HandlerContext
 		interceptors []aop.InterceptorFunc
+		execCtx      *aop.ExecutionContext
 		index        int
 		final        func() (interface{}, error)
 	}
 	var h chainHandler
-	h.p = p
-	h.ctx = ctx
+	h.execCtx = execCtx
 	h.interceptors = interceptors
 	h.index = -1
 	h.final = finalHandler
@@ -344,8 +343,7 @@ func (p *Pipeline) buildInterceptorChain(interceptors []aop.InterceptorFunc, fin
 		if h.index >= len(h.interceptors) {
 			return h.final()
 		}
-		it := h.interceptors[h.index]
-		return it(h.p.newExecutionContext(h.ctx, nil), next)
+		return h.interceptors[h.index](h.execCtx, next)
 	})
 	return next.Handle()
 }

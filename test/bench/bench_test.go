@@ -7,10 +7,17 @@
 //	BenchHTTP_BindValidate Body 解码 + validator，验证 binding 层成本
 //	BenchDI_ResolveNested  5 层依赖解析，验证容器性能
 //
-// 基线文件在 test/bench/baseline.txt，用 tools/benchcheck 做回归门禁：
+// 基线文件在 test/bench/baseline.txt，用 tools/benchcheck 做回归门禁。
 //
-//	go test ./test/bench -bench . -benchmem -count=6 > new.txt
-//	go run ./tools/cmd/benchcheck -baseline test/bench/baseline.txt -current new.txt
+// 基线必须「每项 benchmark 独立进程采集」，因为同一进程内后跑的 benchmark 会受
+// 前面 benchmark 留下的堆/GC 状态影响（实测漂移 10%~20%，足以让门禁误报）：
+//
+//	cd test
+//	for b in BenchmarkHTTP_StaticJSON BenchmarkHTTP_AOPDepth10 BenchmarkHTTP_BindValidate BenchmarkDI_ResolveNested; do
+//		go test -run XXX -bench "^$b$" -benchmem -count 6 ./bench/ | grep '^Benchmark'
+//	done > bench/baseline.txt
+//
+//	cd ../tools && go run ./cmd/benchcheck -baseline ../test/bench/baseline.txt -current <new.txt>
 package bench_test
 
 import (
