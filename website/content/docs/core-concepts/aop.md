@@ -61,6 +61,27 @@ root := module.New(module.Metadata{
 集成包（`auth` / `resilience` / `otel`）在模块 `Init()` 内部调用 `Context.Use(...)`，
 所以引入模块即生效，无需手工注册。
 
+### 模块级（按路由范围）
+
+`Metadata.AOP` 是"全应用生效"，如果需要**只对部分路由生效**，让模块实现
+`Configure(consumer aop.MiddlewareConsumer)`：
+
+```go
+type AccessScopeModule struct{ *module.BaseModule }
+
+func (m *AccessScopeModule) Configure(consumer aop.MiddlewareConsumer) {
+	consumer.Apply(auditMiddleware("users")).
+		ForRoutes("/users/*").
+		Exclude("GET /users")
+
+	consumer.Apply(auditMiddleware("admin")).
+		ForRoutes("GET /admin/*")
+}
+```
+
+把它放进根模块的 `Imports` 即可。规则支持前缀 `*`、单段参数 `:id`、方法前缀 `GET /path`，
+详见 [AOP 参考](../reference/aop)。
+
 ### 控制器 / 路由级
 
 控制器在 `Declare` 中声明，`Prefix`/`Use*` 在第一条路由之前是**控制器作用域**，

@@ -20,6 +20,8 @@ type AOPDiagnostics struct {
 	Interceptors int `json:"interceptors"`
 	Pipes        int `json:"pipes"`
 	Filters      int `json:"filters"`
+	// ScopedMiddlewares 是由模块 MiddlewareConsumer 声明、按路由范围生效的中间件绑定数。
+	ScopedMiddlewares int `json:"scopedMiddlewares"`
 }
 
 // ModuleRouteDiagnostics 描述某个协议下，一个模块拥有的已编译路由数量。

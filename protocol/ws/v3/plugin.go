@@ -4,13 +4,14 @@ package ws
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
-	wsbinding "github.com/sao-lang/lania-g/protocol/ws/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	wsbinding "github.com/sao-lang/lania-g/protocol/ws/v3/binding"
 	wsprotocol "github.com/sao-lang/lania-g/protocol/ws/v3/protocol"
 )
 
@@ -123,6 +124,18 @@ func (p *Plugin) Compile(scan any, reg *registry.Registry, global registry.Globa
 	)
 }
 
+// wsRoutePath 返回 WS handler 在范围化中间件匹配中使用的路径，形如 `/chat/message`。
+func wsRoutePath(prefix, event string) string {
+	event = strings.Trim(event, "/")
+	if event == "" {
+		return prefix
+	}
+	if prefix == "/" {
+		return "/" + event
+	}
+	return prefix + "/" + event
+}
+
 // compileHandler 将单个 WS handler 声明编译为 runtime.Handler，并生成其 routeKey。
 //
 // 主要步骤：
@@ -144,19 +157,23 @@ func compileHandler(item *handlerOwnership, global registry.GlobalAOPRegistratio
 		return nil, "", err
 	}
 
-	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{
+	prefix := normalizeNamespace(def.Prefix)
+	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{
 		Middlewares:  def.Middlewares,
 		Guards:       def.Guards,
 		Interceptors: def.Interceptors,
 		Pipes:        def.Pipes,
 		ParamPipes:   def.ParamPipes,
 		Filters:      def.Filters,
+		RoutePath:    wsRoutePath(prefix, def.Event),
 	})
+	if err != nil {
+		return nil, "", err
+	}
 
 	h.Meta.CompiledAOP = &plan
 	h.Meta.ParamPlans = buildParamPlan(h)
 
-	prefix := normalizeNamespace(def.Prefix)
 	// WS 的 routeKey 由 event + namespace 决定，不像 HTTP 还要再拆 method/path 树。
 	routeKey := runtime.BuildRouteKey(wsprotocol.Protocol, def.Event, prefix)
 	h.Meta.RouteKey = routeKey

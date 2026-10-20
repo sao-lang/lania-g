@@ -36,6 +36,22 @@ root := module.New(module.Metadata{
 })
 ```
 
+### 命令式入口
+
+```go
+func New(cfg Config) *Adapter            // 构造未挂载的 adapter（EnableCors/UseAfter 等链式 API）
+func (a *Adapter) Addr() string          // 当前监听地址（app.Listen 可能已覆盖）
+func (a *Adapter) EnableCors(*CorsConfig) *Adapter
+func (a *Adapter) EnableHelmet(*HelmetConfig) *Adapter
+
+// 复用框架统一错误响应（自定义 transport / 中间件用）
+func WriteError(w http.ResponseWriter, r *http.Request, ctx *runtime.HandlerContext, err error)
+```
+
+{{< callout type="info" >}}
+只配置了 `CORS` / `Helmet` 时用 `Module` 即可；`New` 适合"先构造、再链式追加配置"的场景。
+{{< /callout >}}
+
 ## 2. 控制器与路由声明
 
 ```go

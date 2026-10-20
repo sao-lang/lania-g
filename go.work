@@ -1,6 +1,7 @@
 go 1.25.0
 
 use (
+	./test
 	./cmd
 	./application/v3
 	./integrations/auth/v3

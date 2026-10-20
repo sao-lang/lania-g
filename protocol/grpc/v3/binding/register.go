@@ -54,7 +54,7 @@ func DefaultRegistrations() []runtime.BindingRegistration {
 	allowed := map[runtime.Protocol]bool{grpcprotocol.Protocol: true}
 	return []runtime.BindingRegistration{
 		registration("HandlerContext", nil, matchHandlerContext, resolveHandlerContext),
-		registration("GRPCContext", allowed, matchGRPCContext, resolveGRPCContext),
+		registration("GRPCContext", allowed, MatchGRPCContext, ResolveGRPCContext),
 		registration("Context", allowed, matchStdContext, resolveStdContext),
 		registration("Req", allowed, matchGenericWrapper("Req"), resolveReqWrapper),
 		registration("RequestMessage", allowed, matchRequestMessage, resolveRequestMessage),

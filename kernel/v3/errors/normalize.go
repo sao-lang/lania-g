@@ -70,24 +70,39 @@ func NormalizeWithMeta(protocol, routeKey, moduleKey string, paramIndex int, met
 	ke.Protocol = protocol
 	ke.RouteKey = routeKey
 	ke.ModuleKey = moduleKey
+	ke.Kind = Classify(err)
 
+	return ke
+}
+
+// Classify 基于已分类错误或 sentinel error 推断 Kind。
+//
+// 未命中任何规则时返回 KindUnknown；调用方可用它决定协议侧的兜底状态码。
+func Classify(err error) Kind {
+	if err == nil {
+		return KindUnknown
+	}
+	var existing *KernelError
+	if errors.As(err, &existing) && existing != nil && existing.Kind != "" {
+		return existing.Kind
+	}
 	switch {
 	case errors.Is(err, ErrRouteNotFound):
-		ke.Kind = KindRouteNotFound
+		return KindRouteNotFound
 	case errors.Is(err, ErrBindingNotFound),
 		errors.Is(err, ErrBindingFailed),
 		errors.Is(err, ErrBindingNotSupported),
 		errors.Is(err, ErrInvalidParamType):
-		ke.Kind = KindBinding
+		return KindBinding
 	case errors.Is(err, ErrDIResolveFailed):
-		ke.Kind = KindDI
+		return KindDI
 	case errors.Is(err, ErrGuardRejected):
-		ke.Kind = KindForbidden
+		return KindForbidden
 	case errors.Is(err, ErrExecutionFailed):
-		ke.Kind = KindExecution
+		return KindExecution
+	default:
+		return KindUnknown
 	}
-
-	return ke
 }
 
 // copyMeta 复制一份 meta map，避免调用方后续修改影响错误对象内部状态。

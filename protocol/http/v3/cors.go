@@ -10,9 +10,15 @@ import (
 // CorsConfig 是 net/http 层的 CORS 配置，行为与 v2 基本对齐。
 // 这里只处理标准 CORS header 与 preflight，不引入更复杂的路由级策略。
 type CorsConfig struct {
-	AllowOrigins     []string
-	AllowMethods     []string
-	AllowHeaders     []string
+	AllowOrigins []string
+	// AllowOriginFunc 用于动态判定 origin（子域通配、正则等）。
+	// 命中时会把**请求的实际 origin** 回显，而不是 "*"。
+	AllowOriginFunc func(origin string) bool
+	AllowMethods    []string
+	AllowHeaders    []string
+	// AllowAllHeaders 为 true 时，preflight 会回显客户端请求的 header。
+	// 默认 false：AllowHeaders 为空就不下发 Allow-Headers，避免无限制放行。
+	AllowAllHeaders  bool
 	ExposeHeaders    []string
 	AllowCredentials bool
 	MaxAge           int
@@ -32,15 +38,24 @@ func DefaultCorsConfig() *CorsConfig {
 }
 
 // allowedOrigin 判断当前请求 origin 是否允许通过，并返回最终要写回的 origin 值。
+//
+// 注意：`Access-Control-Allow-Origin: *` 与 `Allow-Credentials: true` 不能同时出现，
+// 否则浏览器会直接拒绝响应。开启 credentials 时通配配置会退化为回显具体 origin。
 func (c *CorsConfig) allowedOrigin(origin string) string {
-	if c == nil || origin == "" || len(c.AllowOrigins) == 0 {
+	if c == nil || origin == "" {
 		return ""
+	}
+	if c.AllowOriginFunc != nil && c.AllowOriginFunc(origin) {
+		return origin
 	}
 	for _, o := range c.AllowOrigins {
 		if o == "*" {
+			if c.AllowCredentials {
+				return origin
+			}
 			return "*"
 		}
-		if o == origin {
+		if strings.EqualFold(o, origin) {
 			return origin
 		}
 	}
@@ -58,6 +73,9 @@ func applyCORS(w http.ResponseWriter, r *http.Request, cfg *CorsConfig) bool {
 	if origin == "" {
 		return false
 	}
+	// 无论是否命中，都要告诉缓存层"响应随 Origin 变化"，否则多 origin 会串味。
+	w.Header().Add("Vary", "Origin")
+
 	allowOrigin := cfg.allowedOrigin(origin)
 	if allowOrigin == "" {
 		return false
@@ -70,17 +88,20 @@ func applyCORS(w http.ResponseWriter, r *http.Request, cfg *CorsConfig) bool {
 
 	// Preflight 请求不进入业务 handler，直接在这里给出协商结果即可。
 	if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+		w.Header().Add("Vary", "Access-Control-Request-Method")
+		w.Header().Add("Vary", "Access-Control-Request-Headers")
+
 		if len(cfg.AllowMethods) > 0 {
 			w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.AllowMethods, ", "))
 		}
 
 		requestHeaders := r.Header.Get("Access-Control-Request-Headers")
-		if requestHeaders != "" {
-			if len(cfg.AllowHeaders) > 0 {
-				w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.AllowHeaders, ", "))
-			} else {
-				w.Header().Set("Access-Control-Allow-Headers", requestHeaders)
-			}
+		switch {
+		case len(cfg.AllowHeaders) > 0:
+			w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.AllowHeaders, ", "))
+		case cfg.AllowAllHeaders && requestHeaders != "":
+			// 仅在显式开启时才回显，避免默认放行任意请求头。
+			w.Header().Set("Access-Control-Allow-Headers", requestHeaders)
 		}
 
 		if cfg.MaxAge > 0 {

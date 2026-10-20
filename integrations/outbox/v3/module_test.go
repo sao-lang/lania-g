@@ -1,6 +1,0 @@
-package outbox
-
-import (
-
-)
-

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"reflect"
 
-	schedulerbinding "github.com/sao-lang/lania-g/protocol/scheduler/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	schedulerbinding "github.com/sao-lang/lania-g/protocol/scheduler/v3/binding"
 	schedulerprotocol "github.com/sao-lang/lania-g/protocol/scheduler/v3/protocol"
 )
 
@@ -121,7 +121,10 @@ func compileJob(item *routeOwnership, global registry.GlobalAOPRegistration) (*r
 	if err != nil {
 		return nil, "", err
 	}
-	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{})
+	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{RoutePath: def.Name})
+	if err != nil {
+		return nil, "", err
+	}
 	h.Meta.CompiledAOP = &plan
 	// 参数绑定名由 DSL 预先记录，编译阶段只负责转成 runtime.ParamPlan。
 	h.Meta.ParamPlans = compiler.BuildBoundParamPlans(h.Meta.ParamTypes, def.ParamBindings)

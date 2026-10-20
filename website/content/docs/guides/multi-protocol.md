@@ -17,22 +17,26 @@ HTTP、WebSocket、GraphQL 可以共享同一个监听端口；gRPC 单独监听
                 │  └─ Adapters                 │
                 └──────────────────────────────┘
                      │                │
-        shared :8080 │                │ :50051 (standalone)
+        shared :18080 │               │ :19051 (standalone)
    ┌─────────────────┴────┐     ┌─────┴──────────┐
    │ HTTP adapter         │     │ gRPC adapter   │
-   │  ├─ /users           │     └────────────────┘
+   │  ├─ /hello           │     └────────────────┘
    │  ├─ /graphql         │
    │  └─ /socket.io/      │
    └──────────────────────┘
 ```
 
-- HTTP 用 `httpadapter.New()`（共享监听）
-- GraphQL 用 `graphqladapter.New()`（共享监听，自动挂到 HTTP）
-- 每个协议用 `X.Module(X.Config{Addr: ...})` 声明自己的监听地址
-- `app.Run()` 会依次启动全部适配器
+关键规则：**`Addr` 留空 = 挂到 HTTP 上；写了 `Addr` = 自己监听**。
+
+| 协议 | 写 `Addr` | 不写 `Addr` |
+|------|-----------|-------------|
+| HTTP | 自己监听（必须） | 报错 |
+| WebSocket | 自己监听 | 挂到 HTTP 的 `/socket.io/` |
+| GraphQL | 自己监听 | 挂到 HTTP 的 `/graphql` |
+| gRPC | 自己监听（只能这样） | 不支持共享 |
 
 {{< callout type="info" >}}
-一个应用里可以有多个协议适配器；它们各自监听自己的地址，互不冲突。
+一个应用里可以有多个协议适配器；`app.Run()` 会按模块树顺序启动全部 adapter。
 {{< /callout >}}
 
 ## 2. 装配
@@ -42,19 +46,37 @@ HTTP、WebSocket、GraphQL 可以共享同一个监听端口；gRPC 单独监听
 ```go
 root := module.New(module.Metadata{
 	Imports: []module.Module{
-		httpadapter.Module(httpadapter.Config{Addr: ":8080", Validator: true}),
-		graphqladapter.Module(graphqladapter.Config{Addr: ":8082"}),
-		wsadapter.Module(wsadapter.Config{Addr: ":8081"}),
-		grpcadapter.Module(grpcadapter.Config{Addr: addr.GRPC(":50051")}),
+		httpadapter.Module(httpadapter.Config{}),            // 共享监听承载者
+		wsadapter.Module(wsadapter.Config{}),                // 挂 /socket.io/
+		graphqladapter.Module(graphqladapter.Config{Playground: true}), // 挂 /graphql
+		grpcadapter.Module(grpcadapter.Config{Addr: addr.GRPC(":19051")}), // 独立
 	},
-	Controllers: []any{userCtrl, gateway, userSvc},
+	Controllers: []any{httpCtrl, gateway, userSvc},
 	Resolvers:   []any{query},
 })
 
 app, err := application.New(root, application.Options{Logger: os.Stdout})
+if err != nil { log.Fatal(err) }
+
+// 统一决定共享监听地址（HTTP 承载它）；必须在 Run 之前调用。
+if err := app.Listen(addr.HTTP(":18080")); err != nil { log.Fatal(err) }
+
+if err := app.Run(); err != nil { log.Fatal(err) }
 ```
 
-每个协议模块声明自己的监听地址，`app.Run()` 统一启动全部适配器。
+`cmd/all-in-one` 就是这份代码的可运行版本：
+
+```bash
+cd cmd && go run ./all-in-one
+# 或用环境变量覆盖
+APP_ADDR=:18080 GRPC_ADDR=:19051 go run ./all-in-one
+```
+
+{{< callout type="warning" >}}
+`app.Listen(addr)` 只作用于实现了 `adapter.SharedListenerConfigurator` 且
+`RequiresSharedListen()` 为 true 的 adapter（当前只有 HTTP）。最多允许一个，
+多个会直接报错。
+{{< /callout >}}
 
 ## 3. 声明
 
@@ -125,21 +147,23 @@ findForProtocol(paramType, ctx.Protocol)
 ## 7. 启动与验证
 
 ```bash
-PORT=18080 GRPC_ADDR=:19051 go run ./cmd/all-in-one
+cd cmd && go run ./all-in-one
 ```
 
 | 入口 | 验证方式 |
 |------|----------|
-| HTTP | `GET /users/ping` |
-| GraphQL | `POST /graphql` |
-| WebSocket | `socket.io-client@4` 连接 `/ws/chat` |
-| gRPC | `grpc.NewClient` 调用 unary / stream |
+| HTTP | `GET :18080/hello` |
+| GraphQL | `GET :18080/graphql?query={ping}` 或 Playground `/playground` |
+| WebSocket | `socket.io-client@4` 连接 `:18080`，命名空间 `/ws/chat` |
+| gRPC | `grpc.NewClient(":19051")` 调用 `allinone.Demo/Ping` |
 
 ## 8. 常见坑
 
 | 现象 | 原因 |
 |------|------|
-| `shared listener adapters present; use app.Run()` | 调用了 `app.Run()`，但存在共享监听 adapter |
-| `multiple adapters require shared listener address` | 有两个 adapter 都想当 listener |
+| `no mounted adapter requires a shared listener address` | 调了 `app.Listen`，但没引入 HTTP 模块 |
+| `multiple adapters require shared listener address` | 有两个 adapter 都想当共享监听者 |
+| `http.Module requires http.Config{Addr: ":8080"}` | HTTP 模块既没配 `Addr`，也没调 `app.Listen` |
+| WS/GraphQL 没挂到 HTTP 上 | 它们配置了 `Addr`，被当成 standalone 独立监听 |
 | WS 连接失败 | 客户端不是 `socket.io-client@4` |
 | GraphQL 字段找不到 | `.Returns(...)` 的类型与 Go 模型不一致 |

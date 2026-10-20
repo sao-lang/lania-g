@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
-	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
+	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 )
 
 const (
@@ -43,6 +43,12 @@ type Adapter struct {
 }
 
 var _ adapter.Adapter = (*Adapter)(nil)
+
+// New 构造一个尚未挂载的 HTTP adapter。
+//
+// Module 是最常用的装配入口；New 用于需要在装配后再调用 EnableCors / UseAfter
+// 等命令式 API 的场景（测试里也用它来直接驱动 ServeHTTP）。
+func New(cfg Config) *Adapter { return newAdapter(cfg) }
 
 // newAdapter 根据配置构造适配器。
 func newAdapter(cfg Config) *Adapter {
@@ -138,6 +144,36 @@ func (a *Adapter) WithBasePath(prefix string) *Adapter {
 	a.basePath = prefix
 	return a
 }
+
+// Addr 返回当前配置的监听地址（`app.Listen` 可能已覆盖它）。
+func (a *Adapter) Addr() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.addr
+}
+
+// RequiresSharedListen 表示 HTTP 是共享监听地址的承载者。
+//
+// WS / GraphQL 在未显式配置 Addr 时会挂到它上面，因此 `app.Listen(addr)`
+// 只作用于 HTTP adapter。
+func (a *Adapter) RequiresSharedListen() bool { return true }
+
+// ConfigureSharedListen 由 `app.Listen(addr)` 调用，覆盖监听地址。
+func (a *Adapter) ConfigureSharedListen(addr string) error {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return fmt.Errorf("shared listen addr is empty")
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.server != nil {
+		return fmt.Errorf("http adapter already started, cannot change listen addr")
+	}
+	a.addr = addr
+	return nil
+}
+
+var _ adapter.SharedListenerConfigurator = (*Adapter)(nil)
 
 // EnableCors 启用内建 CORS 处理（`net/http` 层）。
 func (a *Adapter) EnableCors(config *CorsConfig) *Adapter {

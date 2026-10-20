@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 	httpprotocol "github.com/sao-lang/lania-g/protocol/http/v3/protocol"
 )
 
@@ -48,10 +48,10 @@ func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, httpCtx, err := a.buildHandlerContext(w, r, path)
 	if err != nil {
 		if errors.Is(err, errRequestBodyTooLarge) {
-			http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+			writeRequestError(w, r, http.StatusRequestEntityTooLarge, err.Error())
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeRequestError(w, r, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer runtime.ReleaseHandlerContext(ctx)

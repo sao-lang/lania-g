@@ -73,11 +73,17 @@ m.Context().Use(module.AOP{Interceptors: []aop.InterceptorFunc{...}})
 ## 4. 启动
 
 ```go
-func (a *Application) Run() error   // 声明 → 编译 → 启动适配器 → 阻塞
-func (a *Application) Stop() error  // 逆序停止适配器 + shutdown 钩子
+func (a *Application) Listen(addr string) error  // 设置共享监听地址（HTTP 承载）
+func (a *Application) Bootstrap() error          // 只执行 OnApplicationBootstrap（可重复调用）
+func (a *Application) Run() error                // 声明 → 编译 → 启动适配器 → 阻塞
+func (a *Application) Stop() error               // 逆序停止适配器 + shutdown 钩子
 ```
 
-监听地址属于协议配置（`http.Config{Addr}`），不存在 `app.Listen`。
+- `Listen` 只作用于 `RequiresSharedListen()` 为 true 的 adapter（当前只有 HTTP），
+  且必须在 `Run` / `Start` 之前调用；WS / GraphQL 未配置 `Addr` 时会挂到它上面。
+- `Bootstrap` 用于"不启动监听、只跑后台任务"的部署方式；`Run` 内部也会调用它，
+  重复调用是幂等的。
+- 如果 HTTP 模块已经写了 `Config{Addr}`，`Listen` 会覆盖它。
 
 ## 5. 诊断
 

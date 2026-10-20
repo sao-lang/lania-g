@@ -188,7 +188,8 @@ func BindStreamInto(ctx *runtime.HandlerContext, msg any, obj any) error {
 	return bindMessageInto(ctx, msg, obj, "grpc stream message")
 }
 
-func matchGRPCContext(t reflect.Type) (runtime.WrapperDescriptor, bool) {
+// MatchGRPCContext 判断参数类型是否是 GRPCContext 包装类型。
+func MatchGRPCContext(t reflect.Type) (runtime.WrapperDescriptor, bool) {
 	contextType := reflect.TypeFor[GRPCContext]()
 	if t == contextType {
 		return runtime.WrapperDescriptor{Kind: "GRPCContext", WrapperType: t, InnerType: t}, true
@@ -196,7 +197,8 @@ func matchGRPCContext(t reflect.Type) (runtime.WrapperDescriptor, bool) {
 	return runtime.WrapperDescriptor{}, false
 }
 
-func resolveGRPCContext(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor) (any, error) {
+// ResolveGRPCContext 从请求上下文解析 GRPCContext。
+func ResolveGRPCContext(ctx *runtime.HandlerContext, desc runtime.WrapperDescriptor) (any, error) {
 	if existing, ok := ctx.Get(MetadataKeyContext); ok {
 		if gc, ok := existing.(GRPCContext); ok && gc != nil {
 			return gc, nil

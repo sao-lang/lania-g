@@ -10,10 +10,10 @@ next: /docs/reference/binding
 ## 1. 类型
 
 ```go
-type MiddlewareFunc func(ctx *ExecutionContext, next CallHandler) (any, error)
-type GuardFunc      func(ctx *ExecutionContext) (bool, error)
-type InterceptorFunc func(ctx *ExecutionContext, next CallHandler) (any, error)
-type PipeFunc       func(value any, metadata *ArgumentMetadata) (any, error)
+type MiddlewareFunc      func(ctx *ExecutionContext, next func() error) error
+type GuardFunc           func(ctx *ExecutionContext) (bool, error)
+type InterceptorFunc     func(ctx *ExecutionContext, next CallHandler) (any, error)
+type PipeFunc            func(value any, metadata any) (any, error)
 type ExceptionFilterFunc func(exception any, ctx *ExecutionContext) error
 ```
 
@@ -74,12 +74,18 @@ filter 返回 nil 表示已消费，此时由 filter 自己设置 `ctx.Response.
 
 ## 3. 挂载级别
 
-| 级别 | 方式 |
-|------|------|
-| 全局 | `app.UseGlobalInterceptors(...)` 等 |
-| 控制器 | `r.UseGuards(...)`（`Routes` 作用域，HTTP/gRPC/WS/…） |
-| 路由/字段 | 链式 `Get(...).UseInterceptors(...)` |
-| 参数级 Pipe | `UseParamPipes(index, pipes...)` |
+| 级别 | 生效范围 | 声明方式 |
+|------|----------|----------|
+| 应用级全局 | 所有协议的所有路由 | `app.UseGlobalMiddlewares(...)` 等五个方法 |
+| 模块级（全局贡献） | 并入全局链，按模块加载顺序 | `module.Metadata.AOP` 或 `Init()` 中 `ctx.Use(...)` |
+| 模块级（路由范围） | 命中的方法 / 路径 | 模块实现 `Configure(consumer aop.MiddlewareConsumer)` |
+| 控制器 / 服务 / 网关级 | 该声明单元下的全部路由 | 第一条路由之前的 `Use*`（HTTP/gRPC/GraphQL/WS） |
+| 路由 / 方法 / 字段级 | 单条路由 | 动词之后的链式 `Use*` |
+| 参数级 | 单个参数 | `UseParamPipes(index, pipes...)`（**仅 Pipe**） |
+
+合并顺序是 **全局 → 范围化 → 局部**，越靠后越靠近 handler。
+HTTP/gRPC/GraphQL/WS 在编译期就把这三段拍平成 `HandlerMeta.CompiledAOP`，
+运行期不再二次合并。
 
 `Use*` 既可以接收 `aop.GuardFunc` / `aop.InterceptorFunc` 这类具名类型，
 也可以直接接收**同签名的裸函数**（编译器会自动转换），因此下面两种写法等价：
@@ -91,15 +97,52 @@ r.Get("/users", ctrl.List).UseInterceptors(timingInterceptor)
 r.Get("/users", ctrl.List).UseInterceptors(aop.InterceptorFunc(timingInterceptor))
 ```
 
-## 4. 内置 Pipe
+## 4. 声明形态
+
+五类增强都支持同样的四种写法，编译器按顺序做类型收敛：
+
+| # | 形态 | Middleware | Guard | Interceptor | Pipe | Filter |
+|---|------|-----------|-------|-------------|------|--------|
+| 1 | 接口实现 | `Use(ctx, next)` | `CanActivate` | `Intercept` | `Transform` | `Catch` |
+| 2 | 具名函数类型 | `aop.MiddlewareFunc` | `aop.GuardFunc` | `aop.InterceptorFunc` | `aop.PipeFunc` | `aop.ExceptionFilterFunc` |
+| 3 | 同签名裸函数 | `func(*aop.ExecutionContext, func() error) error` | `func(*aop.ExecutionContext) (bool, error)` | `func(*aop.ExecutionContext, aop.CallHandler) (any, error)` | `func(any, any) (any, error)` | `func(any, *aop.ExecutionContext) error` |
+| 4 | 延迟构造器 | `aop.MiddlewareConstructor` | `aop.GuardConstructor` | `aop.InterceptorConstructor` | `aop.PipeConstructor` | `aop.ExceptionFilterConstructor` |
+
+- 构造器在**编译期执行一次**，结果被该路由的所有请求复用；返回 `nil` 视为"不注册"。
+- 与 DSL 的 `Use*` 不同，`app.UseGlobal*` 只接受函数形态（第 2、3 种）。
+- **传错类型会直接编译失败**，返回 `*aop.ErrUnsupported`（包含种类、下标与期望签名），
+  不会再被静默丢弃。
+
+## 5. 内置 Pipe
+
+`kernel/v3/aop` 自带：
 
 ```go
-func NewDefaultValuePipe(defaultValue any) *DefaultValuePipe
+NewParseIntPipe()    *ParseIntPipe
+NewParseBoolPipe()   *ParseBoolPipe
+NewParseFloatPipe()  *ParseFloatPipe
+NewParseArrayPipe()  *ParseArrayPipe
+NewParseUUIDPipe()   *ParseUUIDPipe
+NewDefaultValuePipe(defaultValue any) *DefaultValuePipe
+NewValidationPipe()  *ValidationPipe
 ```
 
-`Transform(value, metadata)`：当 `value` 为 nil 或零值时替换为默认值。
+`kernel/v3/aop/pipes` 补充常用清洗/格式校验：
 
-## 5. Guard 接口
+```go
+pipes.NewTrimSpacePipe()            // string / []string / 结构体字符串字段去空白
+pipes.NewParseTimePipe(layout)      // RFC3339、2006-01-02 15:04:05、2006-01-02 自动尝试
+pipes.NewParseEnumPipe("admin", "member")  // 默认大小写不敏感
+pipes.NewRequiredPipe()             // 拒绝 nil / 空串 / 空集合 / 零值
+```
+
+全局注册只接受函数形态，对象需要 `aop.WrapPipe`：
+
+```go
+app.UseGlobalPipes(aop.WrapPipe(pipes.NewTrimSpacePipe()))
+```
+
+## 6. Guard 接口
 
 ```go
 type Guard interface {
@@ -113,7 +156,7 @@ func (f GuardFunc) CanActivate(ctx *ExecutionContext) (bool, error)
 
 `GuardFunc` 本身实现了 `Guard`，因此可以直接传给 `UseGuards`。
 
-## 6. 异常过滤器
+## 7. 异常过滤器
 
 ```go
 type ExceptionFilter interface {
@@ -127,23 +170,45 @@ type ExceptionFilterConstructor func() ExceptionFilter
 
 返回 `nil` 表示错误已被消费。
 
-## 7. HTTP 异常
+## 8. HTTP 异常
 
 ```go
 type HttpException struct {
 	Status  int
 	Message string
+	Cause   error
+	Headers map[string]string // 405 的 Allow、429 的 Retry-After 等
+	Code    string            // 业务错误码
+	Details any               // 结构化细节（字段级校验错误等）
 }
 
-func BadRequestException(msg string) *HttpException
-func UnauthorizedException(msg string) *HttpException
-func ForbiddenException(msg string) *HttpException
-func NotFoundException(msg string) *HttpException
-func ConflictException(msg string) *HttpException
-func GoneException(msg string) *HttpException
-func BadGatewayException(msg string) *HttpException
-func GatewayTimeoutException(msg string) *HttpException
-func InternalServerErrorException(msg string) *HttpException
+func (e *HttpException) Unwrap() error
+func FromError(err error) (*HttpException, bool)
+func StatusFromKind(kind kerrors.Kind) int
+```
+
+内置构造器覆盖常见 4xx / 5xx（完整列表见 [错误模型](errors)）：
+
+```go
+BadRequestException / UnauthorizedException / PaymentRequiredException
+ForbiddenException / NotFoundException / MethodNotAllowedException
+NotAcceptableException / RequestTimeoutException / ConflictException
+GoneException / LengthRequiredException / PreconditionFailedException
+PayloadTooLargeException / URITooLongException / UnsupportedMediaTypeException
+RangeNotSatisfiableException / ExpectationFailedException
+UnprocessableEntityException / LockedException / FailedDependencyException
+UpgradeRequiredException / PreconditionRequiredException / TooManyRequestsException
+RequestHeaderFieldsTooLargeException / UnavailableForLegalReasonsException
+InternalServerErrorException / NotImplementedException / BadGatewayException
+ServiceUnavailableException / GatewayTimeoutException / HTTPVersionNotSupportedException
+InsufficientStorageException / LoopDetectedException / NetworkAuthenticationRequiredException
+```
+
+带额外参数的：
+
+```go
+MethodNotAllowedException("", "GET", "POST")  // 自动写 Allow
+TooManyRequestsException("", 3*time.Second)   // 自动写 Retry-After
 ```
 
 各协议会把 `HttpException` 映射到自己的错误表达：
@@ -156,25 +221,118 @@ func InternalServerErrorException(msg string) *HttpException
 | WS | `<event>Error` |
 | MQ | Nack |
 
-## 8. Middleware 消费者
+## 9. Middleware 消费者（按路由范围）
+
+模块实现 `Configure(consumer aop.MiddlewareConsumer)`，即可把中间件绑定到指定路由范围：
 
 ```go
-type MiddlewareConsumer interface {
-	Apply(middlewares ...Middleware) MiddlewareConsumer
-	ForRoutes(routes ...string) MiddlewareConsumer
-	Exclude(routes ...string) MiddlewareConsumer
-	GetMiddlewares() []Middleware
-	ShouldApply(path string) bool
+type AccessScopeModule struct{ *module.BaseModule }
+
+func NewAccessScopeModule() *AccessScopeModule {
+	return &AccessScopeModule{BaseModule: module.New(module.Metadata{})}
+}
+
+func (m *AccessScopeModule) Configure(consumer aop.MiddlewareConsumer) {
+	consumer.Apply(auditMiddleware("users")).
+		ForRoutes("/users/*").
+		Exclude("GET /users")
+
+	consumer.Apply(auditMiddleware("admin")).
+		ForRoutes("GET /admin/*")
 }
 ```
 
-用于按路径选择性地应用 middleware。
+把该模块放进根模块的 `Imports` 即可，无需手工调用任何注册方法。
 
-## 9. 常见错误
+```go
+type MiddlewareConsumer interface {
+	Apply(middlewares ...any) MiddlewareRouteConfigurator
+}
+
+type MiddlewareRouteConfigurator interface {
+	ForRoutes(routes ...string) MiddlewareRouteConfigurator
+	Exclude(routes ...string) MiddlewareRouteConfigurator
+}
+```
+
+- **每次 `Apply` 是一条独立绑定**，不同中间件可以有不同的路由范围。
+- `Apply` 接受与 `UseMiddlewares` 完全相同的四种形态，类型写错会让启动阶段失败。
+- `Exclude` 优先级高于 `ForRoutes`；`ForRoutes` 为空时默认对所有路由生效。
+- 生效顺序：全局中间件 → 范围化中间件（按模块加载顺序）→ 路由级中间件。
+
+### 路由规则
+
+规则既可只写路径，也可带方法前缀：
+
+| 写法 | 含义 |
+|------|------|
+| `"/users/*"` | 前缀匹配：命中 `/users` 与 `/users/42/posts`，不会命中 `/usersettings` |
+| `"/users/:id"` / `"/users/{id}"` | 单段参数匹配：命中 `/users/42`，不命中 `/users/42/posts` |
+| `"*"` | 匹配全部路由 |
+| `"GET /users"` | 仅在 `GET` 方法上生效 |
+| `"ALL /admin/*"` | 方法不限，等价于只写路径 |
+
+匹配按路径段进行，不是字符串前缀，因此 `/users` 不会误命中 `/usersettings`。
+
+### 各协议的路由标识
+
+范围匹配使用协议的“原生路径”，不同协议填写的字段如下：
+
+| 协议 | 匹配路径 | 方法 |
+|------|----------|------|
+| HTTP | `/users/:id` | `GET` / `POST` / … |
+| gRPC | `/pkg.Service/Method` | 空（规则不要写方法前缀） |
+| GraphQL | `Query.user` 或 `<Resolver>.field` | 空 |
+| WebSocket | `/chat/message` | 空 |
+| MQ | topic | 空 |
+| Scheduler | job name | 空 |
+
+## 10. 内置增强器（kernel/v3/runtime/enhancers）
+
+`aop` 包只放抽象，不能依赖 `runtime`。需要读取 `*runtime.HandlerContext` 的通用增强器
+统一放在 `kernel/v3/runtime/enhancers`，四个协议共用：
+
+```go
+import "github.com/sao-lang/lania-g/kernel/v3/runtime/enhancers"
+
+app.UseGlobalMiddlewares(
+	enhancers.Recovery(func(recovered any) { log.Printf("panic: %v", recovered) }),
+	enhancers.RequestID("X-Request-Id", nil),
+	enhancers.AccessLog(func(e enhancers.AccessEntry) {
+		log.Printf("%s %s %s %d %s rid=%s", e.Protocol, e.Method, e.Path, e.Status, e.Duration, e.RequestID)
+	}),
+	enhancers.Timeout(5*time.Second),
+)
+app.UseGlobalFilters(enhancers.ErrorEnvelope(nil))
+```
+
+| 增强器 | 作用 |
+|--------|------|
+| `Recovery(reporter)` | 捕获 panic → 500，并回调上报 |
+| `RequestID(header, gen)` | 透传/生成请求 ID，写入上下文、请求头、响应头 |
+| `AccessLog(logger)` | 结构化访问日志（协议、路由、状态码、耗时、请求 ID） |
+| `Timeout(d)` | 设置 context 超时，超时映射为 504（协作式，handler 需尊重 ctx） |
+| `ErrorEnvelope(body)` | 把任意错误写成 `runtime.Response`，统一错误形态 |
+
+`AccessLog` 的 `AccessEntry`：
+
+```go
+type AccessEntry struct {
+	Protocol, ModuleKey, RouteKey, RequestID string
+	Method, Path                              string
+	Status                                    int
+	Duration                                  time.Duration
+	Err                                       error
+}
+```
+
+## 11. 常见错误
 
 | 现象 | 原因 |
 |------|------|
 | 中间件执行两次 | `CompiledAOP` 与全局列表被同时应用 |
-| Guard 不生效 | 传的是未包装的 `GuardFunc`（需实现 `CanActivate`，`GuardFunc` 已实现） |
+| Guard 不生效 | 传了不支持的签名；现在会直接编译报错 `*aop.ErrUnsupported` |
+| `Configure` 没被调用 | 模块没有实现 `Configure(aop.MiddlewareConsumer)`，或没挂进 `Imports` |
+| 范围化中间件不生效 | 规则与路由路径不匹配（注意 gRPC 的 `/pkg.Service/Method` 形式） |
 | Interceptor 吞掉响应 | 返回了 `nil, nil` |
 | Filter 未触发 | Filter 只处理 error 路径，业务返回成功不会触发 |

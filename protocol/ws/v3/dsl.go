@@ -24,7 +24,10 @@ type Routes struct {
 	err      error
 }
 
-func newRoutes(reg *registry.Registry, gateway any) *Routes {
+// NewRoutes 创建一个绑定到 reg 的声明收集器。
+//
+// 正常装配由 adapter 在 Declare 阶段构造；测试或自定义装载器可直接使用。
+func NewRoutes(reg *registry.Registry, gateway any) *Routes {
 	return &Routes{reg: reg, gateway: gateway}
 }
 

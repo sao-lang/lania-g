@@ -92,8 +92,10 @@ func (a *Application) prepare() error {
 	root := a.rootModule()
 	declarers := make([]module.Declarer, 0)
 	mounters := make([]adapter.HTTPMounterProvider, 0)
+	modules := make([]module.Module, 0)
 	if root != nil {
 		if err := module.WalkModules(root, func(mod module.Module) error {
+			modules = append(modules, mod)
 			if declarer, ok := mod.(module.Declarer); ok {
 				declarers = append(declarers, declarer)
 			}
@@ -105,6 +107,12 @@ func (a *Application) prepare() error {
 			return err
 		}
 	}
+	// 范围化中间件随模块树重新收集：热加载后新增模块的 Configure 也能生效。
+	scoped, err := module.CollectScopedMiddlewares(modules)
+	if err != nil {
+		return err
+	}
+	a.registry.SetScopedMiddlewares(scoped...)
 	if err := module.DeclareAll(a.moduleRef, declarers...); err != nil {
 		return err
 	}

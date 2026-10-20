@@ -1,6 +1,0 @@
-package minio
-
-import (
-
-)
-

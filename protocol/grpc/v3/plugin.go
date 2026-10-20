@@ -4,13 +4,14 @@ package grpc
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
-	grpcbinding "github.com/sao-lang/lania-g/protocol/grpc/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	grpcbinding "github.com/sao-lang/lania-g/protocol/grpc/v3/binding"
 	grpcprotocol "github.com/sao-lang/lania-g/protocol/grpc/v3/protocol"
 )
 
@@ -123,6 +124,20 @@ func (p *Plugin) Compile(scan any, reg *registry.Registry, global registry.Globa
 	)
 }
 
+// grpcRoutePath 返回 gRPC 方法在范围化中间件匹配中使用的路径，形如 `/pkg.Service/Method`。
+func grpcRoutePath(def *MethodDefinition) string {
+	service := strings.Trim(def.Service, "/")
+	method := strings.Trim(def.Method, "/")
+	switch {
+	case service == "":
+		return "/" + method
+	case method == "":
+		return "/" + service
+	default:
+		return "/" + service + "/" + method
+	}
+}
+
 // compileMethod 负责把单条 gRPC 声明编译成 runtime.Handler。
 // 它的特化点主要是：
 // - 通过 `ParamBindings` 给 header/message 等参数补 BindingName
@@ -148,14 +163,18 @@ func compileMethod(item *methodOwnership, global registry.GlobalAOPRegistration)
 	}
 
 	// gRPC adapter 没有单独发明一套 AOP 机制，而是继续复用统一编译器生成的执行计划。
-	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{
+	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{
 		Middlewares:  def.Middlewares,
 		Guards:       def.Guards,
 		Interceptors: def.Interceptors,
 		Pipes:        def.Pipes,
 		ParamPipes:   def.ParamPipes,
 		Filters:      def.Filters,
+		RoutePath:    grpcRoutePath(def),
 	})
+	if err != nil {
+		return nil, "", err
+	}
 	h.Meta.CompiledAOP = &plan
 
 	// gRPC 参数名通常不是从函数签名里猜，而是由 DSL 显式记录到 ParamBindings。

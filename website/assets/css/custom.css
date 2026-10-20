@@ -403,7 +403,7 @@ nav[aria-label*="目录"] a:hover,
   background: linear-gradient(
     135deg,
     hsl(var(--primary-hue) var(--primary-saturation) var(--primary-lightness)),
-    hsl(calc(var(--primary-hue) + 26) var(--primary-saturation) 56%)
+    hsl(calc(var(--primary-hue) + 26deg) var(--primary-saturation) 56%)
   );
 }
 

@@ -1,13 +1,15 @@
 // http-demo 演示 HTTP 协议的可运行组合：
 //
-//	模块树 + DI + 校验 + 五类 AOP（Middleware / Guard / Interceptor / Pipe / Filter）+ Swagger
+//	模块树 + DI + 校验 + 五类 AOP（Middleware / Guard / Interceptor / Pipe / Filter）
+//	+ 模块级范围化中间件（MiddlewareConsumer）+ Swagger
 //
 // 运行：
 //
 //	cd cmd && go run ./http-demo
 //
 // 路由声明写在控制器的 Declare 方法里，因此自动归属于控制器所在的模块。
-// 全局 AOP 通过 app.UseGlobal* 注册，路由/控制器级 AOP 通过 Routes 链声明。
+// 全局 AOP 通过 app.UseGlobal* 注册，控制器/路由级 AOP 通过 Routes 链声明，
+// 按路由范围生效的中间件通过模块的 Configure(consumer) 声明。
 package main
 
 import (
@@ -25,10 +27,12 @@ import (
 	"github.com/sao-lang/lania-g/cmd/internal/addr"
 	swagger "github.com/sao-lang/lania-g/integrations/swagger/v3"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
+	"github.com/sao-lang/lania-g/kernel/v3/aop/pipes"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	"github.com/sao-lang/lania-g/kernel/v3/runtime/enhancers"
 	httpadapter "github.com/sao-lang/lania-g/protocol/http/v3"
 	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 )
@@ -293,32 +297,55 @@ type updateUserRequest struct {
 // AOP：Middleware
 // ---------------------------------------------------------------------------
 
-// loggingMiddleware 是最外层中间件：记录方法、路径、状态码与耗时。
+// accessLog 把 enhancers.AccessLog 的结构化条目打印成一行日志。
+func accessLog(entry enhancers.AccessEntry) {
+	status := fmt.Sprintf("%d", entry.Status)
+	if entry.Err != nil {
+		status = "ERR"
+	}
+	log.Printf("[%s] %-6s %-18s %s %s rid=%s",
+		entry.Protocol, entry.Method, entry.Path, status, entry.Duration.Round(time.Millisecond), entry.RequestID)
+}
+
+// ---------------------------------------------------------------------------
+// AOP：MiddlewareConsumer（模块级、按路由范围生效）
+// ---------------------------------------------------------------------------
+
+// auditMiddleware 是按范围生效的中间件：只对被 MiddlewareConsumer 命中的路由执行。
 //
-// 注意：Guard / 参数绑定这类失败发生在中间件之后（由 ExceptionFilter 兜底），
-// 中间件看不到最终状态码，因此这类请求记录成 ERR 而不是猜测一个状态码。
-func loggingMiddleware(ctx *aop.ExecutionContext, next func() error) error {
-	start := time.Now()
-	err := next()
-	elapsed := time.Since(start).Round(time.Millisecond)
-
-	hc, _ := ctx.HandlerContext.(*runtime.HandlerContext)
-	method, path := "", ""
-	if hc != nil {
-		method, path = hc.Request.Method, hc.Request.Path
+// 与全局 enhancers.AccessLog 的区别是它不注册到 app.UseGlobalMiddlewares，
+// 而是由 AccessScopeModule.Configure 绑定到具体路由范围。
+func auditMiddleware(scope string) aop.MiddlewareFunc {
+	return func(ctx *aop.ExecutionContext, next func() error) error {
+		if hc, ok := ctx.HandlerContext.(*runtime.HandlerContext); ok {
+			hc.Response.Headers["X-Audit-Scope"] = scope
+		}
+		log.Printf("[audit:%s] %s", scope, ctx.RouteKey)
+		return next()
 	}
+}
 
-	if err != nil {
-		log.Printf("[mw] %-6s %-18s ERR %v (%s)", method, path, err, elapsed)
-		return err
-	}
+// AccessScopeModule 演示模块级中间件声明，等价 NestJS 的 configure(consumer)。
+type AccessScopeModule struct {
+	*module.BaseModule
+}
 
-	status := http.StatusOK
-	if hc != nil && hc.Response.Status > 0 {
-		status = hc.Response.Status
-	}
-	log.Printf("[mw] %-6s %-18s %d %s", method, path, status, elapsed)
-	return nil
+// NewAccessScopeModule 创建一个只负责声明范围化中间件的模块。
+func NewAccessScopeModule() *AccessScopeModule {
+	return &AccessScopeModule{BaseModule: module.New(module.Metadata{})}
+}
+
+// Configure 把中间件绑定到指定路由范围。
+//
+//   - `/users/*`：前缀匹配，覆盖 /users 列表与其子路径，且不会误命中 /usersettings
+//   - `GET /users`：Exclude 演示黑名单，优先级高于 ForRoutes
+//   - `GET /admin/*`：带方法前缀的规则
+func (m *AccessScopeModule) Configure(consumer aop.MiddlewareConsumer) {
+	consumer.Apply(auditMiddleware("users")).
+		ForRoutes("/users/*").
+		Exclude("GET /users")
+	consumer.Apply(auditMiddleware("admin")).
+		ForRoutes("GET /admin/*")
 }
 
 // ---------------------------------------------------------------------------
@@ -898,6 +925,9 @@ func main() {
 	httpModule := httpadapter.Module(httpadapter.Config{
 		Addr:      addr.HTTP(":8080"),
 		Validator: true,
+		// 传输层能力：CORS / Helmet / body 上限都在这里配置。
+		// CORS 在路由之前执行，mounted handler（/docs、/redoc）同样受保护。
+		CORS: httpadapter.DefaultCorsConfig(),
 	})
 	swaggerModule := swagger.Module(
 		swagger.Config{
@@ -920,6 +950,7 @@ func main() {
 			httpModule,
 			swaggerModule,
 			StoreModule(store),
+			NewAccessScopeModule(),
 		},
 		Controllers: []any{
 			&SystemController{},
@@ -935,11 +966,18 @@ func main() {
 	}
 
 	// 全局 AOP。
-	// Middleware 在最外层，Interceptor 顺序即执行顺序，Filter 兜住 binding/校验错误。
-	app.UseGlobalMiddlewares(loggingMiddleware)
-	app.UseGlobalPipes(trimPipe)
+	// Middleware 在最外层；Recovery → RequestID → AccessLog → Timeout 是推荐顺序。
+	app.UseGlobalMiddlewares(
+		enhancers.Recovery(func(recovered any) { log.Printf("[recover] %v", recovered) }),
+		enhancers.RequestID("", nil),
+		enhancers.AccessLog(accessLog),
+		enhancers.Timeout(5*time.Second),
+	)
+	app.UseGlobalPipes(aop.WrapPipe(pipes.NewTrimSpacePipe()))
 	app.UseGlobalInterceptors(responseEnvelopeInterceptor, authInterceptor(store))
-	app.UseGlobalFilters(envelopeExceptionFilter)
+	app.UseGlobalFilters(enhancers.ErrorEnvelope(func(httpErr *aop.HttpException) any {
+		return apiEnvelope{Msg: httpErr.Message, Code: httpErr.Status, Data: nil, Success: false}
+	}))
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

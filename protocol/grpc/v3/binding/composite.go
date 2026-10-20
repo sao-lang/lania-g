@@ -105,8 +105,8 @@ func resolveCompositeField(ctx *runtime.HandlerContext, field reflect.StructFiel
 	if field.Type == reflect.TypeFor[*runtime.HandlerContext]() {
 		return ctx, true, nil
 	}
-	if _, ok := matchGRPCContext(field.Type); ok {
-		value, err := resolveGRPCContext(ctx, runtime.WrapperDescriptor{WrapperType: field.Type, InnerType: field.Type})
+	if _, ok := MatchGRPCContext(field.Type); ok {
+		value, err := ResolveGRPCContext(ctx, runtime.WrapperDescriptor{WrapperType: field.Type, InnerType: field.Type})
 		return value, true, err
 	}
 	if field.Type == reflect.TypeFor[stdctx.Context]() {
@@ -231,7 +231,7 @@ func isSupportedCompositeFieldType(t reflect.Type) bool {
 	if _, ok := matchGenericWrapper("Header")(t); ok {
 		return true
 	}
-	if _, ok := matchGRPCContext(t); ok {
+	if _, ok := MatchGRPCContext(t); ok {
 		return true
 	}
 	if _, ok := matchRawServerStream(t); ok {

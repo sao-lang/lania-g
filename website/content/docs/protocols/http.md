@@ -32,6 +32,43 @@ httpModule := http.Module(http.Config{
 
 把模块放进根模块的 `Imports` 即可；适配器由应用在装配阶段自动发现。
 
+### CORS / Helmet / Body 限制
+
+这三项都是 **传输层能力**，在 `Config` 里一次性配置，执行于路由匹配之前
+（mounted handler 如 `/docs` 同样生效）：
+
+```go
+http.Module(http.Config{
+	Addr: ":8080",
+	CORS: &http.CorsConfig{
+		AllowOrigins:     []string{"https://app.example.com"},
+		AllowOriginFunc:  func(origin string) bool { return strings.HasSuffix(origin, ".example.com") },
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"X-Request-Id"},
+		AllowCredentials: true,
+		MaxAge:           3600,
+	},
+	Helmet:       http.DefaultHelmetConfig(),
+	MaxBodyBytes: 10 << 20, // 超出返回 413（统一错误信封）
+})
+```
+
+CORS 行为约定：
+
+| 场景 | 行为 |
+|------|------|
+| `AllowOrigins: ["*"]` 且未开 credentials | 返回 `Access-Control-Allow-Origin: *` |
+| `AllowOrigins: ["*"]` 且开 credentials | **回显请求的实际 origin**（规范禁止 `*` + credentials） |
+| 命中 `AllowOriginFunc` | 回显请求的实际 origin |
+| `AllowHeaders` 为空 | 不下发 `Allow-Headers`（不会回显客户端值） |
+| `AllowAllHeaders: true` | 显式开启后才回显客户端请求头 |
+| 任意 CORS 响应 | 都会带 `Vary: Origin`；preflight 额外带两个 `Vary` |
+
+preflight（`OPTIONS` + `Access-Control-Request-Method`）在 adapter 内直接返回 `204`，
+不会进入路由与业务 handler。CORS **不做成 AOP Middleware**，因为 preflight 必须在
+路由与参数绑定之前短路。
+
 ## 2. 路由声明
 
 ```go

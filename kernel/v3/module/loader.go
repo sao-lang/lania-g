@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/graph"
@@ -32,7 +33,10 @@ type ModuleLoader struct {
 	diagnostics   *graph.Diagnostics
 	registry      *registry.Registry
 	aop           AOP
-	mu            sync.RWMutex
+	// orderedModules 按“根 → imports”的递归顺序记录模块，保证范围化中间件的声明顺序稳定。
+	orderedModules    []Module
+	scopedMiddlewares []aop.ScopedMiddleware
+	mu                sync.RWMutex
 }
 
 // NewModuleLoader 创建模块加载器，并可选设置 root modules。
@@ -63,6 +67,7 @@ func (l *ModuleLoader) LoadMultiple(roots ...Module) (*LoadResult, error) {
 	l.modules = make(map[Module]bool)
 	l.providers = make(map[interface{}]*di.Provider)
 	l.controllers = make([]interface{}, 0)
+	l.orderedModules = make([]Module, 0)
 	l.setRootModules(roots)
 
 	for _, root := range roots {
@@ -84,6 +89,11 @@ func (l *ModuleLoader) LoadMultiple(roots ...Module) (*LoadResult, error) {
 		}
 	}
 	l.aop = l.collectAOP()
+	scoped, err := l.collectScopedMiddlewares()
+	if err != nil {
+		return nil, err
+	}
+	l.scopedMiddlewares = scoped
 
 	return &LoadResult{
 		Modules:     l.getModulesList(),
@@ -164,6 +174,7 @@ func (l *ModuleLoader) loadModule(mod Module) error {
 	}
 
 	l.modules[mod] = true
+	l.orderedModules = append(l.orderedModules, mod)
 
 	metadata := mod.Metadata()
 	for _, imp := range metadata.Imports {
@@ -229,6 +240,40 @@ func (l *ModuleLoader) collectAOP() AOP {
 
 // GetAOP 返回模块贡献的全局 AOP（Init 完成后可用）。
 func (l *ModuleLoader) GetAOP() AOP { return l.aop }
+
+// GetScopedMiddlewares 返回模块通过 MiddlewareConsumer 声明的范围化中间件。
+//
+// 顺序按模块加载顺序（根在前、imports 在后）。
+func (l *ModuleLoader) GetScopedMiddlewares() []aop.ScopedMiddleware {
+	return append([]aop.ScopedMiddleware{}, l.scopedMiddlewares...)
+}
+
+// CollectScopedMiddlewares 遍历给定模块，执行实现了 MiddlewareConfigurable 的 Configure，
+// 并收集其范围化中间件声明。
+//
+// 顺序即传入的模块顺序；Configure 没有返回值，因此配置错误由 consumer 累积后统一返回：
+// 写错类型的中间件应当在启动期失败，而不是静默不生效。
+func CollectScopedMiddlewares(mods []Module) ([]aop.ScopedMiddleware, error) {
+	var out []aop.ScopedMiddleware
+	for _, mod := range mods {
+		configurable, ok := mod.(aop.MiddlewareConfigurable)
+		if !ok {
+			continue
+		}
+		consumer := aop.NewMiddlewareConsumer()
+		configurable.Configure(consumer)
+		if err := consumer.Err(); err != nil {
+			return nil, fmt.Errorf("module %T configure middlewares: %w", mod, err)
+		}
+		out = append(out, consumer.Bindings()...)
+	}
+	return out, nil
+}
+
+// collectScopedMiddlewares 按模块加载顺序收集范围化中间件。
+func (l *ModuleLoader) collectScopedMiddlewares() ([]aop.ScopedMiddleware, error) {
+	return CollectScopedMiddlewares(l.orderedModules)
+}
 
 // getModulesList 返回当前已加载模块集合的切片快照。
 func (l *ModuleLoader) getModulesList() []Module {

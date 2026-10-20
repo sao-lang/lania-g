@@ -3,15 +3,44 @@ package http
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
-	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	kerrors "github.com/sao-lang/lania-g/kernel/v3/errors"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	httpbinding "github.com/sao-lang/lania-g/protocol/http/v3/binding"
 )
+
+// ErrorResponse 是 HTTP adapter 的统一错误响应体。
+//
+// 所有由框架产生的错误（绑定失败、校验失败、Guard 拒绝、业务 HttpException、
+// 未预期 panic）都使用这一结构，便于客户端稳定解析。
+type ErrorResponse struct {
+	// Code 是业务错误码：HttpException 显式指定优先，否则为 `HTTP-<status>`。
+	Code string `json:"code"`
+	// Message 是人类可读文案。
+	Message string `json:"message"`
+	// Details 是结构化细节（例如字段级校验错误）。
+	Details any `json:"details,omitempty"`
+	// Status 与 HTTP 状态码一致，方便只读 body 的客户端。
+	Status int `json:"status"`
+	// Path 是请求路径。
+	Path string `json:"path,omitempty"`
+	// Kind 是内核错误分类（Binding / Validation / Forbidden ...）。
+	Kind string `json:"kind,omitempty"`
+	// RequestID 来自请求上下文（若启用了 RequestID 中间件）。
+	RequestID string `json:"requestId,omitempty"`
+}
+
+// WriteError 把任意 error 写成框架统一错误响应。
+//
+// 它复用 adapter 内部同一套归一化逻辑（Kind → 状态码、HttpException 覆盖、
+// Headers/Code/Details 透传），供自定义 transport 或中间件复用。
+func WriteError(w http.ResponseWriter, r *http.Request, ctx *runtime.HandlerContext, err error) {
+	writeHTTPError(w, r, ctx, err)
+}
 
 // writeHTTPError 负责把框架内部 error 统一投影成 HTTP 错误响应。
 // 这里先把任意 error 归一化成 KernelError，再映射到合适的状态码和 JSON 结构。
@@ -22,39 +51,72 @@ func writeHTTPError(w http.ResponseWriter, r *http.Request, ctx *runtime.Handler
 			moduleKey, _ = value.(string)
 		}
 	}
-	kerr := kerrors.Normalize(string(ctx.Protocol), ctx.RouteKey, moduleKey, err)
+	protocol, routeKey := "", ""
+	if ctx != nil {
+		protocol = string(ctx.Protocol)
+		routeKey = ctx.RouteKey
+	}
+	kerr := kerrors.Normalize(protocol, routeKey, moduleKey, err)
+	writeKernelError(w, r, ctx, kerr)
+}
+
+// writeKernelError 把已归一化的 KernelError 写成统一错误响应。
+func writeKernelError(w http.ResponseWriter, r *http.Request, ctx *runtime.HandlerContext, kerr *kerrors.KernelError) {
 	if kerr == nil {
 		return
 	}
 
-	status := http.StatusInternalServerError
-	switch {
-	case kerr.Kind == kerrors.KindRouteNotFound:
-		status = http.StatusNotFound
-	case kerr.Kind == kerrors.KindUnauthorized:
-		status = http.StatusUnauthorized
-	case kerr.Kind == kerrors.KindForbidden:
-		status = http.StatusForbidden
-	case kerr.Kind == kerrors.KindBinding,
-		kerr.Kind == kerrors.KindValidation,
-		kerr.Kind == kerrors.KindDI:
-		status = http.StatusBadRequest
+	httpErr, _ := aop.FromError(kerr)
+	status := httpErr.Status
+	if status == 0 {
+		status = http.StatusInternalServerError
 	}
 
-	var httpErr *aop.HttpException
-	if errors.As(kerr, &httpErr) && httpErr != nil && httpErr.Status != 0 {
-		// 若业务主动抛的是 HTTP 语义异常，则以异常内的状态码优先。
-		status = httpErr.Status
+	for key, value := range httpErr.Headers {
+		w.Header().Set(key, value)
 	}
-
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"error":  kerr.Error(),
-		"status": status,
-		"path":   r.URL.Path,
-		"kind":   kerr.Kind,
-		"meta":   kerr.Meta,
+
+	response := ErrorResponse{
+		Code:      httpErr.Code,
+		Message:   httpErr.Message,
+		Details:   httpErr.Details,
+		Status:    status,
+		Path:      r.URL.Path,
+		Kind:      string(kerr.Kind),
+		RequestID: requestIDOf(ctx, r),
+	}
+	if response.Code == "" {
+		response.Code = "HTTP-" + strconv.Itoa(status)
+	}
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+// requestIDOf 从请求上下文或请求头里取 RequestID，供错误响应回显。
+func requestIDOf(ctx *runtime.HandlerContext, r *http.Request) string {
+	if ctx != nil {
+		if value, ok := ctx.Get("kernel.requestId"); ok {
+			if id, ok := value.(string); ok {
+				return id
+			}
+		}
+	}
+	if r != nil {
+		return r.Header.Get("X-Request-Id")
+	}
+	return ""
+}
+
+// writeRequestError 用于尚未构造 HandlerContext 的早期失败（例如 body 超限）。
+func writeRequestError(w http.ResponseWriter, r *http.Request, status int, message string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(ErrorResponse{
+		Code:    "HTTP-" + strconv.Itoa(status),
+		Message: message,
+		Status:  status,
+		Path:    r.URL.Path,
 	})
 }
 

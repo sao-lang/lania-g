@@ -32,6 +32,12 @@ type AOPSources struct {
 	Pipes        []any
 	ParamPipes   map[int][]any
 	Filters      []any
+
+	// RoutePath / RouteMethod 是该声明在协议内的路由标识，用于匹配
+	// 模块通过 MiddlewareConsumer 声明的「范围化中间件」。
+	// 为空表示该协议不参与范围匹配。
+	RoutePath   string
+	RouteMethod string
 }
 
 // ModuleOwner 表示某个声明项最终归属到的模块信息。
@@ -255,20 +261,67 @@ func ownerCandidateKeys(candidates []ModuleOwner) []string {
 // CompileAOPPlan 将全局 AOP 声明与本地 AOPSources 合并，并转换为 runtime.AOPPlan。
 //
 // 合并规则：
-// - 全局在前，本地在后（本地更靠近 handler）
-// - 本地 AOPSources 以 []any 形式接收，支持三种写法：
+// - 全局 → 范围化（MiddlewareConsumer）→ 本地，越靠后越靠近 handler
+// - 本地 AOPSources 以 []any 形式接收，支持四种写法：
 //   - Func：aop.MiddlewareFunc / GuardFunc / InterceptorFunc / PipeFunc / ExceptionFilterFunc
+//   - 裸函数：与上面的 Func 同签名的普通函数（自动转换）
 //   - 对象：aop.Middleware / Guard / Interceptor / Pipe / ExceptionFilter
-//   - 构造器：对应的 *Constructor（调用一次创建对象）
-func CompileAOPPlan(global registry.GlobalAOPRegistration, local AOPSources) runtime.AOPPlan {
-	return runtime.AOPPlan{
-		Middlewares:  append(append([]aop.MiddlewareFunc{}, global.Middlewares...), convertMiddlewares(local.Middlewares)...),
-		Guards:       append(append([]aop.GuardFunc{}, global.Guards...), convertGuards(local.Guards)...),
-		Interceptors: append(append([]aop.InterceptorFunc{}, global.Interceptors...), convertInterceptors(local.Interceptors)...),
-		Pipes:        append(append([]aop.PipeFunc{}, global.Pipes...), convertPipes(local.Pipes)...),
-		ParamPipes:   convertParamPipes(local.ParamPipes),
-		Filters:      append(append([]aop.ExceptionFilterFunc{}, global.Filters...), convertFilters(local.Filters)...),
+//   - 构造器：对应的 *Constructor（编译期调用一次创建对象）
+//
+// 遇到无法识别的类型会返回 *aop.ErrUnsupported，由调用方转为编译错误，
+// 而不是静默丢弃。
+func CompileAOPPlan(global registry.GlobalAOPRegistration, local AOPSources) (runtime.AOPPlan, error) {
+	middlewares, err := aop.CoerceMiddlewares(local.Middlewares)
+	if err != nil {
+		return runtime.AOPPlan{}, err
 	}
+	guards, err := aop.CoerceGuards(local.Guards)
+	if err != nil {
+		return runtime.AOPPlan{}, err
+	}
+	interceptors, err := aop.CoerceInterceptors(local.Interceptors)
+	if err != nil {
+		return runtime.AOPPlan{}, err
+	}
+	pipes, err := aop.CoercePipes(local.Pipes)
+	if err != nil {
+		return runtime.AOPPlan{}, err
+	}
+	paramPipes, err := aop.CoerceParamPipes(local.ParamPipes)
+	if err != nil {
+		return runtime.AOPPlan{}, err
+	}
+	filters, err := aop.CoerceFilters(local.Filters)
+	if err != nil {
+		return runtime.AOPPlan{}, err
+	}
+
+	scoped := global.ScopedMiddlewaresFor(local.RouteMethod, local.RoutePath)
+
+	return runtime.AOPPlan{
+		Middlewares:  concatAOP(global.Middlewares, scoped, middlewares),
+		Guards:       concatAOP(global.Guards, guards),
+		Interceptors: concatAOP(global.Interceptors, interceptors),
+		Pipes:        concatAOP(global.Pipes, pipes),
+		ParamPipes:   paramPipes,
+		Filters:      concatAOP(global.Filters, filters),
+	}, nil
+}
+
+// concatAOP 按顺序拼接多段 AOP 列表，返回一个新切片（不共享底层数组）。
+func concatAOP[T any](parts ...[]T) []T {
+	size := 0
+	for _, part := range parts {
+		size += len(part)
+	}
+	if size == 0 {
+		return nil
+	}
+	out := make([]T, 0, size)
+	for _, part := range parts {
+		out = append(out, part...)
+	}
+	return out
 }
 
 // BuildBoundParamPlans 根据参数类型列表与“参数索引 -> bindingName”的映射生成 ParamPlan 列表。
@@ -468,18 +521,6 @@ func InstancePointer(v any) uintptr {
 	return rv.Pointer()
 }
 
-// convertParamPipes 将参数级 pipes 定义（map[int][]any）转换为 map[int][]aop.PipeFunc。
-func convertParamPipes(items map[int][]any) map[int][]aop.PipeFunc {
-	if len(items) == 0 {
-		return nil
-	}
-	out := make(map[int][]aop.PipeFunc, len(items))
-	for idx, defs := range items {
-		out[idx] = convertPipes(defs)
-	}
-	return out
-}
-
 // appendSnapshotOwners 将 scanner 的 owner 结构复制到编译器侧的 owner 结构中，并追加到 dst。
 func appendSnapshotOwners(dst map[reflect.Type][]ModuleOwner, src map[reflect.Type][]corescanner.ModuleOwner) {
 	for token, owners := range src {
@@ -491,104 +532,4 @@ func appendSnapshotOwners(dst map[reflect.Type][]ModuleOwner, src map[reflect.Ty
 			})
 		}
 	}
-}
-
-// convertMiddlewares 将 middleware 定义列表转换为可执行的 aop.MiddlewareFunc 列表。
-func convertMiddlewares(items []any) []aop.MiddlewareFunc {
-	out := make([]aop.MiddlewareFunc, 0, len(items))
-	for _, item := range items {
-		switch v := item.(type) {
-		case aop.MiddlewareFunc:
-			out = append(out, v)
-		case aop.Middleware:
-			out = append(out, func(ctx *aop.ExecutionContext, next func() error) error { return v.Use(ctx, next) })
-		case aop.MiddlewareConstructor:
-			if mw := v(); mw != nil {
-				out = append(out, func(ctx *aop.ExecutionContext, next func() error) error { return mw.Use(ctx, next) })
-			}
-		case func(*aop.ExecutionContext, func() error) error:
-			out = append(out, aop.MiddlewareFunc(v))
-		}
-	}
-	return out
-}
-
-// convertGuards 将 guard 定义列表转换为可执行的 aop.GuardFunc 列表。
-func convertGuards(items []any) []aop.GuardFunc {
-	out := make([]aop.GuardFunc, 0, len(items))
-	for _, item := range items {
-		switch v := item.(type) {
-		case aop.GuardFunc:
-			out = append(out, v)
-		case aop.Guard:
-			out = append(out, aop.WrapGuard(v))
-		case aop.GuardConstructor:
-			if g := v(); g != nil {
-				out = append(out, aop.WrapGuard(g))
-			}
-		case func(*aop.ExecutionContext) (bool, error):
-			out = append(out, aop.GuardFunc(v))
-		}
-	}
-	return out
-}
-
-// convertInterceptors 将 interceptor 定义列表转换为可执行的 aop.InterceptorFunc 列表。
-func convertInterceptors(items []any) []aop.InterceptorFunc {
-	out := make([]aop.InterceptorFunc, 0, len(items))
-	for _, item := range items {
-		switch v := item.(type) {
-		case aop.InterceptorFunc:
-			out = append(out, v)
-		case aop.Interceptor:
-			out = append(out, aop.WrapInterceptor(v))
-		case aop.InterceptorConstructor:
-			if it := v(); it != nil {
-				out = append(out, aop.WrapInterceptor(it))
-			}
-		case func(*aop.ExecutionContext, aop.CallHandler) (interface{}, error):
-			out = append(out, aop.InterceptorFunc(v))
-		}
-	}
-	return out
-}
-
-// convertPipes 将 pipe 定义列表转换为可执行的 aop.PipeFunc 列表。
-func convertPipes(items []any) []aop.PipeFunc {
-	out := make([]aop.PipeFunc, 0, len(items))
-	for _, item := range items {
-		switch v := item.(type) {
-		case aop.PipeFunc:
-			out = append(out, v)
-		case aop.Pipe:
-			out = append(out, aop.WrapPipe(v))
-		case aop.PipeConstructor:
-			if p := v(); p != nil {
-				out = append(out, aop.WrapPipe(p))
-			}
-		case func(interface{}, interface{}) (interface{}, error):
-			out = append(out, aop.PipeFunc(v))
-		}
-	}
-	return out
-}
-
-// convertFilters 将 exception filter 定义列表转换为可执行的 aop.ExceptionFilterFunc 列表。
-func convertFilters(items []any) []aop.ExceptionFilterFunc {
-	out := make([]aop.ExceptionFilterFunc, 0, len(items))
-	for _, item := range items {
-		switch v := item.(type) {
-		case aop.ExceptionFilterFunc:
-			out = append(out, v)
-		case aop.ExceptionFilter:
-			out = append(out, func(exception any, ctx *aop.ExecutionContext) error { return v.Catch(exception, ctx) })
-		case aop.ExceptionFilterConstructor:
-			if f := v(); f != nil {
-				out = append(out, func(exception any, ctx *aop.ExecutionContext) error { return f.Catch(exception, ctx) })
-			}
-		case func(interface{}, *aop.ExecutionContext) error:
-			out = append(out, aop.ExceptionFilterFunc(v))
-		}
-	}
-	return out
 }

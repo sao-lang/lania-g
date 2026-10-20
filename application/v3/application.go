@@ -85,6 +85,8 @@ func New(root module.Module, opts Options) (*Application, error) {
 	reg.UseGlobalInterceptors(contribution.Interceptors...)
 	reg.UseGlobalPipes(contribution.Pipes...)
 	reg.UseGlobalFilters(contribution.Filters...)
+	// 范围化中间件来自模块的 Configure(consumer)，编译期按 route method/path 展开。
+	reg.SetScopedMiddlewares(loader.GetScopedMiddlewares()...)
 
 	if err := app.mountModuleAdapters(root); err != nil {
 		return nil, err

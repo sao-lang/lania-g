@@ -212,9 +212,10 @@ func validateStreamLikeReturns(def *MethodDefinition, returnTypes []reflect.Type
 	return fmt.Errorf("grpc stream method %s/%s should return only error or no value", def.Service, def.Method)
 }
 
-// inferMethodRequestType 只为 unary / server-streaming 推断首个请求消息；
+// InferMethodRequestType 只为 unary / server-streaming 推断首个请求消息；
 // client-stream 和 bidi-stream 没有“唯一请求体”，因此这里直接返回 nil。
-func inferMethodRequestType(def *MethodDefinition) (reflect.Type, error) {
+// InferMethodRequestType 根据方法声明与 handler 签名推断请求消息类型。
+func InferMethodRequestType(def *MethodDefinition) (reflect.Type, error) {
 	if def == nil || def.Receiver == nil || def.HandlerName == "" {
 		return nil, fmt.Errorf("invalid grpc method definition")
 	}

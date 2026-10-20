@@ -96,7 +96,7 @@ func (m *protocolModule) Declare(root *module.ModuleRef) error {
 			if !ok {
 				continue
 			}
-			routes := newRoutes(reg, instance)
+			routes := NewRoutes(reg, instance)
 			declarer.Declare(routes)
 			if err := routes.Err(); err != nil {
 				errs = append(errs, err)

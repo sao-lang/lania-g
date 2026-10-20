@@ -8,9 +8,27 @@
 # 首次需要拉取主题模块（使用 Go proxy）
 hugo mod tidy --source website
 
-# 启动预览（默认 http://localhost:1313）
-hugo server --source website
+# 启动预览（默认 http://localhost:1313/lania-g/）
+hugo server --source website --renderToMemory
 ```
+
+### 两个常见坑
+
+1. **必须加 `--renderToMemory`（或先删掉 `website/public/`）**
+   `hugo server` 默认把页面渲染到 `public/`。如果之前跑过 `hugo --source website` 构建，
+   Fast Render 会直接复用这些旧文件，而它们按生产 `baseURL`（`/lania-g/`）生成；
+   在 `http://localhost:1313/` 下就会表现为「二级页面 404、样式丢失」。
+2. **访问路径带 `/lania-g/`**
+   `baseURL` 含子路径时预览地址是 `http://localhost:1313/lania-g/`，根路径是 404。
+   想在根路径预览就覆盖 baseURL：
+
+   ```bash
+   hugo server --source website --renderToMemory --baseURL http://localhost:1313/
+   ```
+
+首页 CTA 按钮的渐变依赖 `--primary-hue` / `--primary-saturation` / `--primary-lightness`，
+它们是**角度**值（如 `231deg`），做色相偏移时必须写单位：`calc(var(--primary-hue) + 26deg)`。
+写成 `+ 26` 会让整条 `linear-gradient` 失效，按钮退化为白字透明底。
 
 ## 构建
 

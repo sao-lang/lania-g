@@ -50,6 +50,24 @@ type GlobalAOPRegistration struct {
 	Interceptors []aop.InterceptorFunc
 	Pipes        []aop.PipeFunc
 	Filters      []aop.ExceptionFilterFunc
+	// ScopedMiddlewares 来自模块的 MiddlewareConsumer 声明，按路由范围生效。
+	ScopedMiddlewares []aop.ScopedMiddleware
+}
+
+// ScopedMiddlewaresFor 返回命中给定方法 + 路径的中间件（按声明顺序）。
+//
+// 这些中间件会插在全局中间件之后、路由级中间件之前执行。
+func (g GlobalAOPRegistration) ScopedMiddlewaresFor(method, path string) []aop.MiddlewareFunc {
+	if len(g.ScopedMiddlewares) == 0 {
+		return nil
+	}
+	var out []aop.MiddlewareFunc
+	for _, scoped := range g.ScopedMiddlewares {
+		if scoped.ShouldApply(method, path) {
+			out = append(out, scoped.Middlewares...)
+		}
+	}
+	return out
 }
 
 // New 创建一个新的 Registry（编译期声明仓库）。
@@ -206,16 +224,31 @@ func (r *Registry) UseGlobalFilters(items ...aop.ExceptionFilterFunc) {
 	r.globalAOP.Filters = append(r.globalAOP.Filters, items...)
 }
 
+// SetScopedMiddlewares 以 items 整体替换当前的范围化中间件集合。
+//
+// 它与 UseGlobalMiddlewares 的区别是“带路由范围”：编译期按每条路由的
+// method/path 决定是否展开进该 handler 的 AOP 计划。
+// 采用替换语义，使声明阶段（含热加载）重复执行时不会累积重复声明。
+func (r *Registry) SetScopedMiddlewares(items ...aop.ScopedMiddleware) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.globalAOP.ScopedMiddlewares = append([]aop.ScopedMiddleware{}, items...)
+}
+
 // GetGlobalAOP 返回全局 AOP 声明的快照（切片均为拷贝）。
 func (r *Registry) GetGlobalAOP() GlobalAOPRegistration {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return GlobalAOPRegistration{
-		Middlewares:  append([]aop.MiddlewareFunc{}, r.globalAOP.Middlewares...),
-		Guards:       append([]aop.GuardFunc{}, r.globalAOP.Guards...),
-		Interceptors: append([]aop.InterceptorFunc{}, r.globalAOP.Interceptors...),
-		Pipes:        append([]aop.PipeFunc{}, r.globalAOP.Pipes...),
-		Filters:      append([]aop.ExceptionFilterFunc{}, r.globalAOP.Filters...),
+		Middlewares:       append([]aop.MiddlewareFunc{}, r.globalAOP.Middlewares...),
+		Guards:            append([]aop.GuardFunc{}, r.globalAOP.Guards...),
+		Interceptors:      append([]aop.InterceptorFunc{}, r.globalAOP.Interceptors...),
+		Pipes:             append([]aop.PipeFunc{}, r.globalAOP.Pipes...),
+		Filters:           append([]aop.ExceptionFilterFunc{}, r.globalAOP.Filters...),
+		ScopedMiddlewares: append([]aop.ScopedMiddleware{}, r.globalAOP.ScopedMiddlewares...),
 	}
 }
 

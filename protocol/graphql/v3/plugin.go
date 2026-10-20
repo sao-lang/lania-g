@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	coreadapter "github.com/sao-lang/lania-g/kernel/v3/adapter"
-	gqlbinding "github.com/sao-lang/lania-g/protocol/graphql/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/di"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	gqlbinding "github.com/sao-lang/lania-g/protocol/graphql/v3/binding"
 	gqlprotocol "github.com/sao-lang/lania-g/protocol/graphql/v3/protocol"
 )
 
@@ -162,25 +162,30 @@ func compileField(item *fieldOwnership, global registry.GlobalAOPRegistration) (
 
 	// GraphQL 字段既可挂在 resolver 级 AOP，也可挂在字段级 AOP；
 	// 这里按“resolver 在前、field 在后”合并，保持“越靠近 handler 越后执行”的直觉。
-	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{
-		Middlewares:  append(item.resolverDef.Middlewares, def.Middlewares...),
-		Guards:       append(item.resolverDef.Guards, def.Guards...),
-		Interceptors: append(item.resolverDef.Interceptors, def.Interceptors...),
-		Pipes:        append(item.resolverDef.Pipes, def.Pipes...),
-		ParamPipes:   coreadapter.MergeParamPipes(item.resolverDef.ParamPipes, def.ParamPipes),
-		Filters:      append(item.resolverDef.Filters, def.Filters...),
-	})
-
-	h.Meta.CompiledAOP = &plan
-	h.Meta.ParamPlans = buildParamPlan(h, def)
-	h.Meta.ModuleKey = item.moduleKey
-
 	method := string(def.FieldType)
 	// Object 字段在 runtime routeKey 里要用 resolver 名做 method 段，
 	// 这样才能和 Query/Mutation 命名空间区分开。
 	if def.FieldType == FieldTypeObject {
 		method = item.resolverDef.Name
 	}
+
+	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{
+		Middlewares:  append(item.resolverDef.Middlewares, def.Middlewares...),
+		Guards:       append(item.resolverDef.Guards, def.Guards...),
+		Interceptors: append(item.resolverDef.Interceptors, def.Interceptors...),
+		Pipes:        append(item.resolverDef.Pipes, def.Pipes...),
+		ParamPipes:   coreadapter.MergeParamPipes(item.resolverDef.ParamPipes, def.ParamPipes),
+		Filters:      append(item.resolverDef.Filters, def.Filters...),
+		RoutePath:    method + "." + def.FieldName,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	h.Meta.CompiledAOP = &plan
+	h.Meta.ParamPlans = buildParamPlan(h, def)
+	h.Meta.ModuleKey = item.moduleKey
+
 	routeKey := runtime.BuildRouteKey(gqlprotocol.Protocol, method, def.FieldName)
 	h.Meta.RouteKey = routeKey
 	h.Meta.Protocol = gqlprotocol.Protocol

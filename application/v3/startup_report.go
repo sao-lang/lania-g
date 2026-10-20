@@ -171,7 +171,7 @@ func (r *StartupReport) String() string {
 	lines := []string{
 		"startup report:",
 		fmt.Sprintf("  modules=%d adapters=%d protocols=%d routes=%d bindings=%d", r.ModuleCount, r.AdapterCount, r.ProtocolCount, r.RouteCount, r.BindingResolverCount),
-		fmt.Sprintf("  globalAOP middleware=%d guard=%d interceptor=%d pipe=%d filter=%d", r.GlobalAOP.Middlewares, r.GlobalAOP.Guards, r.GlobalAOP.Interceptors, r.GlobalAOP.Pipes, r.GlobalAOP.Filters),
+		fmt.Sprintf("  globalAOP middleware=%d guard=%d interceptor=%d pipe=%d filter=%d scopedMiddleware=%d", r.GlobalAOP.Middlewares, r.GlobalAOP.Guards, r.GlobalAOP.Interceptors, r.GlobalAOP.Pipes, r.GlobalAOP.Filters, r.GlobalAOP.ScopedMiddlewares),
 	}
 	if len(r.Integrations) > 0 {
 		lines = append(lines, fmt.Sprintf("  integrations=%s", strings.Join(r.Integrations, ", ")))

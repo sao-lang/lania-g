@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"reflect"
 
-	mqbinding "github.com/sao-lang/lania-g/protocol/mq/v3/binding"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
+	mqbinding "github.com/sao-lang/lania-g/protocol/mq/v3/binding"
 	mqprotocol "github.com/sao-lang/lania-g/protocol/mq/v3/protocol"
 )
 
@@ -124,7 +124,10 @@ func compileSubscription(item *routeOwnership, global registry.GlobalAOPRegistra
 		return nil, "", err
 	}
 
-	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{})
+	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{RoutePath: def.Topic})
+	if err != nil {
+		return nil, "", err
+	}
 	h.Meta.CompiledAOP = &plan
 
 	// MQ 参数名依赖 DSL 显式绑定，而不是从消息体 schema 自动推断。

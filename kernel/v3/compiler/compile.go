@@ -84,11 +84,12 @@ func Compile(moduleRef *module.ModuleRef, reg *registry.Registry, plugins ...Pro
 	diag.DeclarationCounts = reg.SnapshotDeclCounts()
 	diag.BindingResolverCount = len(reg.GetBindings())
 	diag.GlobalAOP = AOPDiagnostics{
-		Middlewares:  len(global.Middlewares),
-		Guards:       len(global.Guards),
-		Interceptors: len(global.Interceptors),
-		Pipes:        len(global.Pipes),
-		Filters:      len(global.Filters),
+		Middlewares:       len(global.Middlewares),
+		Guards:            len(global.Guards),
+		Interceptors:      len(global.Interceptors),
+		Pipes:             len(global.Pipes),
+		Filters:           len(global.Filters),
+		ScopedMiddlewares: len(global.ScopedMiddlewares),
 	}
 
 	compiled := &CompiledApp{

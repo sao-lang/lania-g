@@ -213,7 +213,7 @@ func (a *Adapter) registerDeclaredServices(server *grpc.Server) error {
 			fullMethod := "/" + service + "/" + methodName
 			switch def.Mode {
 			case RPCModeUnary:
-				reqType, err := inferMethodRequestType(def)
+				reqType, err := InferMethodRequestType(def)
 				if err != nil {
 					return err
 				}
@@ -222,7 +222,7 @@ func (a *Adapter) registerDeclaredServices(server *grpc.Server) error {
 					Handler:    a.makeMethodHandler(routeKey, fullMethod, service, methodName, reqType),
 				})
 			case RPCModeServerStream, RPCModeClientStream, RPCModeBidiStream:
-				reqType, err := inferMethodRequestType(def)
+				reqType, err := InferMethodRequestType(def)
 				if err != nil {
 					return err
 				}

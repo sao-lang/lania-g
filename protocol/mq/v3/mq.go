@@ -76,7 +76,7 @@ func (a *Adapter) Start() error {
 		return fmt.Errorf("mq adapter driver is nil")
 	}
 
-	consumers := collectConsumerConfigs(a.host.Registry())
+	consumers := CollectConsumerConfigs(a.host.Registry())
 	if len(consumers) == 0 {
 		a.started = true
 		return nil
@@ -204,11 +204,11 @@ func (a *Adapter) dispatchMessage(ctx stdctx.Context, cfg ConsumerConfig, msg *M
 	}
 }
 
-// collectConsumerConfigs 负责把 registry 里分散的 consumer/subscription 声明收拢成 transport 配置。
+// CollectConsumerConfigs 负责把 registry 里分散的 consumer/subscription 声明收拢成 transport 配置。
 // 其中：
 // - `consumers` 提供 consumer/group
 // - `subscriptions` 提供该 consumer 实际订阅哪些 topic
-func collectConsumerConfigs(reg *registry.Registry) []ConsumerConfig {
+func CollectConsumerConfigs(reg *registry.Registry) []ConsumerConfig {
 	if reg == nil {
 		return nil
 	}

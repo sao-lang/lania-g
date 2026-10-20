@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	mqadapter "github.com/sao-lang/lania-g/protocol/mq/v3"
 	kafkaintegration "github.com/sao-lang/lania-g/integrations/kafka/v3"
+	mqadapter "github.com/sao-lang/lania-g/protocol/mq/v3"
 
 	kgo "github.com/segmentio/kafka-go"
 )
@@ -30,6 +30,19 @@ type Config struct {
 	QueueCapacity  int
 	StartOffset    int64
 }
+
+// Reader 是 driver 消费消息所需的最小接口。
+//
+// 导出它是为了方便测试或接入自定义 transport：默认实现由 kafka-go 提供，
+// 也可以通过 WithReaderFactory 替换。
+type Reader interface {
+	FetchMessage(ctx stdctx.Context) (kgo.Message, error)
+	CommitMessages(ctx stdctx.Context, msgs ...kgo.Message) error
+	Close() error
+}
+
+// reader 是内部别名，保持既有代码可读性。
+type reader = Reader
 
 // Driver 是 MQ adapter 的 Kafka 驱动实现，用于为每个 consumer 打开一个 session。
 // 它只负责 transport 层的拉取与提交，不关心上层 runtime/binding/DSL 细节。
@@ -65,6 +78,22 @@ func NewWithReaderFactory(factory kafkaintegration.ReaderFactory, cfg Config) *D
 	}
 	return d
 }
+
+// WithReaderFactory 用自定义 Reader 工厂替换底层 kafka-go reader。
+//
+// 主要用于测试注入（例如内存 stub）或把 transport 换成别的实现；
+// 传入 nil 时保持当前工厂不变。
+func (d *Driver) WithReaderFactory(factory func(kgo.ReaderConfig) Reader) *Driver {
+	if d != nil && factory != nil {
+		d.newReader = factory
+	}
+	return d
+}
+
+// NewSession 用自定义 Reader 构造一个 mqadapter.Session。
+//
+// 自定义 driver 或测试可以直接复用它，无需依赖 kafka-go。
+func NewSession(r Reader) mqadapter.Session { return &session{reader: r} }
 
 // Open 根据 consumer 配置创建一个会话，并返回可轮询的 mqadapter.Session。
 // 单 topic 走 `Topic`，多 topic 走 `GroupTopics`，其余 reader 参数来自 driver 级默认配置。
@@ -125,13 +154,7 @@ func normalizeConfig(cfg Config) Config {
 	return cfg
 }
 
-// reader 抽出最小依赖接口，便于测试时替换底层 kafka-go Reader。
-type reader interface {
-	FetchMessage(ctx stdctx.Context) (kgo.Message, error)
-	CommitMessages(ctx stdctx.Context, msgs ...kgo.Message) error
-	Close() error
-}
-
+// session 封装一个 Reader，向上提供轮询与 ack 语义。
 type session struct {
 	reader reader
 }

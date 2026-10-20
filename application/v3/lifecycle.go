@@ -15,6 +15,17 @@ import (
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
+// Bootstrap 执行模块的 OnApplicationBootstrap 钩子。
+//
+// Run 会自动调用；只跑后台任务、不启动监听的应用可以手动调用。
+// 重复调用只会生效一次（内部有 bootstrapped 防重复）。
+func (a *Application) Bootstrap() error {
+	if a == nil {
+		return fmt.Errorf("application is nil")
+	}
+	return a.bootstrapLifecycle()
+}
+
 // bootstrapLifecycle 只会成功执行一次，之后由 `bootstrapped` 防重复。
 func (a *Application) bootstrapLifecycle() error {
 	if a.bootstrapped {

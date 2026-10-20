@@ -52,8 +52,20 @@ func TestRouteDeclaration(t *testing.T) {
 拿它做断言比解析日志稳定。
 {{< /callout >}}
 
-协议内部的参数解析、AOP 计划生成属于包内细节，测试放在协议包内（`package http`），
-这样可以直接使用未导出的 `newRoutes`，避免为测试扩大公开 API。
+协议内部的参数解析、AOP 计划生成属于包内细节。为了让源码目录保持干净，
+**所有测试都放在仓库根目录的 `test/` 模块**，通过 dot-import 访问被测包：
+
+```go
+package http_test
+
+import . "github.com/sao-lang/lania-g/protocol/http/v3"
+```
+
+{{< callout type="info" >}}
+`test/` 是一个独立的 Go module（已加入 `go.work`），按领域再分目录：
+`test/kernel`、`test/application`、`test/protocol`、`test/integrations`、`test/e2e`。
+需要构造声明的场景使用各协议导出的 `NewRoutes(reg, instance)`，无需把测试塞回源码目录。
+{{< /callout >}}
 
 ## 3. 端到端测试（最后一道）
 
@@ -91,14 +103,14 @@ err := conn.Invoke(ctx, "/AuthService/Register", req, resp)
 ## 4. 回归命令
 
 ```bash
-# 单模块
-cd protocol/http/v3 && go test ./...
+# 全量测试（含协议、集成、端到端）
+cd test && go test ./...
 
-# 全模块
-$mods = Get-ChildItem -Path application,cmd,integrations,kernel,protocol -Recurse -Filter go.mod |
-  ForEach-Object { $_.Directory.FullName }
-foreach ($m in $mods) { Push-Location $m; go build ./...; go test ./...; Pop-Location }
+# 单个领域
+cd test && go test ./protocol/http/...
 ```
+
+源码目录不再包含 `*_test.go`；`go build ./...` 在每个模块里只验证编译。
 
 ## 5. 测试小贴士
 
