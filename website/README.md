@@ -40,6 +40,19 @@ hugo --source website --minify
 hugo --source website --minify --cleanDestinationDir --panicOnWarning --logLevel warn
 ```
 
+## 部署（GitHub Pages）
+
+站点由 [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) 自动发布到
+**https://sao-lang.github.io/lania-g/**。
+
+- **一次性设置**：仓库 Settings → Pages → Source 选 **GitHub Actions**（之后再无人工步骤）
+- **触发条件**：推送到 `master` 且改动涉及 `website/**` 或该 workflow；也可在 Actions 页面手动 Run workflow
+- **产物**：构建结果只作为 Pages artifact 上传，不落仓库（`website/public/` 已 gitignore）
+- **构建环境**：Hugo extended `0.168.0`（版本写在 workflow 的 `HUGO_VERSION`）、Go 版本取自 `website/go.mod`、
+  `fetch-depth: 0` 供 `enableGitInfo` 使用；构建命令与上方「严格构建」一致
+- **`baseURL` 说明**：CI 用 `actions/configure-pages` 输出的站点地址覆盖 `baseURL`，
+  所以仓库改名或绑定自定义域名后无需改 `hugo.yaml`；本地预览仍用 `hugo.yaml` 里的值
+
 ## 目录
 
 ```text

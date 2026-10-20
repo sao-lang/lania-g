@@ -16,6 +16,7 @@ docs/
 
 | 需求 | 去哪 |
 |------|------|
+| 在线读文档 | <https://sao-lang.github.io/lania-g/>（由 `website/` 自动发布） |
 | 快速跑起来 | [website/getting-started](../website/content/docs/getting-started) |
 | 查某个 API 签名 | [website/reference](../website/content/docs/reference) |
 | 理解编译 / 运行期原理 | [website/internals](../website/content/docs/internals) |
