@@ -87,12 +87,11 @@ type CacheModule struct {
 
 func NewCacheModule() *CacheModule {
 	cache := NewCache()
-	token := reflect.TypeFor[*Cache]()
-	p, _ := di.ProviderFromInstanceWithToken(token, cache, di.Singleton)
+	p, _ := di.ProviderFromValue[*Cache](cache, di.Singleton)
 	return &CacheModule{
 		BaseModule: module.NewBaseModule(&module.ModuleMetadata{
 			Providers: []*di.Provider{p},
-			Exports:   []any{token},
+			Exports:   []any{di.TokenFor[*Cache]()},
 		}),
 		cache: cache,
 	}

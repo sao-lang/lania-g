@@ -528,10 +528,36 @@ func RegisterExisting[T any](c *Container, token interface{}, existing interface
 	c.RegisterExisting(token, existing)
 }
 
+// TokenFor 返回泛型参数 T 对应的 provider token（reflect.Type）。
+//
+// 业务代码因此不必为了取 token 而 import reflect：
+//
+//	token := di.TokenFor[*Store]()
+//	exports := []any{di.TokenFor[*Store]()}
+func TokenFor[T any]() reflect.Type {
+	return reflect.TypeFor[T]()
+}
+
+// ProviderFromValue 以泛型参数 T 作为 token 创建 Value provider。
+//
+// 它是 ProviderFromInstanceWithToken 的免 token 版本：
+//
+//	di.ProviderFromValue[*Store](store, di.Singleton)
+//
+// 等价于：
+//
+//	di.ProviderFromInstanceWithToken(di.TokenFor[*Store](), store, di.Singleton)
+//
+// 使用接口类型作为泛型参数时，token 是接口而非实例的动态类型，这正是
+// "按接口注册、按接口解析" 的常见写法。
+func ProviderFromValue[T any](instance T, scope Scope) (*Provider, error) {
+	return ProviderFromInstanceWithToken(TokenFor[T](), instance, scope)
+}
+
 // ProviderFromInstance 将一个实例转换为 Provider 描述。
 //
 // 注意：这里的语义是“Class provider”：token 为实例类型，UseClass 为该类型。
-// 如果你希望以常量值方式注册实例，应使用 ProviderFromInstanceWithToken。
+// 如果你希望以常量值方式注册实例，应使用 ProviderFromValue（或 ProviderFromInstanceWithToken）。
 func ProviderFromInstance[T any](instance T, scope Scope) (*Provider, error) {
 	typ := reflect.TypeOf(instance)
 	return &Provider{

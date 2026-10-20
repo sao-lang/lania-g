@@ -184,9 +184,28 @@ type Provider struct {
 	Scope       Scope
 }
 
+func TokenFor[T any]() reflect.Type
+func ProviderFromValue[T any](instance T, scope Scope) (*Provider, error)
 func ProviderFromInstance[T any](instance T, scope Scope) (*Provider, error)
 func ProviderFromInstanceWithToken[T any](token any, instance T, scope Scope) (*Provider, error)
 func ProviderFromFactory[T any](token any, factory func() (T, error), scope Scope) (*Provider, error)
+```
+
+| 函数 | Provider 类型 | token |
+|------|---------------|-------|
+| `TokenFor[T]()` | — | 返回 `reflect.TypeFor[T]()`，业务代码无需 import `reflect` |
+| `ProviderFromValue[T]` | Value | 泛型参数 `T`；`T` 可以是接口 |
+| `ProviderFromInstance[T]` | Class | 实例的动态类型（用于让容器反射构造） |
+| `ProviderFromInstanceWithToken[T]` | Value | 显式传入（按接口/命名 token 注册） |
+| `ProviderFromFactory[T]` | Factory | 显式传入 |
+
+```go
+// 推荐写法：免 token
+provider, _ := di.ProviderFromValue[*Store](store, di.Singleton)
+exports := []any{di.TokenFor[*Store]()}
+
+// 按接口注册
+provider, _ := di.ProviderFromValue[StoreContract](store, di.Singleton)
 ```
 
 ## 8. 作用域

@@ -22,12 +22,11 @@ type StoreModule struct {
 }
 
 func NewStoreModule(store *Store) *StoreModule {
-	token := reflect.TypeFor[*Store]()
-	provider, _ := di.ProviderFromInstanceWithToken(token, store, di.Singleton)
+	provider, _ := di.ProviderFromValue[*Store](store, di.Singleton)
 	return &StoreModule{
 		BaseModule: module.New(module.Metadata{
 			Providers: []*di.Provider{provider},
-			Exports:   []any{token}, // 只有导出的 token 才能被导入方注入
+			Exports:   []any{di.TokenFor[*Store]()}, // 只有导出的 token 才能被导入方注入
 		}),
 		store: store,
 	}

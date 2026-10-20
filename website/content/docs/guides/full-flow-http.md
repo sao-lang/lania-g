@@ -50,7 +50,7 @@ func NewStore() *Store { /* ... */ }
 ## 2. StoreModule：注册并导出 provider
 
 ```go
-var storeToken = reflect.TypeFor[*Store]()
+var storeToken = di.TokenFor[*Store]()
 
 type StoreModule struct {
 	*module.BaseModule
@@ -59,7 +59,7 @@ type StoreModule struct {
 
 func NewStoreModule() *StoreModule {
 	store := NewStore()
-	p, _ := di.ProviderFromInstanceWithToken(storeToken, store, di.Singleton)
+	p, _ := di.ProviderFromValue[*Store](store, di.Singleton)
 	return &StoreModule{
 		BaseModule: module.NewBaseModule(&module.ModuleMetadata{
 			Providers: []*di.Provider{p},

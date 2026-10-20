@@ -258,11 +258,11 @@ func (s *Store) CountAccounts() int {
 
 // StoreModule 把 Store 作为 provider 导出给其他模块。
 func StoreModule(store *Store) module.Module {
-	token := reflect.TypeFor[*Store]()
-	provider, _ := di.ProviderFromInstanceWithToken(token, store, di.Singleton)
+	// 免 reflect：ProviderFromValue 以泛型参数 *Store 作为 token。
+	provider, _ := di.ProviderFromValue[*Store](store, di.Singleton)
 	return module.New(module.Metadata{
 		Providers: []*di.Provider{provider},
-		Exports:   []any{token},
+		Exports:   []any{di.TokenFor[*Store]()},
 	})
 }
 

@@ -5,7 +5,6 @@ package main
 import (
 	"errors"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -482,7 +481,7 @@ func main() {
 
 	// 这个 demo 故意保留 provider 连接与共享监听集成，
 	// 以便同时展示 gateway 归属、DI，以及挂载到 HTTP 上的 socket.io 行为。
-	pStore, err := di.ProviderFromInstanceWithToken(reflect.TypeFor[*memoryStore](), store, di.Singleton)
+	pStore, err := di.ProviderFromValue[*memoryStore](store, di.Singleton)
 	if err != nil {
 		panic(err)
 	}

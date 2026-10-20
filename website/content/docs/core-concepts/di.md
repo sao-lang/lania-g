@@ -10,17 +10,26 @@ next: /docs/core-concepts/compile-runtime
 ## 1. 三种注册方式
 
 ```go
-// 1) 值 / 实例
-p, _ := di.ProviderFromInstanceWithToken(token, instance, di.Singleton)
+// 1) 值 / 实例（推荐：免 token）
+p, _ := di.ProviderFromValue[*Store](store, di.Singleton)
+
+// 需要自定义 token（例如按接口注册）时用带 token 的版本
+p, _ := di.ProviderFromInstanceWithToken(di.TokenFor[StoreContract](), store, di.Singleton)
 
 // 2) 构造函数
-p := di.ProviderFromFactory(token, func(c *di.Container) (any, error) {
+p := di.ProviderFromFactory(di.TokenFor[*Service](), func() (*Service, error) {
 	return NewService(), nil
 }, di.Singleton)
 
-// 3) 类型（由容器反射构造）
-p := di.ProviderFromType(reflect.TypeFor[*Service](), di.Transient)
+// 3) 类型（由容器反射构造实例）
+p, _ := di.ProviderFromInstance[*Service](&Service{}, di.Transient)
 ```
+
+{{< callout type="info" >}}
+`di.TokenFor[T]()` 等价于 `reflect.TypeFor[T]()`，业务代码因此不必 import `reflect`。
+`ProviderFromValue[T]` 与 `ProviderFromInstanceWithToken(TokenFor[T](), ...)` 完全等价，
+区别只是省掉了 token 参数。
+{{< /callout >}}
 
 ## 2. 作用域
 
@@ -32,10 +41,22 @@ p := di.ProviderFromType(reflect.TypeFor[*Service](), di.Transient)
 
 ## 3. token 约定
 
-框架内部统一用 `reflect.Type` 作为 token：
+框架内部统一用 `reflect.Type` 作为 token。业务代码不需要 import `reflect`：
 
 ```go
-typeToken := reflect.TypeFor[*MemoryStore]()
+token := di.TokenFor[*MemoryStore]()   // 等价于 reflect.TypeFor[*MemoryStore]()
+```
+
+完整例子（注册 + 导出）：
+
+```go
+func StoreModule(store *Store) module.Module {
+	provider, _ := di.ProviderFromValue[*Store](store, di.Singleton)
+	return module.New(module.Metadata{
+		Providers: []*di.Provider{provider},
+		Exports:   []any{di.TokenFor[*Store]()},
+	})
+}
 ```
 
 泛型便捷方法：

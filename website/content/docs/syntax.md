@@ -15,9 +15,10 @@ module.AsGlobal(module.Metadata{...})
 module.ForwardRef(func() module.Module { ... })   // 打破循环引用
 
 // Provider
-di.ProviderFromInstance(instance)
-di.ProviderFromInstanceWithToken(reflect.TypeFor[T](), instance, di.Singleton)
+di.ProviderFromValue[T](instance, di.Singleton)   // 免 token（推荐）
+di.ProviderFromInstanceWithToken(token, instance, di.Singleton)
 di.ProviderFromFactory(token, func() (T, error) { ... }, di.Singleton)
+di.TokenFor[T]()                                   // 取 token，无需 import reflect
 
 // 作用域
 di.Singleton / di.Transient / di.Request
