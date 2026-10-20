@@ -152,9 +152,57 @@ func (s *Store) Login(username, password string) (string, accountView, error) {
 	return "", accountView{}, aop.UnauthorizedException("账号或密码错误")
 }
 
-// AccountByToken 按 token 查账号。
-func (s *Store) AccountByToken(token string) (account, bool) {
+// ResetPassword 重置指定账号的密码（忘记密码场景）。
+//
+// demo 环境没有邮件/验证码通道，因此只校验账号存在；
+// 重置成功后让该账号已签发的会话全部失效，避免旧 token 继续可用。
+func (s *Store) ResetPassword(username, newPassword string) (accountView, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := range s.accounts {
+		if strings.EqualFold(s.accounts[i].Username, username) {
+			s.accounts[i].Password = newPassword
+			s.dropSessionsLocked(s.accounts[i].ID)
+			return s.accounts[i].view(), nil
+		}
+	}
+
+	return accountView{}, aop.NotFoundException("账号不存在")
+}
+
+// ChangePassword 校验原密码后更新密码；原密码错误时返回 400。
+func (s *Store) ChangePassword(accountID int, oldPassword, newPassword string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := range s.accounts {
+		if s.accounts[i].ID != accountID {
+			continue
+		}
+		if s.accounts[i].Password != oldPassword {
+			return aop.BadRequestException("原密码不正确")
+		}
+		s.accounts[i].Password = newPassword
+		return nil
+	}
+
+	return aop.NotFoundException("账号不存在")
+}
+
+// dropSessionsLocked 清理某个账号的全部会话；调用方必须已持有 s.mu。
+func (s *Store) dropSessionsLocked(accountID int) {
+	kept := s.sessions[:0]
+	for _, item := range s.sessions {
+		if item.AccountID != accountID {
+			kept = append(kept, item)
+		}
+	}
+	s.sessions = kept
+}
+
+// AccountByToken 按 token 查账号。
+func (s *Store) AccountByToken(token string) (account, bool) {	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for _, item := range s.sessions {
@@ -279,6 +327,16 @@ type registerRequest struct {
 type loginRequest struct {
 	Username string `json:"username" validate:"required"`
 	Password string `json:"password" validate:"required"`
+}
+
+type resetPasswordRequest struct {
+	Username    string `json:"username" validate:"required,min=3"`
+	NewPassword string `json:"newPassword" validate:"required,min=6"`
+}
+
+type changePasswordRequest struct {
+	OldPassword string `json:"oldPassword" validate:"required"`
+	NewPassword string `json:"newPassword" validate:"required,min=6"`
 }
 
 type createUserRequest struct {
@@ -523,7 +581,8 @@ func envelopeExceptionFilter(exception interface{}, ctx *aop.ExecutionContext) e
 // isPublicRoute 判断当前路由是否允许匿名访问。
 func isPublicRoute(routeKey string) bool {
 	switch routeKey {
-	case "http:GET:/", "http:POST:/auth/login", "http:POST:/auth/register":
+	case "http:GET:/", "http:POST:/auth/login", "http:POST:/auth/register",
+		"http:POST:/auth/forgot-password":
 		return true
 	default:
 		return false
@@ -728,6 +787,54 @@ func (c *AuthController) Me(args meArgs) (any, error) {
 	return acc.view(), nil
 }
 
+type forgotPasswordArgs struct {
+	Ctx  httpbinding.Context
+	Body httpbinding.Body[resetPasswordRequest]
+}
+
+// ForgotPassword 重置账号密码（演示环境不做邮件验证，只校验账号存在）。
+func (c *AuthController) ForgotPassword(args forgotPasswordArgs) (any, error) {
+	req := args.Body.Value
+	if strings.TrimSpace(req.Username) == "" {
+		return nil, aop.BadRequestException("username 不能为空")
+	}
+	if len(strings.TrimSpace(req.NewPassword)) < 6 {
+		return nil, aop.BadRequestException("password 长度不能少于 6 位")
+	}
+
+	account, err := c.Store.ResetPassword(req.Username, req.NewPassword)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"account": account, "message": "密码已重置，请使用新密码登录"}, nil
+}
+
+type changePasswordArgs struct {
+	Ctx  httpbinding.Context
+	Body httpbinding.Body[changePasswordRequest]
+}
+
+// ChangePassword 更新当前登录账号的密码。
+func (c *AuthController) ChangePassword(args changePasswordArgs) (any, error) {
+	hc, ok := args.Ctx.(*httpbinding.HttpContext)
+	if !ok || hc == nil {
+		return nil, aop.InternalServerErrorException("request context unavailable")
+	}
+	acc, ok := currentAccountFromContext(hc)
+	if !ok {
+		return nil, aop.UnauthorizedException("未登录")
+	}
+
+	req := args.Body.Value
+	if len(strings.TrimSpace(req.NewPassword)) < 6 {
+		return nil, aop.BadRequestException("password 长度不能少于 6 位")
+	}
+	if err := c.Store.ChangePassword(acc.ID, req.OldPassword, req.NewPassword); err != nil {
+		return nil, err
+	}
+	return map[string]any{"account": acc.view(), "message": "密码已更新"}, nil
+}
+
 // Declare 声明认证路由。
 func (c *AuthController) Declare(r *httpadapter.Routes) {
 	r.Prefix("/auth").
@@ -749,7 +856,20 @@ func (c *AuthController) Declare(r *httpadapter.Routes) {
 		Description("返回当前登录账号。").
 		Tags("auth").
 		Security("bearerAuth").
-		ResponseEnvelope(apiEnvelope{}, "data")
+		ResponseEnvelope(apiEnvelope{}, "data").
+		Post("/forgot-password", c.ForgotPassword).
+		Summary("Forgot Password").
+		Description("忘记密码：校验账号存在后重置密码。").
+		Tags("auth").
+		ResponseEnvelope(apiEnvelope{}, "data").
+		ErrorResponse(http.StatusNotFound, "账号不存在").
+		Post("/change-password", c.ChangePassword).
+		Summary("Change Password").
+		Description("修改当前登录账号的密码。").
+		Tags("auth").
+		Security("bearerAuth").
+		ResponseEnvelope(apiEnvelope{}, "data").
+		ErrorResponse(http.StatusBadRequest, "原密码不正确")
 }
 
 // UserController 演示受保护接口（控制器级拦截器 + 全局过滤器）。
@@ -919,6 +1039,19 @@ func currentAccountFromContext(hc *httpbinding.HttpContext) (account, bool) {
 	return acc, ok
 }
 
+// newControllerProvider 把已装配好的控制器注册为单例工厂 provider，
+// 让运行时按 token 取到同一个带依赖的实例。
+func newControllerProvider(controller any) *di.Provider {
+	return &di.Provider{
+		Token: reflect.TypeOf(controller),
+		Type:  di.ProviderTypeFactory,
+		UseFactory: func() (any, error) {
+			return controller, nil
+		},
+		Scope: di.Singleton,
+	}
+}
+
 func main() {
 	store := NewStore()
 
@@ -944,7 +1077,8 @@ func main() {
 		},
 	)
 
-	// 控制器传零值即可：字段注入会从模块容器补齐 *Store。
+	// 控制器显式装配 *Store 并注册为工厂 provider：路由 handler 由独立的 route/root 容器解析，
+	// 依赖模块容器对零值控制器做字段注入会在实际请求中拿到 nil。
 	root := module.New(module.Metadata{
 		Imports: []module.Module{
 			httpModule,
@@ -952,11 +1086,17 @@ func main() {
 			StoreModule(store),
 			NewAccessScopeModule(),
 		},
+		Providers: []*di.Provider{
+			newControllerProvider(&SystemController{Store: store}),
+			newControllerProvider(&AuthController{Store: store}),
+			newControllerProvider(&UserController{Store: store}),
+			newControllerProvider(&AdminController{Store: store}),
+		},
 		Controllers: []any{
-			&SystemController{},
-			&AuthController{},
-			&UserController{},
-			&AdminController{},
+			&SystemController{Store: store},
+			&AuthController{Store: store},
+			&UserController{Store: store},
+			&AdminController{Store: store},
 		},
 	})
 
