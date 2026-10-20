@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	coreadapter "github.com/sao-lang/lania-g/kernel/v3/adapter"
+	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 )
 
@@ -51,12 +52,12 @@ type Routes struct {
 }
 
 type aopScope struct {
-	guards       []any
-	interceptors []any
-	middlewares  []any
-	pipes        []any
-	filters      []any
-	paramPipes   map[int][]any
+	guards       []aop.Guard
+	interceptors []aop.Interceptor
+	middlewares  []aop.Middleware
+	pipes        []aop.Pipe
+	filters      []aop.ExceptionFilter
+	paramPipes   map[int][]aop.Pipe
 }
 
 type routeDraft struct {
@@ -94,47 +95,51 @@ func (r *Routes) Prefix(prefix string) *Routes {
 // UseGuards 声明守卫。
 //
 // 出现在第一条路由之前作用于整个控制器，之后作用于当前路由。
-func (r *Routes) UseGuards(items ...any) *Routes {
+//
+// 参数是 `aop.Guard` 接口：`aop.GuardFunc` 已实现它，因此具名函数类型可直接传入；
+// 裸函数需要显式转换 `aop.GuardFunc(fn)`，这样签名错误在编译期就会暴露。
+// 延迟构造器用 `aop.GuardFactory(ctor)` 包装。
+func (r *Routes) UseGuards(guards ...aop.Guard) *Routes {
 	s := r.scopeOrCurrent("UseGuards")
-	s.guards = append(s.guards, items...)
+	s.guards = append(s.guards, guards...)
 	return r
 }
 
 // UseInterceptors 声明拦截器。
-func (r *Routes) UseInterceptors(items ...any) *Routes {
+func (r *Routes) UseInterceptors(interceptors ...aop.Interceptor) *Routes {
 	s := r.scopeOrCurrent("UseInterceptors")
-	s.interceptors = append(s.interceptors, items...)
+	s.interceptors = append(s.interceptors, interceptors...)
 	return r
 }
 
 // UseMiddlewares 声明中间件。
-func (r *Routes) UseMiddlewares(items ...any) *Routes {
+func (r *Routes) UseMiddlewares(middlewares ...aop.Middleware) *Routes {
 	s := r.scopeOrCurrent("UseMiddlewares")
-	s.middlewares = append(s.middlewares, items...)
+	s.middlewares = append(s.middlewares, middlewares...)
 	return r
 }
 
 // UsePipes 声明管道。
-func (r *Routes) UsePipes(items ...any) *Routes {
+func (r *Routes) UsePipes(pipes ...aop.Pipe) *Routes {
 	s := r.scopeOrCurrent("UsePipes")
-	s.pipes = append(s.pipes, items...)
+	s.pipes = append(s.pipes, pipes...)
 	return r
 }
 
 // UseFilters 声明异常过滤器。
-func (r *Routes) UseFilters(items ...any) *Routes {
+func (r *Routes) UseFilters(filters ...aop.ExceptionFilter) *Routes {
 	s := r.scopeOrCurrent("UseFilters")
-	s.filters = append(s.filters, items...)
+	s.filters = append(s.filters, filters...)
 	return r
 }
 
 // UseParamPipes 为指定参数位置声明管道。
-func (r *Routes) UseParamPipes(paramIndex int, items ...any) *Routes {
+func (r *Routes) UseParamPipes(paramIndex int, pipes ...aop.Pipe) *Routes {
 	s := r.scopeOrCurrent("UseParamPipes")
 	if s.paramPipes == nil {
-		s.paramPipes = make(map[int][]any)
+		s.paramPipes = make(map[int][]aop.Pipe)
 	}
-	s.paramPipes[paramIndex] = append(s.paramPipes[paramIndex], items...)
+	s.paramPipes[paramIndex] = append(s.paramPipes[paramIndex], pipes...)
 	return r
 }
 
@@ -356,12 +361,12 @@ func (r *Routes) build(draft *routeDraft) *RouteDefinition {
 		Path:         r.prefix + draft.path,
 		Controller:   r.controller,
 		MethodName:   draft.methodName,
-		Guards:       append(append([]any{}, r.scope.guards...), draft.aop.guards...),
-		Interceptors: append(append([]any{}, r.scope.interceptors...), draft.aop.interceptors...),
-		Middlewares:  append(append([]any{}, r.scope.middlewares...), draft.aop.middlewares...),
-		Pipes:        append(append([]any{}, r.scope.pipes...), draft.aop.pipes...),
+		Guards:       append(append([]aop.Guard{}, r.scope.guards...), draft.aop.guards...),
+		Interceptors: append(append([]aop.Interceptor{}, r.scope.interceptors...), draft.aop.interceptors...),
+		Middlewares:  append(append([]aop.Middleware{}, r.scope.middlewares...), draft.aop.middlewares...),
+		Pipes:        append(append([]aop.Pipe{}, r.scope.pipes...), draft.aop.pipes...),
 		ParamPipes:   coreadapter.MergeParamPipes(r.scope.paramPipes, draft.aop.paramPipes),
-		Filters:      append(append([]any{}, r.scope.filters...), draft.aop.filters...),
+		Filters:      append(append([]aop.ExceptionFilter{}, r.scope.filters...), draft.aop.filters...),
 		StatusCode:   draft.statusCode,
 		Headers:      copyHeaders(draft.headers),
 		Redirect:     draft.redirect,

@@ -35,8 +35,11 @@ type Config struct {
 	Renderer httpbinding.Renderer
 	// MaxBodyBytes 限制请求体大小，0 表示默认 10MB。
 	MaxBodyBytes int64
-	// Middlewares 是 adapter 层中间件，围绕 runtime 执行形成 gin 风格链路。
-	Middlewares []func(*httpbinding.HttpContext) error
+	// PreRouting 是路由匹配之前执行的传输层中间件（gin 风格）。
+	//
+	// 只用于必须早于 runtime 的逻辑（例如给 mounted handler 加 header、wire-level 认证）。
+	// 业务横切逻辑请使用 AOP Middleware —— 见 docs/LAYERING.md。
+	PreRouting []func(*httpbinding.HttpContext) error
 	// CORS 非空时启用内建 CORS。
 	CORS *CorsConfig
 	// Helmet 非空时启用内建安全响应头。

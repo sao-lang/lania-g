@@ -91,8 +91,8 @@ func (m *integrationModule) Init() error {
 		coreintegration.NewBindingEntry("ResilienceFactory", reflect.TypeFor[Factory]()),
 	)
 	m.Context().Use(module.AOP{
-		Middlewares:  []aop.MiddlewareFunc{Middleware()},
-		Interceptors: []aop.InterceptorFunc{Interceptor()},
+		Middlewares:  []aop.Middleware{Middleware()},
+		Interceptors: []aop.Interceptor{Interceptor()},
 	})
 	return nil
 }

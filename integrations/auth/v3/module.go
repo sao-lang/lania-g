@@ -94,7 +94,7 @@ func (m *integrationModule) Init() error {
 	)
 	registerBindings(reg)
 	// 认证中间件作为模块级全局 AOP 贡献给应用。
-	m.Context().Use(module.AOP{Middlewares: []aop.MiddlewareFunc{Middleware()}})
+	m.Context().Use(module.AOP{Middlewares: []aop.Middleware{Middleware()}})
 	return nil
 }
 

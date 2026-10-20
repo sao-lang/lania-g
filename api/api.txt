@@ -1,0 +1,2096 @@
+# lania-g exported API snapshot
+# 由 tools/apicheck 生成，请勿手工编辑。更新方式：go run ./tools/cmd/apicheck -update
+
+github.com/sao-lang/lania-g/application/v3
+  func  New(root github.com/sao-lang/lania-g/kernel/v3/module.Module, opts Options) (*Application, error)
+  method Application.Adapter(adapterID string) (github.com/sao-lang/lania-g/kernel/v3/adapter.Adapter, bool)
+  method Application.Bootstrap() error
+  method Application.Diagnostics() *github.com/sao-lang/lania-g/kernel/v3/compiler.CompileDiagnostics
+  method Application.GraphDiagnostics() *github.com/sao-lang/lania-g/kernel/v3/graph.Diagnostics
+  method Application.Handle(pattern string, handler net/http.Handler)
+  method Application.HotLoad(mod github.com/sao-lang/lania-g/kernel/v3/module.Module) error
+  method Application.InjectionProblems() []github.com/sao-lang/lania-g/kernel/v3/di.InjectionRecord
+  method Application.LastCompileDiagnostics() *github.com/sao-lang/lania-g/kernel/v3/compiler.CompileDiagnostics
+  method Application.Listen(addr string) error
+  method Application.ModuleRef() *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef
+  method Application.MountHTTP(pattern string, handler net/http.Handler) error
+  method Application.RegisterPlugin(plugins ...github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin)
+  method Application.Registry() *github.com/sao-lang/lania-g/kernel/v3/registry.Registry
+  method Application.Run() error
+  method Application.Runtime() *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime
+  method Application.StartupReport() (*StartupReport, error)
+  method Application.Static(prefix string, root string)
+  method Application.Stop() error
+  method Application.UseGlobalFilters(fs ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter)
+  method Application.UseGlobalGuards(gs ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard)
+  method Application.UseGlobalInterceptors(is ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor)
+  method Application.UseGlobalMiddlewares(mws ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware)
+  method Application.UseGlobalPipes(ps ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe)
+  method StartupReport.String() string
+  type  AdapterStartupReport struct{ID string "json:\"id\""}
+  type  Application struct{runtime *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime; registry *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; moduleLoader *github.com/sao-lang/lania-g/kernel/v3/module.ModuleLoader; moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef; adapters map[string]github.com/sao-lang/lania-g/kernel/v3/adapter.Adapter; adapterList []github.com/sao-lang/lania-g/kernel/v3/adapter.Adapter; compiled *github.com/sao-lang/lania-g/kernel/v3/compiler.CompiledApp; lastDiagnostics *github.com/sao-lang/lania-g/kernel/v3/compiler.CompileDiagnostics; plugins []github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin; startupReporter io.Writer; bootstrapped bool; prepared bool; mounted bool; stopCh chan struct{}; stopOnce sync.Once}
+  type  ModuleStartupReport struct{Name string "json:\"name\""; Package string "json:\"package\""; Imports int "json:\"imports\""; Providers int "json:\"providers\""; Controllers int "json:\"controllers\""; Resolvers int "json:\"resolvers\""; Global bool "json:\"global\""}
+  type  Options struct{Logger io.Writer; StrictInjection bool}
+  type  ProtocolStartupReport struct{Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol "json:\"protocol\""; PluginID string "json:\"pluginId\""; Declarations int "json:\"declarations\""; Routes int "json:\"routes\""; RouteContainers int "json:\"routeContainers\""; OwnerModules []github.com/sao-lang/lania-g/kernel/v3/compiler.ModuleRouteDiagnostics "json:\"ownerModules\""}
+  type  StartupReport struct{ModuleCount int "json:\"moduleCount\""; AdapterCount int "json:\"adapterCount\""; ProtocolCount int "json:\"protocolCount\""; RouteCount int "json:\"routeCount\""; BindingResolverCount int "json:\"bindingResolverCount\""; GlobalAOP github.com/sao-lang/lania-g/kernel/v3/compiler.AOPDiagnostics "json:\"globalAOP\""; RegistryFallbacks []github.com/sao-lang/lania-g/kernel/v3/compiler.RegistryFallbackDiagnostics "json:\"registryFallbacks\""; RuntimeFallbacks []github.com/sao-lang/lania-g/kernel/v3/compiler.RuntimeFallbackDiagnostics "json:\"runtimeFallbacks\""; Modules []ModuleStartupReport "json:\"modules\""; Adapters []AdapterStartupReport "json:\"adapters\""; Protocols []ProtocolStartupReport "json:\"protocols\""; Integrations []string "json:\"integrations\""; Warnings []string "json:\"warnings\""}
+
+github.com/sao-lang/lania-g/integrations/auth/v3
+  const ContextKeyPrincipal ctxKey
+  const ContextKeyTenant ctxKey
+  const DefaultAPIKeyHeader untyped string
+  const DefaultAuthorizationHeader untyped string
+  const DefaultName untyped string
+  const DefaultSessionHeader untyped string
+  const DefaultTenantHeader untyped string
+  const MetadataKeyPrincipal untyped string
+  const MetadataKeyTenant untyped string
+  func  ChainGuards(guards ...github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc) github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc
+  func  ClaimsValidators() map[string]ClaimsValidator
+  func  Current(hc *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) *Principal
+  func  CurrentTenant(hc *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) string
+  func  DefaultConfig() Config
+  func  Middleware() github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Service, error)
+  func  NewExampleIdentityProvider(name string, type_ string) *ExampleIdentityProvider
+  func  RequireAllRoles(roles ...string) github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc
+  func  RequireAnyRole(roles ...string) github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc
+  func  RequireAuthenticated() github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc
+  func  RequireClaims(claims map[string]interface{}) github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc
+  func  RequireRoles(roles ...string) github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc
+  func  RequireTenant() github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc
+  func  ServiceToken(name string) string
+  method ExampleIdentityProvider.Authenticate(token string) (*Principal, error)
+  method ExampleIdentityProvider.Name() string
+  method ExampleIdentityProvider.Type() string
+  method Service.Authenticate(hc *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) (*Principal, error)
+  method Service.Config() Config
+  method Service.Default() *Service
+  method Service.GetIdentityProvider(name string) IdentityProvider
+  method Service.New(cfg Config) (*Service, error)
+  method Service.RegisterIdentityProvider(name string, provider IdentityProvider)
+  type  ClaimsValidator func(claims map[string]any) error
+  type  Config struct{Name string; JWTSecret string; JWTIssuer string; JWTAudience string; AuthorizationHeader string; APIKeyHeader string; SessionHeader string; TenantHeader string; APIKeys map[string]Principal; Sessions map[string]Principal; Clock func() time.Time; IdentityProviders map[string]IdentityProviderConfig; ClaimsValidators map[string]ClaimsValidator}
+  type  ExampleIdentityProvider struct{name string; type_ string}
+  type  Factory interface{Default() *Service; New(cfg Config) (*Service, error)}
+  type  IdentityProvider interface{Authenticate(token string) (*Principal, error); Name() string; Type() string}
+  type  IdentityProviderConfig struct{Type string; Endpoint string; ClientID string; ClientSecret string; Scopes []string; RedirectURI string}
+  type  InjectClaims struct{Value map[string]any}
+  type  InjectPrincipal struct{*Principal}
+  type  InjectTenant struct{Value string}
+  type  Principal struct{Subject string; TenantID string; Roles []string; Claims map[string]any; AuthType string; Token string; IssuedAt time.Time; ExpiresAt time.Time}
+  type  PrincipalNamer interface{PrincipalName() string}
+  type  PrincipalRef struct{*Principal; _ *N}
+  type  Service struct{config Config; mu sync.RWMutex; providers map[string]IdentityProvider}
+
+github.com/sao-lang/lania-g/integrations/cache/v3
+  const Memory CacheType
+  const Redis CacheType
+  func  CacheToken(name string) string
+  func  Decorate(target any, cache Cache, opts DecoratorOptions) any
+  func  DecorateE(target any, cache Cache, opts DecoratorOptions) (any, error)
+  func  DefaultKeyBuilder(prefix string) KeyBuilder
+  func  ExpandKeyTemplate(template string, args []reflect.Value) string
+  func  Get[T any](cache Cache, key string) (T, error)
+  func  Invalidate(cache Cache, keys ...string) error
+  func  InvalidatePattern(cache Cache, patterns ...string) error
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  Must[T any](cache Cache, key string) T
+  func  NewMemoryCache() *MemoryCache
+  func  NewRedisCache(config *RedisConfig) *RedisCache
+  func  Remember[T any](cache Cache, key string, policy Policy, loader func() (T, error)) (T, error)
+  func  SetValue[T any](cache Cache, key string, value T) error
+  func  TemplateKeyBuilder(template string) KeyBuilder
+  method DefaultCache.CacheName() string
+  method MemoryCache.Close() error
+  method MemoryCache.Del(key string) error
+  method MemoryCache.DelKeys(keys ...string) error
+  method MemoryCache.Exists(key string) (bool, error)
+  method MemoryCache.Expire(key string, expiration time.Duration) error
+  method MemoryCache.FlushDB() error
+  method MemoryCache.Get(key string) (interface{}, error)
+  method MemoryCache.GetBool(key string) (bool, error)
+  method MemoryCache.GetFloat64(key string) (float64, error)
+  method MemoryCache.GetInt(key string) (int, error)
+  method MemoryCache.GetInt64(key string) (int64, error)
+  method MemoryCache.GetJSON(key string, dest interface{}) error
+  method MemoryCache.GetString(key string) (string, error)
+  method MemoryCache.Keys(pattern string) ([]string, error)
+  method MemoryCache.Set(key string, value interface{}) error
+  method MemoryCache.SetEx(key string, value interface{}, expiration time.Duration) error
+  method MemoryCache.SetJSON(key string, value interface{}) error
+  method MemoryCache.SetJSONEx(key string, value interface{}, expiration time.Duration) error
+  method MemoryCache.TTL(key string) (time.Duration, error)
+  method RedisCache.Close() error
+  method RedisCache.Decr(key string) (int64, error)
+  method RedisCache.DecrBy(key string, decrement int64) (int64, error)
+  method RedisCache.Del(key string) error
+  method RedisCache.DelKeys(keys ...string) error
+  method RedisCache.Exists(key string) (bool, error)
+  method RedisCache.Expire(key string, expiration time.Duration) error
+  method RedisCache.FlushAll() error
+  method RedisCache.FlushDB() error
+  method RedisCache.Get(key string) (interface{}, error)
+  method RedisCache.GetBool(key string) (bool, error)
+  method RedisCache.GetFloat64(key string) (float64, error)
+  method RedisCache.GetInt(key string) (int, error)
+  method RedisCache.GetInt64(key string) (int64, error)
+  method RedisCache.GetJSON(key string, dest interface{}) error
+  method RedisCache.GetString(key string) (string, error)
+  method RedisCache.HDel(key string, fields ...string) error
+  method RedisCache.HExists(key string, field string) (bool, error)
+  method RedisCache.HGet(key string, field string) (interface{}, error)
+  method RedisCache.HGetAll(key string) (map[string]string, error)
+  method RedisCache.HGetString(key string, field string) (string, error)
+  method RedisCache.HMSet(key string, fields map[string]interface{}) error
+  method RedisCache.HSet(key string, field string, value interface{}) error
+  method RedisCache.Incr(key string) (int64, error)
+  method RedisCache.IncrBy(key string, increment int64) (int64, error)
+  method RedisCache.Keys(pattern string) ([]string, error)
+  method RedisCache.LLen(key string) (int, error)
+  method RedisCache.LPop(key string) (string, error)
+  method RedisCache.LPush(key string, values ...interface{}) error
+  method RedisCache.LRange(key string, start int, stop int) ([]string, error)
+  method RedisCache.Ping() error
+  method RedisCache.RPop(key string) (string, error)
+  method RedisCache.RPush(key string, values ...interface{}) error
+  method RedisCache.SAdd(key string, members ...interface{}) error
+  method RedisCache.SIsMember(key string, member interface{}) (bool, error)
+  method RedisCache.SMembers(key string) ([]string, error)
+  method RedisCache.SRem(key string, members ...interface{}) error
+  method RedisCache.Set(key string, value interface{}) error
+  method RedisCache.SetEx(key string, value interface{}, expiration time.Duration) error
+  method RedisCache.SetJSON(key string, value interface{}) error
+  method RedisCache.SetJSONEx(key string, value interface{}, expiration time.Duration) error
+  method RedisCache.SetNX(key string, value interface{}) (bool, error)
+  method RedisCache.TTL(key string) (time.Duration, error)
+  method RedisCache.ZAdd(key string, score float64, member interface{}) error
+  method RedisCache.ZRange(key string, start int, stop int) ([]string, error)
+  method RedisCache.ZRank(key string, member interface{}) (int, error)
+  method RedisCache.ZScore(key string, member interface{}) (float64, error)
+  type  Cache interface{Close() error; Del(key string) error; DelKeys(keys ...string) error; Exists(key string) (bool, error); Expire(key string, expiration time.Duration) error; FlushDB() error; Get(key string) (interface{}, error); GetBool(key string) (bool, error); GetFloat64(key string) (float64, error); GetInt(key string) (int, error); GetInt64(key string) (int64, error); GetJSON(key string, dest interface{}) error; GetString(key string) (string, error); Keys(pattern string) ([]string, error); Set(key string, value interface{}) error; SetEx(key string, value interface{}, expiration time.Duration) error; SetJSON(key string, value interface{}) error; SetJSONEx(key string, value interface{}, expiration time.Duration) error; TTL(key string) (time.Duration, error)}
+  type  CacheNamer interface{CacheName() string}
+  type  CacheRef struct{Cache; _ *N}
+  type  CacheType string
+  type  Config struct{Type CacheType; Name string; Redis *RedisConfig}
+  type  DecoratorOptions struct{Key string; KeyBuilder KeyBuilder; Policy Policy; Invalidate []string; InvalidatePatterns []string}
+  type  DefaultCache struct{}
+  type  Factory interface{CloseAll() error; Default() Cache; GetOrCreate(name string, cfg Config) (Cache, error); New(cfg Config) (Cache, error)}
+  type  InjectCache struct{Cache}
+  type  KeyBuilder func(args []reflect.Value) (string, error)
+  type  MemoryCache struct{mu sync.RWMutex; items map[string]*memoryItem; stop chan struct{}}
+  type  Policy struct{TTL time.Duration; SkipReadErrors bool; SkipWriteErrors bool; CacheNil bool}
+  type  RedisCache struct{pool *github.com/gomodule/redigo/redis.Pool}
+  type  RedisConfig struct{Name string; Host string; Port int; Password string; DB int; MaxIdle int; MaxActive int; IdleTimeout time.Duration; ReadTimeout time.Duration; WriteTimeout time.Duration}
+  type  RedisExtended interface{Decr(key string) (int64, error); DecrBy(key string, decrement int64) (int64, error); FlushAll() error; HDel(key string, fields ...string) error; HExists(key string, field string) (bool, error); HGet(key string, field string) (interface{}, error); HGetAll(key string) (map[string]string, error); HGetString(key string, field string) (string, error); HMSet(key string, fields map[string]interface{}) error; HSet(key string, field string, value interface{}) error; Incr(key string) (int64, error); IncrBy(key string, increment int64) (int64, error); LLen(key string) (int, error); LPop(key string) (string, error); LPush(key string, values ...interface{}) error; LRange(key string, start int, stop int) ([]string, error); Ping() error; RPop(key string) (string, error); RPush(key string, values ...interface{}) error; SAdd(key string, members ...interface{}) error; SIsMember(key string, member interface{}) (bool, error); SMembers(key string) ([]string, error); SRem(key string, members ...interface{}) error; SetNX(key string, value interface{}) (bool, error); ZAdd(key string, score float64, member interface{}) error; ZRange(key string, start int, stop int) ([]string, error); ZRank(key string, member interface{}) (int, error); ZScore(key string, member interface{}) (float64, error); Cache}
+
+github.com/sao-lang/lania-g/integrations/config/v3
+  const JSONFormat Format
+  const TOMLFormat Format
+  const YAMLFormat Format
+  const YMLFormat Format
+  func  Load(path string, target any) error
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  MustSection[T any](loader *Loader, key string) T
+  func  NewLoader(cfg Config) (*Loader, error)
+  func  ReadSection[T any](loader *Loader, key string) (T, error)
+  func  ReadValue[T any](loader *Loader, key string) (T, error)
+  method Loader.All() map[string]any
+  method Loader.Default() *Loader
+  method Loader.Get(key string) (any, bool)
+  method Loader.GetBool(key string, defaults ...bool) bool
+  method Loader.GetString(key string, defaults ...string) string
+  method Loader.LoadFile(path string) error
+  method Loader.LoadFiles(paths ...string) error
+  method Loader.LoadFromEnv(prefix string)
+  method Loader.LoadFromMap(data map[string]any)
+  method Loader.New(cfg Config) (*Loader, error)
+  method Loader.Paths() []string
+  method Loader.Save(path string, formats ...Format) error
+  method Loader.ToString(format Format) (string, error)
+  method Loader.Unmarshal(key string, dest any) error
+  type  Config struct{Files []string; EnvPrefix string; Data map[string]any}
+  type  Factory interface{Default() *Loader; New(cfg Config) (*Loader, error)}
+  type  Format string
+  type  Loader struct{data map[string]any; mu sync.RWMutex; paths []string}
+  type  Section struct{Value T}
+  type  Value struct{Value T}
+
+github.com/sao-lang/lania-g/integrations/es/v3
+  func  ClientToken(name string) string
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Client, error)
+  func  NewRepository[T any](client *Client, index string) *Repository[T]
+  method Client.Addresses() []string
+  method Client.Config() Config
+  method Client.Default() *Client
+  method Client.DoRequest(method string, path string, body interface{}) (*net/http.Response, error)
+  method Client.GetAddress() string
+  method Client.New(cfg Config) (*Client, error)
+  method DefaultClient.ESClientName() string
+  method Repository.BulkIndex(docs map[string]*T) error
+  method Repository.Create(doc *T) (string, error)
+  method Repository.Exists(id string) (bool, error)
+  method Repository.Get(id string) (*T, error)
+  method Repository.Index(id string, doc *T) error
+  method Repository.MatchAll() ([]*T, error)
+  method Repository.Search(query interface{}) ([]*T, error)
+  type  Client struct{addresses []string; username string; password string; http *net/http.Client}
+  type  ClientNamer interface{ESClientName() string}
+  type  ClientRef struct{*Client; _ *N}
+  type  Config struct{Name string; Addresses []string; Username string; Password string}
+  type  DefaultClient struct{}
+  type  Factory interface{Default() *Client; New(cfg Config) (*Client, error)}
+  type  InjectClient struct{*Client}
+  type  Repository struct{client *Client; index string}
+
+github.com/sao-lang/lania-g/integrations/events/v3
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Bus, error)
+  method Bus.Config() Config
+  method Bus.Default() *Bus
+  method Bus.Emit(ctx context.Context, event string, args ...interface{}) error
+  method Bus.EmitAsync(ctx context.Context, event string, args ...interface{})
+  method Bus.New(cfg Config) (*Bus, error)
+  method Bus.Off(event string)
+  method Bus.On(event string, handler Handler)
+  method Bus.Once(event string, handler Handler)
+  method Routes.On(event string, handler any) *Routes
+  method Routes.Once(event string, handler any) *Routes
+  type  Bus struct{mu sync.RWMutex; handlers map[string][]*subscription; cfg Config}
+  type  Config struct{Async bool}
+  type  Emitter interface{Emit(context.Context, string, ...interface{}) error; EmitAsync(context.Context, string, ...interface{})}
+  type  Factory interface{Default() *Bus; New(cfg Config) (*Bus, error)}
+  type  Handler func(context.Context, ...interface{}) error
+  type  Routes struct{receiver any; items []*routeItem}
+  type  Subscriber interface{Subscribe(*Routes)}
+
+github.com/sao-lang/lania-g/integrations/grpc/v3
+  func  ClientToken(name string) string
+  func  ConnToken(name string) string
+  func  Dial(cfg Config) (*google.golang.org/grpc.ClientConn, error)
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Client, error)
+  method Client.Close() error
+  method Client.Config() Config
+  method Client.Conn() *google.golang.org/grpc.ClientConn
+  method Client.Default() *Client
+  method Client.DialConn(cfg Config) (*google.golang.org/grpc.ClientConn, error)
+  method Client.Invoke(ctx context.Context, method string, args any, reply any, opts ...google.golang.org/grpc.CallOption) error
+  method Client.New(cfg Config) (*Client, error)
+  method Client.NewStream(ctx context.Context, desc *google.golang.org/grpc.StreamDesc, method string, opts ...google.golang.org/grpc.CallOption) (google.golang.org/grpc.ClientStream, error)
+  method Client.OnModuleDestroy() error
+  method DefaultClient.GRPCClientName() string
+  type  Client struct{cfg Config; conn *google.golang.org/grpc.ClientConn}
+  type  ClientNamer interface{GRPCClientName() string}
+  type  ClientRef struct{*Client; _ *N}
+  type  Config struct{Name string; Target string; DialTimeout time.Duration; Insecure bool; DialOptions []google.golang.org/grpc.DialOption; CallOptions []google.golang.org/grpc.CallOption}
+  type  ConnRef struct{*google.golang.org/grpc.ClientConn; _ *N}
+  type  DefaultClient struct{}
+  type  Factory interface{Default() *Client; DialConn(cfg Config) (*google.golang.org/grpc.ClientConn, error); New(cfg Config) (*Client, error); NewStream(ctx context.Context, desc *google.golang.org/grpc.StreamDesc, method string, opts ...google.golang.org/grpc.CallOption) (google.golang.org/grpc.ClientStream, error)}
+  type  InjectClient struct{*Client}
+  type  InjectConn struct{*google.golang.org/grpc.ClientConn}
+
+github.com/sao-lang/lania-g/integrations/http/v3
+  func  ClientToken(name string) string
+  func  DefaultConfig() Config
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Client, error)
+  func  WithAuthToken(token string) RequestOption
+  func  WithBasicAuth(username string, password string) RequestOption
+  func  WithHeader(key string, value string) RequestOption
+  func  WithHeaders(headers map[string]string) RequestOption
+  func  WithQueryParam(key string, value string) RequestOption
+  func  WithQueryParams(params map[string]string) RequestOption
+  method Client.AddErrorInterceptor(interceptor ErrorInterceptor)
+  method Client.AddRequestInterceptor(interceptor RequestInterceptor)
+  method Client.AddResponseInterceptor(interceptor ResponseInterceptor)
+  method Client.Config() Config
+  method Client.Default() *Client
+  method Client.Delete(url string, opts ...RequestOption) (Response, error)
+  method Client.Get(url string, opts ...RequestOption) (Response, error)
+  method Client.New(cfg Config) (*Client, error)
+  method Client.Patch(url string, body interface{}, opts ...RequestOption) (Response, error)
+  method Client.Post(url string, body interface{}, opts ...RequestOption) (Response, error)
+  method Client.Put(url string, body interface{}, opts ...RequestOption) (Response, error)
+  method Client.Raw() *github.com/go-resty/resty/v2.Client
+  method Client.Request(method string, url string, body interface{}, opts ...RequestOption) (Response, error)
+  method Client.SetBaseURL(url string)
+  method Client.SetHeader(key string, value string)
+  method Client.SetHeaders(headers map[string]string)
+  method Client.SetProxy(proxyURL string)
+  method Client.SetTimeout(timeout time.Duration)
+  method DefaultClient.HTTPClientName() string
+  type  Client struct{cfg Config; raw *github.com/go-resty/resty/v2.Client; requestInterceptors []RequestInterceptor; responseInterceptors []ResponseInterceptor; errorInterceptors []ErrorInterceptor}
+  type  ClientNamer interface{HTTPClientName() string}
+  type  ClientRef struct{*Client; _ *N}
+  type  Config struct{Name string; BaseURL string; Timeout time.Duration; RetryCount int; RetryDelay time.Duration; RetryDelayMultiplier float64; DefaultHeaders map[string]string; ProxyURL string; RequestInterceptors []RequestInterceptor; ResponseInterceptors []ResponseInterceptor; ErrorInterceptors []ErrorInterceptor}
+  type  DefaultClient struct{}
+  type  ErrorInterceptor func(error) error
+  type  Factory interface{Default() *Client; New(cfg Config) (*Client, error)}
+  type  InjectClient struct{*Client}
+  type  Request interface{SetAuthToken(token string) Request; SetBasicAuth(username string, password string) Request; SetBody(body interface{}) Request; SetHeader(key string, value string) Request; SetHeaders(headers map[string]string) Request; SetQueryParam(key string, value string) Request; SetQueryParams(params map[string]string) Request}
+  type  RequestInterceptor func(Request) Request
+  type  RequestOption func(Request)
+  type  Response interface{Body() []byte; Header() net/http.Header; Status() string; StatusCode() int; String() string; Unmarshal(obj interface{}) error}
+  type  ResponseInterceptor func(Response) Response
+
+github.com/sao-lang/lania-g/integrations/kafka/v3
+  func  ClientToken(name string) string
+  func  ConsumerConfigFromMQ(cfg github.com/sao-lang/lania-g/protocol/mq/v3.ConsumerConfig, topic string, opts ConsumeOptions) ConsumerConfig
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  NewClient(cfg Config) (*Client, error)
+  func  NewConsumerWithReader(cfg ConsumerConfig, reader ReaderClient, dlqWriter WriterClient) *Consumer
+  func  NewProducerWithWriter(cfg ProducerConfig, writer WriterClient, dlqWriter WriterClient) *Producer
+  method Client.Brokers() []string
+  method Client.Config() Config
+  method Client.Default() *Client
+  method Client.New(cfg Config) (*Client, error)
+  method Client.NewConsumer(cfg ConsumerConfig) *Consumer
+  method Client.NewProducer(cfg ProducerConfig) *Producer
+  method Client.NewReader(cfg github.com/segmentio/kafka-go.ReaderConfig) *github.com/segmentio/kafka-go.Reader
+  method Client.NewWriter(cfg github.com/segmentio/kafka-go.WriterConfig) *github.com/segmentio/kafka-go.Writer
+  method Consumer.Close() error
+  method Consumer.ConsumeBatch(ctx context.Context, handler MessageHandler) error
+  method Consumer.ConsumeOnce(ctx context.Context, handler MessageHandler) error
+  method Consumer.Run(ctx context.Context, handler MessageHandler) error
+  method DefaultClient.KafkaClientName() string
+  method KafkaModule.Client() *Client
+  method KafkaModule.Config() Config
+  method KafkaModule.Init() error
+  method Producer.Close() error
+  method Producer.Publish(ctx context.Context, message Message) error
+  method Producer.PublishBatch(ctx context.Context, messages []Message) error
+  method Producer.PublishValue(ctx context.Context, value interface{}, opts PublishOptions) error
+  type  Client struct{cfg Config}
+  type  ClientNamer interface{KafkaClientName() string}
+  type  ClientRef struct{*Client; _ *N}
+  type  Config struct{Name string; Brokers []string; Dialer *github.com/segmentio/kafka-go.Dialer; WriterBalancer github.com/segmentio/kafka-go.Balancer; WriterMaxAttempts int; WriterBatchSize int; WriterBatchBytes int; WriterBatchTimeout time.Duration; WriterReadTimeout time.Duration; WriterWriteTimeout time.Duration; WriterRequiredAcks int; WriterAsync bool}
+  type  ConsumeOptions struct{GroupID string; Topic string; BatchSize int; AutoCommit bool; RetryAttempts int; RetryBackoff time.Duration; DLQTopic string}
+  type  Consumer struct{cfg ConsumerConfig; reader ReaderClient; dlqWriter WriterClient}
+  type  ConsumerConfig struct{Topic string; GroupID string; DLQTopic string; RetryAttempts int; RetryBackoff time.Duration; BatchSize int; AutoCommit bool; ReaderConfig github.com/segmentio/kafka-go.ReaderConfig}
+  type  DefaultClient struct{}
+  type  Factory interface{Default() *Client; New(cfg Config) (*Client, error); ReaderFactory; WriterFactory}
+  type  InjectClient struct{*Client}
+  type  InjectReaderFactory struct{ReaderFactory}
+  type  InjectWriterFactory struct{WriterFactory}
+  type  KafkaModule struct{*github.com/sao-lang/lania-g/kernel/v3/module.BaseModule; client *Client; config *Config}
+  type  Message = Message
+  type  MessageHandler func(context.Context, Message) error
+  type  Producer struct{cfg ProducerConfig; writer WriterClient; dlqWriter WriterClient}
+  type  ProducerConfig struct{Topic string; DLQTopic string; RetryAttempts int; RetryBackoff time.Duration; WriterConfig github.com/segmentio/kafka-go.WriterConfig}
+  type  PublishOptions struct{Topic string; Key string; Headers map[string]string; RetryAttempts int; RetryBackoff time.Duration; DLQTopic string}
+  type  ReaderClient interface{Close() error; CommitMessages(context.Context, ...github.com/segmentio/kafka-go.Message) error; FetchMessage(context.Context) (github.com/segmentio/kafka-go.Message, error)}
+  type  ReaderFactory interface{NewReader(cfg github.com/segmentio/kafka-go.ReaderConfig) *github.com/segmentio/kafka-go.Reader}
+  type  WriterClient interface{Close() error; WriteMessages(context.Context, ...github.com/segmentio/kafka-go.Message) error}
+  type  WriterFactory interface{NewWriter(cfg github.com/segmentio/kafka-go.WriterConfig) *github.com/segmentio/kafka-go.Writer}
+
+github.com/sao-lang/lania-g/integrations/logger/v3
+  const DebugLevel Level
+  const ErrorLevel Level
+  const FatalLevel Level
+  const InfoLevel Level
+  const WarnLevel Level
+  func  Any(key string, value interface{}) Field
+  func  Bool(key string, value bool) Field
+  func  DefaultConfig() Config
+  func  DevelopmentConfig() Config
+  func  Duration(key string, value time.Duration) Field
+  func  Error(err error) Field
+  func  Fields(fields ...Field) []Field
+  func  Float64(key string, value float64) Field
+  func  Int(key string, value int) Field
+  func  Int64(key string, value int64) Field
+  func  LoggerToken(name string) string
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (Logger, error)
+  func  ObjectField(key string, value Object) Field
+  func  ParseLevel(s string) Level
+  func  ProductionConfig() Config
+  func  String(key string, value string) Field
+  func  Time(key string, value time.Time) Field
+  func  Uint(key string, value uint) Field
+  func  Uint64(key string, value uint64) Field
+  method DefaultLogger.LoggerName() string
+  method Level.String() string
+  type  Config struct{Name string; Level Level; Driver string; Format string; Output OutputConfig; Hooks []Hook; ContextKeys []string; Formatter Formatter; Writer Writer}
+  type  DefaultLogger struct{}
+  type  Entry struct{Time time.Time; Level Level; Message string; Fields []Field}
+  type  Factory interface{Default() Logger; New(cfg Config) (Logger, error)}
+  type  Field struct{Key string; Value interface{}}
+  type  Formatter interface{Format(entry Entry) ([]byte, error)}
+  type  Hook interface{Fire(entry Entry) error; Levels() []Level}
+  type  InjectLogger struct{Logger}
+  type  Level int
+  type  Logger interface{Debug(msg string, fields ...Field); Debugf(format string, args ...interface{}); Error(msg string, fields ...Field); Errorf(format string, args ...interface{}); Fatal(msg string, fields ...Field); Fatalf(format string, args ...interface{}); Info(msg string, fields ...Field); Infof(format string, args ...interface{}); Sync() error; Warn(msg string, fields ...Field); Warnf(format string, args ...interface{}); With(fields ...Field) Logger; WithContext(ctx context.Context) Logger}
+  type  LoggerNamer interface{LoggerName() string}
+  type  LoggerRef struct{Logger; _ *N}
+  type  Object map[string]interface{}
+  type  OutputConfig struct{Type string; Filename string; MaxSize int; MaxBackups int; MaxAge int; Compress bool; Writers []io.Writer}
+  type  Writer interface{Close() error; Write(p []byte) (n int, err error)}
+
+github.com/sao-lang/lania-g/integrations/minio/v3
+  func  ClientToken(name string) string
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Client, error)
+  method Client.BucketExists(ctx context.Context, bucketName string) (bool, error)
+  method Client.Config() Config
+  method Client.CopyObject(ctx context.Context, dst github.com/minio/minio-go/v7.CopyDestOptions, src github.com/minio/minio-go/v7.CopySrcOptions) (github.com/minio/minio-go/v7.UploadInfo, error)
+  method Client.Default() *Client
+  method Client.FGetObject(ctx context.Context, bucketName string, objectName string, filePath string, opts github.com/minio/minio-go/v7.GetObjectOptions) error
+  method Client.FPutObject(ctx context.Context, bucketName string, objectName string, filePath string, opts github.com/minio/minio-go/v7.PutObjectOptions) (github.com/minio/minio-go/v7.UploadInfo, error)
+  method Client.GetObject(ctx context.Context, bucketName string, objectName string, opts github.com/minio/minio-go/v7.GetObjectOptions) (*github.com/minio/minio-go/v7.Object, error)
+  method Client.GetObjectBytes(ctx context.Context, bucketName string, objectName string) ([]byte, error)
+  method Client.ListBuckets(ctx context.Context) ([]github.com/minio/minio-go/v7.BucketInfo, error)
+  method Client.ListObjects(ctx context.Context, bucketName string, opts github.com/minio/minio-go/v7.ListObjectsOptions) <-chan github.com/minio/minio-go/v7.ObjectInfo
+  method Client.MakeBucket(ctx context.Context, bucketName string, location string) error
+  method Client.New(cfg Config) (*Client, error)
+  method Client.PresignedGetObject(ctx context.Context, bucketName string, objectName string, expires time.Duration, reqParams net/url.Values) (*net/url.URL, error)
+  method Client.PresignedPutObject(ctx context.Context, bucketName string, objectName string, expires time.Duration) (*net/url.URL, error)
+  method Client.PutObject(ctx context.Context, bucketName string, objectName string, reader io.Reader, objectSize int64, opts github.com/minio/minio-go/v7.PutObjectOptions) (github.com/minio/minio-go/v7.UploadInfo, error)
+  method Client.PutObjectBytes(ctx context.Context, bucketName string, objectName string, data []byte, opts github.com/minio/minio-go/v7.PutObjectOptions) (github.com/minio/minio-go/v7.UploadInfo, error)
+  method Client.Raw() *github.com/minio/minio-go/v7.Client
+  method Client.RemoveBucket(ctx context.Context, bucketName string) error
+  method Client.RemoveObject(ctx context.Context, bucketName string, objectName string, opts github.com/minio/minio-go/v7.RemoveObjectOptions) error
+  method Client.StatObject(ctx context.Context, bucketName string, objectName string, opts github.com/minio/minio-go/v7.StatObjectOptions) (github.com/minio/minio-go/v7.ObjectInfo, error)
+  method DefaultClient.MinIOClientName() string
+  type  Client struct{client *github.com/minio/minio-go/v7.Client; cfg Config}
+  type  ClientNamer interface{MinIOClientName() string}
+  type  ClientRef struct{*Client; _ *N}
+  type  Config struct{Name string; Endpoint string; AccessKeyID string; SecretAccessKey string; UseSSL bool}
+  type  DefaultClient struct{}
+  type  Factory interface{Default() *Client; New(cfg Config) (*Client, error)}
+  type  InjectClient struct{*Client}
+
+github.com/sao-lang/lania-g/integrations/mongodb/v3
+  const DefaultName untyped string
+  func  DatabaseToken(name string) string
+  func  DefaultConfig() Config
+  func  DeleteByID(ctx context.Context, collection *go.mongodb.org/mongo-driver/mongo.Collection, id go.mongodb.org/mongo-driver/bson/primitive.ObjectID) error
+  func  FindByID[T Model](ctx context.Context, collection *go.mongodb.org/mongo-driver/mongo.Collection, id go.mongodb.org/mongo-driver/bson/primitive.ObjectID) (*T, error)
+  func  IsValidObjectID(id string) bool
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  MustObjectID(id string) go.mongodb.org/mongo-driver/bson/primitive.ObjectID
+  func  NewRepository[T any](db *go.mongodb.org/mongo-driver/mongo.Database, collectionName string) Repository[T]
+  func  ToObjectID(id string) (go.mongodb.org/mongo-driver/bson/primitive.ObjectID, error)
+  func  UpdateByID[T Model](ctx context.Context, collection *go.mongodb.org/mongo-driver/mongo.Collection, id go.mongodb.org/mongo-driver/bson/primitive.ObjectID, update interface{}) error
+  func  WithSession(ctx context.Context, client *go.mongodb.org/mongo-driver/mongo.Client, fn func(sessionContext context.Context, session go.mongodb.org/mongo-driver/mongo.Session) error) error
+  func  WithTransaction(ctx context.Context, client *go.mongodb.org/mongo-driver/mongo.Client, fn func(sessionContext context.Context, session go.mongodb.org/mongo-driver/mongo.Session) error) error
+  method BaseModel.BeforeCreate()
+  method BaseModel.GetID() go.mongodb.org/mongo-driver/bson/primitive.ObjectID
+  method BaseModel.SetID(id go.mongodb.org/mongo-driver/bson/primitive.ObjectID)
+  method BaseRepository.Collection() *go.mongodb.org/mongo-driver/mongo.Collection
+  method BaseRepository.Count(ctx context.Context, filter interface{}) (int64, error)
+  method BaseRepository.Create(ctx context.Context, document *T) error
+  method BaseRepository.Delete(ctx context.Context, filter interface{}) error
+  method BaseRepository.Find(ctx context.Context, filter interface{}, opts ...*go.mongodb.org/mongo-driver/mongo/options.FindOptions) ([]T, error)
+  method BaseRepository.FindOne(ctx context.Context, filter interface{}) (*T, error)
+  method BaseRepository.Update(ctx context.Context, filter interface{}, update interface{}) error
+  type  BaseModel struct{ID go.mongodb.org/mongo-driver/bson/primitive.ObjectID "bson:\"_id,omitempty\" json:\"id,omitempty\""}
+  type  BaseRepository struct{collection *go.mongodb.org/mongo-driver/mongo.Collection}
+  type  Config struct{Name string; URI string; Database string; Client *go.mongodb.org/mongo-driver/mongo.Client; DB *go.mongodb.org/mongo-driver/mongo.Database; Options *go.mongodb.org/mongo-driver/mongo/options.ClientOptions}
+  type  DatabaseNamer interface{MongoDatabaseName() string}
+  type  DatabaseRef struct{*go.mongodb.org/mongo-driver/mongo.Database; _ *N}
+  type  Factory interface{Default() *go.mongodb.org/mongo-driver/mongo.Database; GetOrCreate(name string, cfg Config) (*go.mongodb.org/mongo-driver/mongo.Database, error); New(cfg Config) (*go.mongodb.org/mongo-driver/mongo.Database, error)}
+  type  InjectClient struct{*go.mongodb.org/mongo-driver/mongo.Client}
+  type  InjectDatabase struct{*go.mongodb.org/mongo-driver/mongo.Database}
+  type  Model interface{GetID() go.mongodb.org/mongo-driver/bson/primitive.ObjectID; SetID(id go.mongodb.org/mongo-driver/bson/primitive.ObjectID)}
+  type  Repository interface{Collection() *go.mongodb.org/mongo-driver/mongo.Collection; Count(ctx context.Context, filter interface{}) (int64, error); Create(ctx context.Context, document *T) error; Delete(ctx context.Context, filter interface{}) error; Find(ctx context.Context, filter interface{}, opts ...*go.mongodb.org/mongo-driver/mongo/options.FindOptions) ([]T, error); FindOne(ctx context.Context, filter interface{}) (*T, error); Update(ctx context.Context, filter interface{}, update interface{}) error}
+
+github.com/sao-lang/lania-g/integrations/orm/v3
+  func  ConfigToken(name string) string
+  func  DBFromContext(ctx context.Context, fallback *gorm.io/gorm.DB) *gorm.io/gorm.DB
+  func  DataSourceToken(name string) string
+  func  Entity(table string, primaryKeyOrEntity interface{}, entity ...interface{})
+  func  ForFeature(features ...Feature) (github.com/sao-lang/lania-g/kernel/v3/module.Module, error)
+  func  ForFeatureWithOptions(opts FeatureOptions) (github.com/sao-lang/lania-g/kernel/v3/module.Module, error)
+  func  GetEntity(target interface{}) *EntityMetadata
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  NewRepository[T any](db *gorm.io/gorm.DB) *Repository[T]
+  func  NewTransactionManager(db *gorm.io/gorm.DB) TransactionManager
+  func  NewUnitOfWork(manager TransactionManager) *UnitOfWork
+  func  RepositoryToken(name string, entityType reflect.Type) string
+  func  TransactionManagerToken() reflect.Type
+  method DefaultDataSource.ORMDataSourceName() string
+  method Repository.Avg(column string) (float64, error)
+  method Repository.Count() (int64, error)
+  method Repository.CountByCondition(query interface{}, args ...interface{}) (int64, error)
+  method Repository.Create(entity *T) error
+  method Repository.CreateInBatches(entities []*T, batchSize int) error
+  method Repository.DB() *gorm.io/gorm.DB
+  method Repository.Delete(id interface{}) error
+  method Repository.DeleteByCondition(query interface{}, args ...interface{}) error
+  method Repository.DeleteInBatches(ids []interface{}) error
+  method Repository.Exec(sql string, values ...interface{}) error
+  method Repository.Exists(query interface{}, args ...interface{}) (bool, error)
+  method Repository.Find(query interface{}, args ...interface{}) ([]*T, error)
+  method Repository.FindAll() ([]*T, error)
+  method Repository.First(id interface{}) (*T, error)
+  method Repository.FirstOrCreate(entity *T, attrs ...interface{}) error
+  method Repository.Group(name string) *Repository[T]
+  method Repository.Having(query interface{}, args ...interface{}) *Repository[T]
+  method Repository.Joins(query string, args ...interface{}) *Repository[T]
+  method Repository.Last() (*T, error)
+  method Repository.Limit(limit int) *Repository[T]
+  method Repository.Max(column string) (float64, error)
+  method Repository.Min(column string) (float64, error)
+  method Repository.Model() *gorm.io/gorm.DB
+  method Repository.Not(query interface{}, args ...interface{}) *Repository[T]
+  method Repository.Offset(offset int) *Repository[T]
+  method Repository.Or(query interface{}, args ...interface{}) *Repository[T]
+  method Repository.Order(value interface{}) *Repository[T]
+  method Repository.Paginate(page int, pageSize int) (*PageResult[T], error)
+  method Repository.Pluck(column string, dest interface{}) error
+  method Repository.Preload(query string, args ...interface{}) *Repository[T]
+  method Repository.Raw(sql string, values ...interface{}) *Repository[T]
+  method Repository.Scan(dest interface{}) error
+  method Repository.Scopes(scopes ...Scope) *Repository[T]
+  method Repository.Select(query interface{}, args ...interface{}) *Repository[T]
+  method Repository.Sum(column string) (float64, error)
+  method Repository.Take() (*T, error)
+  method Repository.Transaction(fn func(tx *Repository[T]) error) error
+  method Repository.Unscoped() *Repository[T]
+  method Repository.Update(entity *T) error
+  method Repository.UpdateColumn(column string, value interface{}, id interface{}) error
+  method Repository.UpdateColumns(values map[string]interface{}, id interface{}) error
+  method Repository.UpdateInBatches(ids []interface{}, values map[string]interface{}) error
+  method Repository.Updates(entity *T) error
+  method Repository.Where(query interface{}, args ...interface{}) *Repository[T]
+  method UnitOfWork.Do(ctx context.Context, fn func(context.Context) error) error
+  type  Config struct{Name string; DB *gorm.io/gorm.DB; Dialector gorm.io/gorm.Dialector; GormConfig *gorm.io/gorm.Config; AutoMigrate []interface{}; Plugins []gorm.io/gorm.Plugin; Managed bool}
+  type  DataSourceNamer interface{ORMDataSourceName() string}
+  type  DataSourceRef struct{*gorm.io/gorm.DB; _ *N}
+  type  DefaultDataSource struct{}
+  type  EntityMetadata struct{Table string; PrimaryKey string}
+  type  Factory interface{CloseAll() error; Default() *gorm.io/gorm.DB; GetOrCreate(name string, cfg Config) (*gorm.io/gorm.DB, error); New(cfg Config) (*gorm.io/gorm.DB, error)}
+  type  Feature struct{DataSourceName string; Entities []any; AutoMigrate []any}
+  type  FeatureOptions struct{Imports []github.com/sao-lang/lania-g/kernel/v3/module.Module; Features []Feature}
+  type  InjectDataSource struct{*gorm.io/gorm.DB}
+  type  InjectRepository struct{*Repository[T]; _ *T}
+  type  MultiConfig struct{DefaultName string; DataSources []Config}
+  type  PageResult struct{Records []*T "json:\"records\""; Total int64 "json:\"total\""; Page int "json:\"page\""; Size int "json:\"size\""; Pages int "json:\"pages\""}
+  type  Repository struct{db *gorm.io/gorm.DB}
+  type  RepositoryRef struct{*Repository[T]; _ *T; _ *N}
+  type  Scope func(*gorm.io/gorm.DB) *gorm.io/gorm.DB
+  type  TransactionManager interface{Current(ctx context.Context) *gorm.io/gorm.DB; Do(ctx context.Context, fn func(context.Context, *gorm.io/gorm.DB) error) error; With(ctx context.Context, db *gorm.io/gorm.DB) context.Context}
+  type  UnitOfWork struct{manager TransactionManager}
+
+github.com/sao-lang/lania-g/integrations/otel/v3
+  const ContextKeyRequestID contextKey
+  const ContextKeySpanID contextKey
+  const ContextKeyTraceID contextKey
+  const DefaultErrorCounterName untyped string
+  const DefaultInstrumentationName untyped string
+  const DefaultName untyped string
+  const DefaultRequestCounterName untyped string
+  const DefaultRequestDurationName untyped string
+  const DefaultRequestIDHeader untyped string
+  const DefaultServiceName untyped string
+  const DefaultThroughputName untyped string
+  const DefaultTraceparentHeader untyped string
+  const MetadataKeyRequestID untyped string
+  const MetadataKeySpanID untyped string
+  const MetadataKeyTraceContext untyped string
+  const MetadataKeyTraceID untyped string
+  func  ContextWithTraceContext(ctx context.Context, tc TraceContext) context.Context
+  func  Current(hc *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) TraceContext
+  func  DefaultConfig() Config
+  func  Interceptor(t *Telemetry) github.com/sao-lang/lania-g/kernel/v3/aop.InterceptorFunc
+  func  LoggerContextKeys() []string
+  func  LoggerFields(hc *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) []github.com/sao-lang/lania-g/integrations/logger/v3.Field
+  func  Middleware(t *Telemetry) github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Telemetry, error)
+  func  TelemetryToken(name string) string
+  func  TraceContextFromContext(ctx context.Context) TraceContext
+  func  WithLoggerFields(lg github.com/sao-lang/lania-g/integrations/logger/v3.Logger, hc *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) github.com/sao-lang/lania-g/integrations/logger/v3.Logger
+  method Telemetry.Config() Config
+  method Telemetry.Default() *Telemetry
+  method Telemetry.ErrorCounter() go.opentelemetry.io/otel/metric.Int64Counter
+  method Telemetry.Exporters() []go.opentelemetry.io/otel/sdk/trace.SpanExporter
+  method Telemetry.Interceptor() github.com/sao-lang/lania-g/kernel/v3/aop.InterceptorFunc
+  method Telemetry.Meter() go.opentelemetry.io/otel/metric.Meter
+  method Telemetry.MeterProvider() go.opentelemetry.io/otel/metric.MeterProvider
+  method Telemetry.Middleware() github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  method Telemetry.New(cfg Config) (*Telemetry, error)
+  method Telemetry.Propagator() go.opentelemetry.io/otel/propagation.TextMapPropagator
+  method Telemetry.RequestCounter() go.opentelemetry.io/otel/metric.Int64Counter
+  method Telemetry.RequestDuration() go.opentelemetry.io/otel/metric.Float64Histogram
+  method Telemetry.Resource() *go.opentelemetry.io/otel/sdk/resource.Resource
+  method Telemetry.SpanProcessors() []go.opentelemetry.io/otel/sdk/trace.SpanProcessor
+  method Telemetry.ThroughputCounter() go.opentelemetry.io/otel/metric.Int64Counter
+  method Telemetry.Tracer() go.opentelemetry.io/otel/trace.Tracer
+  method Telemetry.TracerProvider() go.opentelemetry.io/otel/trace.TracerProvider
+  type  Config struct{Name string; ServiceName string; InstrumentationName string; RequestIDHeader string; TraceparentHeader string; RequestCounterName string; Propagator go.opentelemetry.io/otel/propagation.TextMapPropagator; TracerProvider go.opentelemetry.io/otel/trace.TracerProvider; MeterProvider go.opentelemetry.io/otel/metric.MeterProvider; Exporters []ExporterConfig; Metrics MetricConfig; Resource *go.opentelemetry.io/otel/sdk/resource.Resource; BatchProcessor go.opentelemetry.io/otel/sdk/trace.SpanProcessor}
+  type  ExporterConfig struct{Type string; Endpoint string; Sampler float64; BatchSize int; Interval time.Duration; Headers map[string]string}
+  type  Factory interface{Default() *Telemetry; New(cfg Config) (*Telemetry, error)}
+  type  InjectRequestID struct{Value string}
+  type  InjectTelemetry struct{*Telemetry}
+  type  InjectTraceContext struct{TraceContext}
+  type  MetricConfig struct{RequestDurationName string; ErrorCounterName string; ThroughputName string; Labels map[string]string}
+  type  Telemetry struct{config Config; propagator go.opentelemetry.io/otel/propagation.TextMapPropagator; tracerProvider go.opentelemetry.io/otel/trace.TracerProvider; meterProvider go.opentelemetry.io/otel/metric.MeterProvider; tracer go.opentelemetry.io/otel/trace.Tracer; meter go.opentelemetry.io/otel/metric.Meter; requestCounter go.opentelemetry.io/otel/metric.Int64Counter; requestDuration go.opentelemetry.io/otel/metric.Float64Histogram; errorCounter go.opentelemetry.io/otel/metric.Int64Counter; throughputCounter go.opentelemetry.io/otel/metric.Int64Counter; commonAttrs []go.opentelemetry.io/otel/attribute.KeyValue; exporters []go.opentelemetry.io/otel/sdk/trace.SpanExporter; spanProcessors []go.opentelemetry.io/otel/sdk/trace.SpanProcessor; resource *go.opentelemetry.io/otel/sdk/resource.Resource}
+  type  TelemetryNamer interface{TelemetryName() string}
+  type  TelemetryRef struct{*Telemetry; _ *N}
+  type  TraceContext struct{TraceID string; SpanID string; RequestID string; Remote bool; Sampled bool}
+
+github.com/sao-lang/lania-g/integrations/outbox/v3
+  const DefaultName untyped string
+  const StatusDead Status
+  const StatusDispatched Status
+  const StatusFailed Status
+  const StatusPending Status
+  func  DefaultConfig() Config
+  func  MarshalPayload(payload any) ([]byte, error)
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Service, error)
+  func  NewEmitterDispatcher(emitter github.com/sao-lang/lania-g/integrations/events/v3.Emitter) Dispatcher
+  func  NewEventDispatcher(bus *github.com/sao-lang/lania-g/integrations/events/v3.Bus) Dispatcher
+  func  NewInbox() *Inbox
+  func  NewMemoryStore() Store
+  func  NewMongoDBStore(db *go.mongodb.org/mongo-driver/mongo.Database, collectionName string) Store
+  func  NewSQLStore(db *gorm.io/gorm.DB) Store
+  func  NewScheduler(service *Service, config SchedulerConfig) *Scheduler
+  method DispatcherFunc.Dispatch(ctx context.Context, message *Message) error
+  method Inbox.Allow(id string) bool
+  method MongoDBStore.Get(ctx context.Context, id string) (*Message, error)
+  method MongoDBStore.ListPending(ctx context.Context, limit int) ([]*Message, error)
+  method MongoDBStore.Mark(ctx context.Context, id string, status Status, lastError string, attempts int) error
+  method MongoDBStore.Save(ctx context.Context, msg *Message) error
+  method SQLStore.Get(ctx context.Context, id string) (*Message, error)
+  method SQLStore.ListPending(ctx context.Context, limit int) ([]*Message, error)
+  method SQLStore.Mark(ctx context.Context, id string, status Status, lastError string, attempts int) error
+  method SQLStore.Save(ctx context.Context, msg *Message) error
+  method Scheduler.Start()
+  method Scheduler.Stop()
+  method Service.CleanupOldMessages(ctx context.Context, olderThan time.Duration) error
+  method Service.Config() Config
+  method Service.Default() *Service
+  method Service.Flush(ctx context.Context, limit int) error
+  method Service.New(cfg Config) (*Service, error)
+  method Service.Publish(ctx context.Context, topic string, payload any) (*Message, error)
+  method Service.PublishInTransaction(ctx context.Context, manager github.com/sao-lang/lania-g/integrations/orm/v3.TransactionManager, topic string, payload any) (*Message, error)
+  method Service.Receive(ctx context.Context, message *Message, handler func(context.Context, *Message) error) error
+  method Service.ReprocessDead(ctx context.Context, limit int) error
+  type  Config struct{Name string; MaxAttempts int; Store Store; Dispatcher Dispatcher; DeadLetter Dispatcher; Scheduler SchedulerConfig}
+  type  Dispatcher interface{Dispatch(context.Context, *Message) error}
+  type  DispatcherFunc func(context.Context, *Message) error
+  type  Factory interface{Default() *Service; New(cfg Config) (*Service, error)}
+  type  Inbox struct{mu sync.Mutex; processed map[string]time.Time}
+  type  InjectService struct{*Service}
+  type  Message struct{ID string; Topic string; Key string; Payload []byte; Headers map[string]string; Status Status; Attempts int; LastError string; CreatedAt time.Time; UpdatedAt time.Time; AvailableAt time.Time}
+  type  MongoDBStore struct{collection *go.mongodb.org/mongo-driver/mongo.Collection}
+  type  SQLStore struct{db *gorm.io/gorm.DB}
+  type  Scheduler struct{service *Service; config SchedulerConfig; ctx context.Context; cancel context.CancelFunc; wg sync.WaitGroup}
+  type  SchedulerConfig struct{Enabled bool; Interval time.Duration; BatchSize int; Concurrency int}
+  type  Service struct{config Config; store Store; dispatcher Dispatcher; deadLetter Dispatcher; inbox *Inbox; scheduler *Scheduler}
+  type  Status string
+  type  Store interface{Get(context.Context, string) (*Message, error); ListPending(context.Context, int) ([]*Message, error); Mark(context.Context, string, Status, string, int) error; Save(context.Context, *Message) error}
+
+github.com/sao-lang/lania-g/integrations/resilience/v3
+  const DefaultIdempotencyHeader untyped string
+  const DefaultName untyped string
+  const DefaultRateLimitHeader untyped string
+  const MetadataKeyIdempotencyRecord untyped string
+  func  ContextWithIdempotency(ctx context.Context, key string) context.Context
+  func  DefaultConfig() Config
+  func  Interceptor() github.com/sao-lang/lania-g/kernel/v3/aop.InterceptorFunc
+  func  Middleware() github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  func  Module(cfgs ...Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Service, error)
+  func  ServiceToken(name string) string
+  method Service.Config() Config
+  method Service.Default() *Service
+  method Service.New(cfg Config) (*Service, error)
+  type  CircuitBreakerConfig struct{Enabled bool; FailureThreshold int; OpenTimeout time.Duration}
+  type  Config struct{Name string; RateLimit RateLimitConfig; Timeout TimeoutConfig; Retry RetryConfig; Circuit CircuitBreakerConfig; Idempotency IdempotencyConfig; Clock func() time.Time; DistributedStore DistributedStore; Strategy StrategyConfig}
+  type  DistributedStore interface{Delete(key string) error; Exists(key string) (bool, error); Get(key string) (string, error); Set(key string, value string, ttl time.Duration) error}
+  type  Factory interface{Default() *Service; New(cfg Config) (*Service, error)}
+  type  IdempotencyConfig struct{Enabled bool; Header string; TTL time.Duration}
+  type  RateLimitConfig struct{Enabled bool; Limit int; Window time.Duration; Header string}
+  type  RetryConfig struct{Enabled bool; MaxAttempts int; Backoff time.Duration}
+  type  Service struct{config Config; mu sync.Mutex; rateWindows map[string]*rateState; breakers map[string]*breakerState; idempotency map[string]*idempotentRecord; distributed DistributedStore}
+  type  StrategyConfig struct{RateLimit map[string]RateLimitConfig; Circuit map[string]CircuitBreakerConfig; Timeout map[string]TimeoutConfig; Retry map[string]RetryConfig; Idempotency map[string]IdempotencyConfig}
+  type  TimeoutConfig struct{Enabled bool; Duration time.Duration}
+
+github.com/sao-lang/lania-g/integrations/swagger/v3
+  func  BuildFromHTTPRegistry(builder *Builder, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) (*Builder, error)
+  func  DefaultUIConfig() *UIConfig
+  func  GenerateRedocHTML(config *UIConfig) string
+  func  GenerateSwaggerUIHTML(config *UIConfig) string
+  func  Module(cfg Config, ui ...*UIConfig) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) (*Builder, error)
+  method Builder.AddBearerAuth(name string) *Builder
+  method Builder.AddHTTPRoute(def *github.com/sao-lang/lania-g/protocol/http/v3.RouteDefinition) *Builder
+  method Builder.AddOAuth2(name string, flows *OAuthFlows) *Builder
+  method Builder.AddPath(path string, pathItem *Path) *Builder
+  method Builder.AddSchema(name string, schema *Schema) *Builder
+  method Builder.AddSchemaFromType(name string, typ interface{}) *Builder
+  method Builder.AddServer(url string, description string) *Builder
+  method Builder.AddTag(name string, description string) *Builder
+  method Builder.Build() *OpenAPI
+  method Builder.Default() *Builder
+  method Builder.New(cfg Config) (*Builder, error)
+  method Builder.SetDefaultErrorResponse(description string, schema interface{}, statusCodes ...int) *Builder
+  method Builder.SetInfo(title string, description string, version string) *Builder
+  method Builder.ToJSON() ([]byte, error)
+  type  BearerAuthConfig struct{Names []string}
+  type  Builder struct{openapi *OpenAPI; defaultErrorSchema *Schema; defaultErrorMessage string; defaultErrorCodes []int}
+  type  Components struct{Schemas map[string]*Schema "json:\"schemas,omitempty\""; SecuritySchemes map[string]*SecurityScheme "json:\"securitySchemes,omitempty\""}
+  type  Config struct{Title string; Description string; Version string; BearerAuth []string; Servers []Server; Tags []Tag; DefaultErrorResponse string}
+  type  Contact struct{Name string "json:\"name,omitempty\""; URL string "json:\"url,omitempty\""; Email string "json:\"email,omitempty\""}
+  type  Factory interface{Default() *Builder; New(cfg Config) (*Builder, error)}
+  type  Header struct{Description string "json:\"description,omitempty\""; Schema *Schema "json:\"schema,omitempty\""; Example interface{} "json:\"example,omitempty\""}
+  type  Info struct{Title string "json:\"title,omitempty\""; Description string "json:\"description,omitempty\""; TermsOfService string "json:\"termsOfService,omitempty\""; Contact *Contact "json:\"contact,omitempty\""; License *License "json:\"license,omitempty\""; Version string "json:\"version,omitempty\""}
+  type  License struct{Name string "json:\"name,omitempty\""; URL string "json:\"url,omitempty\""}
+  type  MediaType struct{Schema *Schema "json:\"schema,omitempty\""; Example interface{} "json:\"example,omitempty\""; Examples interface{} "json:\"examples,omitempty\""}
+  type  OAuthFlow struct{AuthorizationURL string "json:\"authorizationUrl,omitempty\""; TokenURL string "json:\"tokenUrl,omitempty\""; RefreshURL string "json:\"refreshUrl,omitempty\""; Scopes map[string]string "json:\"scopes,omitempty\""}
+  type  OAuthFlows struct{Implicit *OAuthFlow "json:\"implicit,omitempty\""; Password *OAuthFlow "json:\"password,omitempty\""; ClientCredentials *OAuthFlow "json:\"clientCredentials,omitempty\""; AuthorizationCode *OAuthFlow "json:\"authorizationCode,omitempty\""}
+  type  OpenAPI struct{OpenAPIVersion string "json:\"openapi,omitempty\""; Info *Info "json:\"info,omitempty\""; Paths map[string]*Path "json:\"paths,omitempty\""; Components *Components "json:\"components,omitempty\""; Tags []*Tag "json:\"tags,omitempty\""; Servers []*Server "json:\"servers,omitempty\""}
+  type  Operation struct{Tags []string "json:\"tags,omitempty\""; Summary string "json:\"summary,omitempty\""; Description string "json:\"description,omitempty\""; OperationID string "json:\"operationId,omitempty\""; Parameters []*Parameter "json:\"parameters,omitempty\""; RequestBody *RequestBody "json:\"requestBody,omitempty\""; Responses map[string]*Response "json:\"responses,omitempty\""; Security []map[string][]string "json:\"security,omitempty\""}
+  type  Parameter struct{Name string "json:\"name,omitempty\""; In string "json:\"in,omitempty\""; Description string "json:\"description,omitempty\""; Required bool "json:\"required,omitempty\""; Schema *Schema "json:\"schema,omitempty\""; Example interface{} "json:\"example,omitempty\""}
+  type  Path struct{Summary string "json:\"summary,omitempty\""; Description string "json:\"description,omitempty\""; Get *Operation "json:\"get,omitempty\""; Put *Operation "json:\"put,omitempty\""; Post *Operation "json:\"post,omitempty\""; Delete *Operation "json:\"delete,omitempty\""; Options *Operation "json:\"options,omitempty\""; Head *Operation "json:\"head,omitempty\""; Patch *Operation "json:\"patch,omitempty\""; Trace *Operation "json:\"trace,omitempty\""; Parameters []*Parameter "json:\"parameters,omitempty\""}
+  type  RequestBody struct{Description string "json:\"description,omitempty\""; Content map[string]*MediaType "json:\"content,omitempty\""; Required bool "json:\"required,omitempty\""}
+  type  Response struct{Description string "json:\"description,omitempty\""; Headers map[string]*Header "json:\"headers,omitempty\""; Content map[string]*MediaType "json:\"content,omitempty\""}
+  type  Schema struct{Type string "json:\"type,omitempty\""; Format string "json:\"format,omitempty\""; Description string "json:\"description,omitempty\""; Properties map[string]*Schema "json:\"properties,omitempty\""; Required []string "json:\"required,omitempty\""; Items *Schema "json:\"items,omitempty\""; Ref string "json:\"$ref,omitempty\""; Example interface{} "json:\"example,omitempty\""; Default interface{} "json:\"default,omitempty\""; Enum []interface{} "json:\"enum,omitempty\""; AdditionalProperties *Schema "json:\"additionalProperties,omitempty\""; Nullable bool "json:\"nullable,omitempty\""}
+  type  SecurityScheme struct{Type string "json:\"type,omitempty\""; Scheme string "json:\"scheme,omitempty\""; BearerFormat string "json:\"bearerFormat,omitempty\""; Flows *OAuthFlows "json:\"flows,omitempty\""; OpenIDConnectURL string "json:\"openIdConnectUrl,omitempty\""}
+  type  Server struct{URL string "json:\"url,omitempty\""; Description string "json:\"description,omitempty\""; Variables map[string]*ServerVariable "json:\"variables,omitempty\""}
+  type  ServerVariable struct{Enum []string "json:\"enum,omitempty\""; Default string "json:\"default,omitempty\""; Description string "json:\"description,omitempty\""}
+  type  Tag struct{Name string "json:\"name,omitempty\""; Description string "json:\"description,omitempty\""}
+  type  UIConfig struct{Title string; SpecURL string; SwaggerURL string; RedocURL string}
+
+github.com/sao-lang/lania-g/integrations/terminus/v3
+  const StatusFail HealthStatus
+  const StatusPass HealthStatus
+  const StatusWarn HealthStatus
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  NewDatabaseIndicator(name string, db *database/sql.DB, componentID ...string) *DatabaseIndicator
+  func  NewHTTPIndicator(name string, url string, componentID ...string) *HTTPIndicator
+  func  NewHealthService() *HealthService
+  func  NewRedisIndicator(name string, pinger RedisPinger, componentID ...string) *RedisIndicator
+  func  NewRedisIndicatorFunc(name string, pinger func() error, componentID ...string) *RedisIndicator
+  method DatabaseIndicator.Check() (*CheckResult, error)
+  method DatabaseIndicator.Name() string
+  method HTTPIndicator.Check() (*CheckResult, error)
+  method HTTPIndicator.Name() string
+  method HealthService.AddIndicator(indicator Indicator) *HealthService
+  method HealthService.Check() *HealthCheckResult
+  method HealthService.SetReleaseID(releaseID string) *HealthService
+  method HealthService.SetVersion(version string) *HealthService
+  method RedisIndicator.Check() (*CheckResult, error)
+  method RedisIndicator.Name() string
+  type  CheckResult struct{Status HealthStatus "json:\"status\""; ObservedValue interface{} "json:\"observedValue,omitempty\""; ObservedUnit string "json:\"observedUnit,omitempty\""; Output string "json:\"output,omitempty\""; ComponentType string "json:\"componentType,omitempty\""; ComponentID string "json:\"componentId,omitempty\""; MeasurementName string "json:\"measurementName,omitempty\""; Time time.Time "json:\"time,omitempty\""}
+  type  Config struct{Version string; ReleaseID string; Path string}
+  type  DatabaseIndicator struct{name string; db *database/sql.DB; componentID string}
+  type  Factory interface{Default() *HealthService; New(cfg Config) (*HealthService, error)}
+  type  HTTPIndicator struct{name string; url string; client *net/http.Client; componentID string}
+  type  HealthCheckResult struct{Status HealthStatus "json:\"status\""; Checks map[string]*CheckResult "json:\"checks,omitempty\""; Version string "json:\"version,omitempty\""; ReleaseID string "json:\"releaseId,omitempty\""}
+  type  HealthService struct{mu sync.RWMutex; indicators []Indicator; version string; releaseID string}
+  type  HealthStatus string
+  type  Indicator interface{Check() (*CheckResult, error); Name() string}
+  type  RedisIndicator struct{name string; pinger func() error; componentID string}
+  type  RedisPinger interface{Ping() error}
+
+github.com/sao-lang/lania-g/kernel/v3/adapter
+  func  CopyIntStringMap(src map[int]string) map[int]string
+  func  FindMethodName(receiver any, handler any) string
+  func  MergeParamPipes[T any](base map[int][]T, extra map[int][]T) map[int][]T
+  type  Adapter interface{ID() string; Mount(host Host) error; Start() error; Stop() error}
+  type  HTTPMountHost interface{MountHTTP(pattern string, handler net/http.Handler) error}
+  type  HTTPMountRequest struct{Host Host; Mounter Mounter}
+  type  HTTPMounterProvider interface{MountHTTP(HTTPMountRequest) error}
+  type  Host interface{ModuleRef() *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef; Registry() *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; Runtime() *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime}
+  type  ModuleAdapter interface{Adapter() Adapter}
+  type  Mounter interface{Handle(pattern string, handler net/http.Handler); Static(prefix string, root string)}
+  type  SharedListenerConfigurator interface{ConfigureSharedListen(addr string) error; RequiresSharedListen() bool}
+
+github.com/sao-lang/lania-g/kernel/v3/aop
+  func  BadGatewayException(message string) *HttpException
+  func  BadRequestException(message string) *HttpException
+  func  ConflictException(message string) *HttpException
+  func  ExpectationFailedException(message string) *HttpException
+  func  FailedDependencyException(message string) *HttpException
+  func  FilterFactory(ctor ExceptionFilterConstructor) ExceptionFilter
+  func  ForbiddenException(message string) *HttpException
+  func  FromError(err error) (*HttpException, bool)
+  func  GatewayTimeoutException(message string) *HttpException
+  func  GoneException(message string) *HttpException
+  func  GuardFactory(ctor GuardConstructor) Guard
+  func  HTTPVersionNotSupportedException(message string) *HttpException
+  func  InsufficientStorageException(message string) *HttpException
+  func  InterceptorFactory(ctor InterceptorConstructor) Interceptor
+  func  InternalServerErrorException(message string) *HttpException
+  func  LengthRequiredException(message string) *HttpException
+  func  LockedException(message string) *HttpException
+  func  LoopDetectedException(message string) *HttpException
+  func  MethodNotAllowedException(message string, allow ...string) *HttpException
+  func  MiddlewareFactory(ctor MiddlewareConstructor) Middleware
+  func  NetworkAuthenticationRequiredException(message string) *HttpException
+  func  NewCallHandler(handler func() (interface{}, error)) CallHandler
+  func  NewDefaultValuePipe(defaultValue interface{}) *DefaultValuePipe
+  func  NewExecutionContext(ctx context.Context, handlerContext interface{}, handler interface{}, class interface{}) *ExecutionContext
+  func  NewHttpException(status int, message string) *HttpException
+  func  NewMiddlewareConsumer() *DefaultMiddlewareConsumer
+  func  NewParseArrayPipe() *ParseArrayPipe
+  func  NewParseBoolPipe() *ParseBoolPipe
+  func  NewParseFloatPipe() *ParseFloatPipe
+  func  NewParseIntPipe() *ParseIntPipe
+  func  NewParseUUIDPipe() *ParseUUIDPipe
+  func  NewValidationException(message string, errors ...ValidationError) *ValidationException
+  func  NewValidationPipe() *ValidationPipe
+  func  NotAcceptableException(message string) *HttpException
+  func  NotFoundException(message string) *HttpException
+  func  NotImplementedException(message string) *HttpException
+  func  PayloadTooLargeException(message string) *HttpException
+  func  PaymentRequiredException(message string) *HttpException
+  func  PipeFactory(ctor PipeConstructor) Pipe
+  func  PreconditionFailedException(message string) *HttpException
+  func  PreconditionRequiredException(message string) *HttpException
+  func  RangeNotSatisfiableException(message string) *HttpException
+  func  RequestHeaderFieldsTooLargeException(message string) *HttpException
+  func  RequestTimeoutException(message string) *HttpException
+  func  ServiceUnavailableException(message string) *HttpException
+  func  StatusFromKind(kind github.com/sao-lang/lania-g/kernel/v3/errors.Kind) int
+  func  TooManyRequestsException(message string, retryAfter time.Duration) *HttpException
+  func  URITooLongException(message string) *HttpException
+  func  UnauthorizedException(message string) *HttpException
+  func  UnavailableForLegalReasonsException(message string) *HttpException
+  func  UnprocessableEntityException(message string) *HttpException
+  func  UnsupportedMediaTypeException(message string) *HttpException
+  func  UpgradeRequiredException(message string) *HttpException
+  func  WrapFilters(items []ExceptionFilter) []ExceptionFilterFunc
+  func  WrapGuard(guard Guard) GuardFunc
+  func  WrapGuards(items []Guard) []GuardFunc
+  func  WrapInterceptor(interceptor Interceptor) InterceptorFunc
+  func  WrapInterceptors(items []Interceptor) []InterceptorFunc
+  func  WrapMiddlewares(items []Middleware) []MiddlewareFunc
+  func  WrapParamPipes(items map[int][]Pipe) map[int][]PipeFunc
+  func  WrapPipe(pipe Pipe) PipeFunc
+  func  WrapPipes(items []Pipe) []PipeFunc
+  method DefaultMiddlewareConsumer.Apply(middlewares ...Middleware) MiddlewareRouteConfigurator
+  method DefaultMiddlewareConsumer.Bindings() []ScopedMiddleware
+  method DefaultValuePipe.Transform(value interface{}, metadata interface{}) (interface{}, error)
+  method ExceptionFilterFunc.Catch(exception interface{}, ctx *ExecutionContext) error
+  method ExecutionContext.GetRequest() interface{}
+  method ExecutionContext.GetResponse() interface{}
+  method GuardFunc.CanActivate(ctx *ExecutionContext) (bool, error)
+  method HttpException.Error() string
+  method HttpException.Unwrap() error
+  method HttpException.WithCause(cause error) *HttpException
+  method HttpException.WithCode(code string) *HttpException
+  method HttpException.WithDetails(details any) *HttpException
+  method HttpException.WithHeaders(headers map[string]string) *HttpException
+  method InterceptorFunc.Intercept(ctx *ExecutionContext, next CallHandler) (interface{}, error)
+  method MiddlewareFunc.Use(ctx *ExecutionContext, next func() error) error
+  method ParseArrayPipe.Transform(value interface{}, metadata interface{}) (interface{}, error)
+  method ParseBoolPipe.Transform(value interface{}, metadata interface{}) (interface{}, error)
+  method ParseFloatPipe.Transform(value interface{}, metadata interface{}) (interface{}, error)
+  method ParseIntPipe.Transform(value interface{}, metadata interface{}) (interface{}, error)
+  method ParseUUIDPipe.Transform(value interface{}, metadata interface{}) (interface{}, error)
+  method PipeFunc.Transform(value interface{}, metadata interface{}) (interface{}, error)
+  method ScopedMiddleware.ShouldApply(method string, path string) bool
+  method ValidationError.Error() string
+  method ValidationException.Error() string
+  method ValidationPipe.Transform(value interface{}, metadata interface{}) (interface{}, error)
+  type  ArgumentMetadata struct{Type reflect.Type; Data string; Metatype reflect.Type}
+  type  CallHandler interface{Handle() (interface{}, error)}
+  type  CanActivate interface{CanActivate(ctx *ExecutionContext) (bool, error)}
+  type  DefaultMiddlewareConsumer struct{bindings []*middlewareBinding}
+  type  DefaultValuePipe struct{defaultValue interface{}}
+  type  ExceptionFilter interface{Catch(exception interface{}, ctx *ExecutionContext) error}
+  type  ExceptionFilterConstructor func() ExceptionFilter
+  type  ExceptionFilterFunc func(exception interface{}, ctx *ExecutionContext) error
+  type  ExecutionContext struct{Context context.Context; HandlerContext interface{}; Handler interface{}; Class interface{}; Request interface{}; Response interface{}; Container interface{}; Protocol string; RouteKey string; ModuleKey string}
+  type  Guard interface{CanActivate}
+  type  GuardConstructor func() Guard
+  type  GuardFunc func(ctx *ExecutionContext) (bool, error)
+  type  HttpException struct{Status int; Message string; Cause error; Headers map[string]string; Code string; Details any}
+  type  Interceptor interface{NestInterceptor}
+  type  InterceptorConstructor func() Interceptor
+  type  InterceptorFunc func(ctx *ExecutionContext, next CallHandler) (interface{}, error)
+  type  Middleware interface{NestMiddleware}
+  type  MiddlewareConfigurable interface{Configure(consumer MiddlewareConsumer)}
+  type  MiddlewareConstructor func() Middleware
+  type  MiddlewareConsumer interface{Apply(middlewares ...Middleware) MiddlewareRouteConfigurator}
+  type  MiddlewareFunc func(ctx *ExecutionContext, next func() error) error
+  type  MiddlewareModule = MiddlewareModule
+  type  MiddlewareRouteConfigurator interface{Exclude(routes ...string) MiddlewareRouteConfigurator; ForRoutes(routes ...string) MiddlewareRouteConfigurator}
+  type  NestInterceptor interface{Intercept(ctx *ExecutionContext, next CallHandler) (interface{}, error)}
+  type  NestMiddleware interface{Use(ctx *ExecutionContext, next func() error) error}
+  type  ParseArrayPipe struct{Separator string; Optional bool}
+  type  ParseBoolPipe struct{ErrorHttpStatus int; ExceptionFactory func(error) error}
+  type  ParseFloatPipe struct{ErrorHttpStatus int; ExceptionFactory func(error) error}
+  type  ParseIntPipe struct{ErrorHttpStatus int; ExceptionFactory func(error) error}
+  type  ParseUUIDPipe struct{ErrorHttpStatus int; ExceptionFactory func(error) error; Version string}
+  type  Pipe interface{PipeTransform}
+  type  PipeConstructor func() Pipe
+  type  PipeFunc func(value interface{}, metadata interface{}) (interface{}, error)
+  type  PipeTransform interface{Transform(value interface{}, metadata interface{}) (interface{}, error)}
+  type  RouteInfo struct{Path string; Method string}
+  type  ScopedMiddleware struct{Middlewares []MiddlewareFunc; IncludeRoutes []string; ExcludeRoutes []string}
+  type  ValidationError struct{Field string; Message string}
+  type  ValidationException struct{Message string; Errors []ValidationError}
+  type  ValidationPipe struct{Whitelist bool; ForbidNonWhitelisted bool; ForbidUnknownValues bool; SkipMissingProperties bool; ExceptionFactory func([]ValidationError) error; validate *github.com/go-playground/validator/v10.Validate; trans github.com/go-playground/universal-translator.Translator}
+
+github.com/sao-lang/lania-g/kernel/v3/aop/pipes
+  func  NewParseEnumPipe(allowed ...string) *ParseEnumPipe
+  func  NewParseTimePipe(layout string) *ParseTimePipe
+  func  NewRequiredPipe() *RequiredPipe
+  func  NewTrimSpacePipe() *TrimSpacePipe
+  method ParseEnumPipe.Transform(value interface{}, _ interface{}) (interface{}, error)
+  method ParseTimePipe.Transform(value interface{}, _ interface{}) (interface{}, error)
+  method RequiredPipe.Transform(value interface{}, _ interface{}) (interface{}, error)
+  method TrimSpacePipe.Transform(value interface{}, _ interface{}) (interface{}, error)
+  type  ParseEnumPipe struct{Allowed []string; IgnoreCase bool}
+  type  ParseTimePipe struct{Layout string; Location *time.Location}
+  type  RequiredPipe struct{Message string}
+  type  TrimSpacePipe struct{}
+
+github.com/sao-lang/lania-g/kernel/v3/compiler
+  const OwnerKindReceiver untyped string
+  const OwnerResolutionAmbiguous OwnerResolutionStatus
+  const OwnerResolutionMissing OwnerResolutionStatus
+  const OwnerResolutionResolved OwnerResolutionStatus
+  func  BuildBoundParamPlans(paramTypes []reflect.Type, bindings map[int]string) []github.com/sao-lang/lania-g/kernel/v3/runtime.ParamPlan
+  func  BuildSnapshotOwnerIndex(snapshot *github.com/sao-lang/lania-g/kernel/v3/scanner.Snapshot, opts SnapshotOwnerOptions) SnapshotOwnerIndex
+  func  Compile(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, plugins ...ProtocolPlugin) (*CompiledApp, error)
+  func  CompileAOPPlan(global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration, local AOPSources) github.com/sao-lang/lania-g/kernel/v3/runtime.AOPPlan
+  func  CompileRouteSet[T any](items []T, compile func(T) (*CompiledRoute[T], error), conflict func(T, string) error) (map[string]*github.com/sao-lang/lania-g/kernel/v3/runtime.Handler, map[string]*github.com/sao-lang/lania-g/kernel/v3/di.Container, error)
+  func  CompileSimpleProtocol[T any](scan any, protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol, pluginID string, invalidScanMessage string, items func(any) ([]T, bool), global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration, compile func(T, github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration) (*CompiledRoute[T], error), conflictReason func(T) string) (*CompiledProtocol, error)
+  func  InstancePointer(v any) uintptr
+  func  NewOwnerResolutionError(pluginID string, declaration string, ownerKind string, token reflect.Type, status OwnerResolutionStatus, candidates []ModuleOwner, meta map[string]any, guidance string) error
+  func  NewOwnerTargetNilError(pluginID string, declaration string, ownerKind string, meta map[string]any) error
+  func  NewRouteConflictError(conflict RouteConflict) error
+  func  PointerToken(v any) reflect.Type
+  func  ProtocolInstaller(protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol, matcher github.com/sao-lang/lania-g/kernel/v3/runtime.RouteMatcher, routes map[string]*github.com/sao-lang/lania-g/kernel/v3/runtime.Handler) func(*github.com/sao-lang/lania-g/kernel/v3/runtime.Router) error
+  func  ScanResolvedRegistryItems[T, O any](pluginID string, moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, nilRegistryMessage string, ownerOpts SnapshotOwnerOptions, declGroup string, cast func(any) (T, bool), receiver func(T) any, declaration func(T) string, meta func(T) map[string]any, guidance string, build func(T, ModuleOwner, reflect.Type) O) ([]O, error)
+  method CompileDiagnostics.Clone() *CompileDiagnostics
+  method CompileDiagnostics.HasCompatFallbacks() bool
+  method CompileError.Error() string
+  method CompileError.Unwrap() error
+  method CompiledApp.Install(rt *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime) error
+  method RouteConflictError.Error() string
+  method RouteConflictError.Unwrap() error
+  method SnapshotOwnerIndex.Resolve(instance any) OwnerResolution
+  type  AOPDiagnostics struct{Middlewares int "json:\"middlewares\""; Guards int "json:\"guards\""; Interceptors int "json:\"interceptors\""; Pipes int "json:\"pipes\""; Filters int "json:\"filters\""; ScopedMiddlewares int "json:\"scopedMiddlewares\""}
+  type  AOPSources struct{Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; ParamPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter; RoutePath string; RouteMethod string}
+  type  CompatFallbackCategorySummary struct{Category string "json:\"category\""; Hits int "json:\"hits\""; Sources int "json:\"sources\""}
+  type  CompatFallbackSourceSummary struct{Source string "json:\"source\""; Hits int "json:\"hits\""}
+  type  CompileDiagnostics struct{RegisteredPlugins []string "json:\"registeredPlugins\""; ProtocolOrder []github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol "json:\"protocolOrder\""; DeclarationCounts map[string]map[string]int "json:\"declarationCounts\""; BindingResolverCount int "json:\"bindingResolverCount\""; RegistrySource string "json:\"registrySource\""; GlobalAOP AOPDiagnostics "json:\"globalAOP\""; Protocols map[github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol]*ProtocolDiagnostics "json:\"protocols\""; RegistryFallbacks []RegistryFallbackDiagnostics "json:\"registryFallbacks\""; RuntimeFallbacks []RuntimeFallbackDiagnostics "json:\"runtimeFallbacks\""; CompatFallbackCategories []CompatFallbackCategorySummary "json:\"compatFallbackCategories\""; CompatFallbackSources []CompatFallbackSourceSummary "json:\"compatFallbackSources\""; RouteConflicts []RouteConflict "json:\"routeConflicts\""; Errors []string "json:\"errors\""; Warnings []string "json:\"warnings\""}
+  type  CompileError struct{Cause error; Diagnostics *CompileDiagnostics}
+  type  CompiledApp struct{BindingRegistry *github.com/sao-lang/lania-g/kernel/v3/runtime.BindingRegistry; Protocols map[github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol]*CompiledProtocol; ProtocolOrder []github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol; RouteContainers map[string]*github.com/sao-lang/lania-g/kernel/v3/di.Container; GlobalAOP github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration; Diagnostics *CompileDiagnostics}
+  type  CompiledProtocol struct{Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol; Routes map[string]*github.com/sao-lang/lania-g/kernel/v3/runtime.Handler; RouteContainers map[string]*github.com/sao-lang/lania-g/kernel/v3/di.Container; Install func(router *github.com/sao-lang/lania-g/kernel/v3/runtime.Router) error}
+  type  CompiledRoute struct{Item T; Handler *github.com/sao-lang/lania-g/kernel/v3/runtime.Handler; RouteKey string; Container *github.com/sao-lang/lania-g/kernel/v3/di.Container}
+  type  ModuleOwner struct{ModuleKey string; ModuleType reflect.Type; Container *github.com/sao-lang/lania-g/kernel/v3/di.Container}
+  type  ModuleRouteDiagnostics struct{ModuleKey string "json:\"moduleKey\""; Routes int "json:\"routes\""; RouteKeys []string "json:\"routeKeys\""}
+  type  OwnerResolution struct{Token reflect.Type; Candidates []ModuleOwner; Owner ModuleOwner; Status OwnerResolutionStatus}
+  type  OwnerResolutionStatus int
+  type  ProtocolDiagnostics struct{Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol "json:\"protocol\""; PluginID string "json:\"pluginId\""; DeclarationKinds map[string]int "json:\"declarationKinds\""; DeclarationCount int "json:\"declarationCount\""; RouteCount int "json:\"routeCount\""; RouteContainers int "json:\"routeContainers\""; OwnerModules []ModuleRouteDiagnostics "json:\"ownerModules\""}
+  type  ProtocolPlugin interface{Compile(scan any, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration) (*CompiledProtocol, error); ID() string; Protocol() github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol; Register(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry); Scan(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) (any, error)}
+  type  RegistryFallbackDiagnostics struct{Key string "json:\"key\""; Category string "json:\"category\""; Summary string "json:\"summary\""}
+  type  RouteConflict struct{RouteKey string "json:\"routeKey\""; Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol "json:\"protocol\""; PluginID string "json:\"pluginId\""; ExistingRoute string "json:\"existingRoute\""; ExistingPlugin string "json:\"existingPlugin\""; Reason string "json:\"reason\""}
+  type  RouteConflictError struct{Conflict RouteConflict; Cause error}
+  type  RuntimeFallbackDiagnostics struct{Key string "json:\"key\""; Category string "json:\"category\""; Summary string "json:\"summary\""}
+  type  SnapshotOwnerIndex struct{OwnerByType map[reflect.Type][]ModuleOwner; OwnerByPointer map[uintptr]ModuleOwner}
+  type  SnapshotOwnerOptions struct{Controllers bool; Resolvers bool; Providers bool}
+
+github.com/sao-lang/lania-g/kernel/v3/di
+  const InjectionAlreadySet InjectionStatus
+  const InjectionInjected InjectionStatus
+  const InjectionMissingProvider InjectionStatus
+  const InjectionNotSettable InjectionStatus
+  const InjectionOptional InjectionStatus
+  const InjectionSkipped InjectionStatus
+  const InjectionTypeMismatch InjectionStatus
+  const InjectionUnexported InjectionStatus
+  const ProviderTypeClass ProviderType
+  const ProviderTypeExisting ProviderType
+  const ProviderTypeFactory ProviderType
+  const ProviderTypeValue ProviderType
+  const Request github.com/sao-lang/lania-g/kernel/v3/metadata.Scope
+  const Singleton github.com/sao-lang/lania-g/kernel/v3/metadata.Scope
+  const Transient github.com/sao-lang/lania-g/kernel/v3/metadata.Scope
+  func  GetByType[T any](c *Container) (T, error)
+  func  Get[T any](c *Container, token interface{}) (T, error)
+  func  MustGetByType[T any](c *Container) T
+  func  MustGet[T any](c *Container, token interface{}) T
+  func  NewContainer() *Container
+  func  ProviderFromFactory[T any](token interface{}, factory func() (T, error), scope Scope) (*Provider, error)
+  func  ProviderFromInstanceWithToken[T any](token interface{}, instance T, scope Scope) (*Provider, error)
+  func  ProviderFromInstance[T any](instance T, scope Scope) (*Provider, error)
+  func  ProviderFromValue[T any](instance T, scope Scope) (*Provider, error)
+  func  RegisterClass[T any](c *Container, token interface{}, scope Scope)
+  func  RegisterExisting[T any](c *Container, token interface{}, existing interface{})
+  func  RegisterFactory[T any](c *Container, token interface{}, factory func() (T, error), scope Scope)
+  func  RegisterValue[T any](c *Container, token interface{}, value T)
+  func  TokenFor[T any]() reflect.Type
+  method Container.Get(token interface{}) (interface{}, error)
+  method Container.GetAll() map[interface{}]*Provider
+  method Container.InjectionProblems() []InjectionRecord
+  method Container.InjectionReport() []InjectionRecord
+  method Container.NewChild() *Container
+  method Container.Register(provider *Provider)
+  method Container.RegisterClass(token interface{}, typ reflect.Type, scope Scope)
+  method Container.RegisterExisting(token interface{}, existing interface{})
+  method Container.RegisterFactory(token interface{}, factory func() (interface{}, error), scope Scope)
+  method Container.RegisterValue(token interface{}, value interface{})
+  method Container.SetConstructorFinder(finder ConstructorFinder)
+  method Container.SetInjectionAudit(enabled bool)
+  method Container.SetParent(parent *Container)
+  method Container.SetStrictInjection(enabled bool)
+  method Container.StrictInjection() bool
+  method InjectionRecord.String() string
+  type  ConstructorFinder func(typ reflect.Type) (reflect.Value, bool)
+  type  Container struct{providers map[interface{}]*Provider; instances map[interface{}]interface{}; resolving map[interface{}]bool; mu sync.RWMutex; instancesMu sync.Mutex; parent *Container; constructorFinder ConstructorFinder; auditMu sync.Mutex; audit []InjectionRecord; strict bool; auditOn bool}
+  type  Injectable interface{Inject(container *Container) error}
+  type  InjectionRecord struct{Token reflect.Type; TargetType reflect.Type; Field string; Status InjectionStatus; Reason string; Candidates []reflect.Type}
+  type  InjectionStatus string
+  type  Provider struct{Token interface{}; Type ProviderType; UseClass reflect.Type; UseValue interface{}; UseFactory func() (interface{}, error); UseExisting interface{}; Scope Scope; Deps []interface{}}
+  type  ProviderType string
+  type  Scope = Scope
+  var   ErrCircularDependency error
+  var   ErrProviderNotFound error
+
+github.com/sao-lang/lania-g/kernel/v3/errors
+  const KindBinding Kind
+  const KindDI Kind
+  const KindExecution Kind
+  const KindForbidden Kind
+  const KindRouteNotFound Kind
+  const KindUnauthorized Kind
+  const KindUnknown Kind
+  const KindValidation Kind
+  func  Classify(err error) Kind
+  func  Normalize(protocol string, routeKey string, moduleKey string, err error) *KernelError
+  func  NormalizeWithMeta(protocol string, routeKey string, moduleKey string, paramIndex int, meta map[string]interface{}, err error) *KernelError
+  method KernelError.Error() string
+  method KernelError.Unwrap() error
+  type  KernelError struct{Kind Kind; Protocol string; RouteKey string; ModuleKey string; ParamIndex int; Message string; Cause error; Meta map[string]interface{}}
+  type  Kind string
+  var   ErrBindingFailed error
+  var   ErrBindingNotFound error
+  var   ErrBindingNotSupported error
+  var   ErrDIResolveFailed error
+  var   ErrExecutionFailed error
+  var   ErrGuardRejected error
+  var   ErrInvalidHandler error
+  var   ErrInvalidParamType error
+  var   ErrInvalidProtocol error
+  var   ErrInvalidReturnType error
+  var   ErrMethodNotFound error
+  var   ErrMiddlewareAborted error
+  var   ErrRouteNotFound error
+
+github.com/sao-lang/lania-g/kernel/v3/graph
+  func  BuildDiagnostics(mods []ModuleNodeInput, providers map[interface{}]*github.com/sao-lang/lania-g/kernel/v3/di.Provider) *Diagnostics
+  func  NewModuleGraph(mods []ModuleNodeInput) *ModuleGraph
+  func  NewProviderGraph(providers map[interface{}]*github.com/sao-lang/lania-g/kernel/v3/di.Provider) *ProviderGraph
+  method Diagnostics.HasIssues() bool
+  method Diagnostics.String() string
+  method ModuleGraph.DetectCycles() [][]string
+  method ModuleGraph.TopologicalSort() ([]string, error)
+  method ProviderGraph.DetectCycles() [][]string
+  method ProviderGraph.TopologicalSort() ([]string, error)
+  type  Diagnostics struct{ModuleCycles [][]string; ProviderCycles [][]string}
+  type  ModuleGraph struct{nodes map[string]struct{}; edges map[string][]string; names map[string]string}
+  type  ModuleNodeInput struct{Key string; Display string; Imports []string}
+  type  ProviderGraph struct{nodes map[string]*github.com/sao-lang/lania-g/kernel/v3/di.Provider; edges map[string][]string}
+
+github.com/sao-lang/lania-g/kernel/v3/integration
+  func  MatchNamedWrapper(pkgPath string, baseName string) func(reflect.Type) (github.com/sao-lang/lania-g/kernel/v3/runtime.WrapperDescriptor, bool)
+  func  NewBindingEntry(name string, token reflect.Type) BindingEntry
+  func  NewBindingEntryFor[T any](name string) BindingEntry
+  func  RegisterContainerBindings(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, entries ...BindingEntry)
+  func  ResolveMarkerName(wrapperType reflect.Type, defaultName string, resolve func(marker any) (string, bool)) string
+  func  WrapFirstField(wrapperType reflect.Type, value reflect.Value) (any, error)
+  type  BindingEntry struct{Name string; Token reflect.Type}
+
+github.com/sao-lang/lania-g/kernel/v3/metadata
+  const ScopeRequest Scope
+  const ScopeSingleton Scope
+  const ScopeTransient Scope
+  func  GetStore() *MetadataStore
+  func  NewMetadataStore() *MetadataStore
+  method MetadataStore.Get(target interface{}, key MetadataKey) (interface{}, bool)
+  method MetadataStore.GetAll(target interface{}) map[MetadataKey]interface{}
+  method MetadataStore.Has(target interface{}, key MetadataKey) bool
+  method MetadataStore.Set(target interface{}, key MetadataKey, value interface{})
+  type  MetadataKey string
+  type  MetadataStore struct{data map[interface{}]map[MetadataKey]interface{}; mu sync.RWMutex}
+  type  Scope string
+
+github.com/sao-lang/lania-g/kernel/v3/module
+  func  AsGlobal(metadata Metadata) *GlobalModule
+  func  CollectScopedMiddlewares(mods []Module) []github.com/sao-lang/lania-g/kernel/v3/aop.ScopedMiddleware
+  func  DeclareAll(root *ModuleRef, declarers ...Declarer) error
+  func  Failed(err error) Module
+  func  GetByType[T any](ref *ModuleRef) (T, error)
+  func  MustGetByType[T any](ref *ModuleRef) T
+  func  New(metadata Metadata) *BaseModule
+  func  NewForwardRef(fn func() Module) ForwardRef
+  func  NewModuleLoader(rootModules ...Module) *ModuleLoader
+  func  NewModuleRef(rootModule Module) *ModuleRef
+  func  Reexport(module Module, tokens ...any) *ModuleReexport
+  func  ResolveController(mod Module, controller any) (any, error)
+  func  WalkModules(root Module, fn func(Module) error) error
+  method AOP.IsZero() bool
+  method BaseModule.Container() *github.com/sao-lang/lania-g/kernel/v3/di.Container
+  method BaseModule.Context() *Context
+  method BaseModule.Destroy() error
+  method BaseModule.Init() error
+  method BaseModule.Metadata() *Metadata
+  method BaseModule.SetModuleContext(ctx *Context)
+  method Context.AOP() AOP
+  method Context.Bind(name string, tokens ...any)
+  method Context.Container() *github.com/sao-lang/lania-g/kernel/v3/di.Container
+  method Context.Key() string
+  method Context.Module() Module
+  method Context.RegisterDecl(protocol string, kind string, items ...any)
+  method Context.Registry() *github.com/sao-lang/lania-g/kernel/v3/registry.Registry
+  method Context.String() string
+  method Context.Use(contribution AOP)
+  method ModuleLoader.GetAOP() AOP
+  method ModuleLoader.GetDiagnostics() *github.com/sao-lang/lania-g/kernel/v3/graph.Diagnostics
+  method ModuleLoader.GetLoadedModules() []Module
+  method ModuleLoader.GetModuleRef() *ModuleRef
+  method ModuleLoader.GetRootModule() Module
+  method ModuleLoader.GetScopedMiddlewares() []github.com/sao-lang/lania-g/kernel/v3/aop.ScopedMiddleware
+  method ModuleLoader.IsLoaded(moduleType interface{}) bool
+  method ModuleLoader.Load(root Module) (*LoadResult, error)
+  method ModuleLoader.LoadModule(mod Module) error
+  method ModuleLoader.LoadMultiple(roots ...Module) (*LoadResult, error)
+  method ModuleLoader.ReloadModule(moduleType interface{}) error
+  method ModuleLoader.SetRegistry(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method ModuleLoader.UnloadModule(moduleType interface{}) error
+  method ModuleRef.Get(token interface{}) (interface{}, error)
+  method ModuleRef.GetAllModules() []Module
+  method ModuleRef.GetAllModulesWithTypes() map[reflect.Type]Module
+  method ModuleRef.GetContainer() *github.com/sao-lang/lania-g/kernel/v3/di.Container
+  method ModuleRef.GetModule(moduleType interface{}) (Module, error)
+  method ModuleRef.GetModuleContainerByType(moduleType reflect.Type) (*github.com/sao-lang/lania-g/kernel/v3/di.Container, bool)
+  method ModuleRef.GetRootModule() Module
+  method ModuleRef.MustGet(token interface{}) interface{}
+  method ModuleRef.MustGetModule(moduleType interface{}) Module
+  type  AOP struct{Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter}
+  type  BaseModule struct{metadata *Metadata; container *github.com/sao-lang/lania-g/kernel/v3/di.Container; context *Context; initialized bool}
+  type  Context struct{module Module; key string; registry *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; aop AOP}
+  type  Declarer interface{Declare(root *ModuleRef) error}
+  type  ForwardRef func() Module
+  type  GlobalModule struct{*BaseModule}
+  type  LoadResult struct{Modules []Module; Providers map[interface{}]*github.com/sao-lang/lania-g/kernel/v3/di.Provider; Controllers []interface{}}
+  type  Metadata struct{Imports []Module; Providers []*github.com/sao-lang/lania-g/kernel/v3/di.Provider; Controllers []any; Resolvers []any; Exports []any; IsGlobal bool; AOP AOP}
+  type  Module interface{Container() *github.com/sao-lang/lania-g/kernel/v3/di.Container; Destroy() error; Init() error; Metadata() *Metadata}
+  type  ModuleContextAware interface{Context() *Context; SetModuleContext(*Context)}
+  type  ModuleLoader struct{modules map[Module]bool; providers map[interface{}]*github.com/sao-lang/lania-g/kernel/v3/di.Provider; controllers []interface{}; rootModule Module; loadedModules map[reflect.Type]Module; moduleRef *ModuleRef; diagnostics *github.com/sao-lang/lania-g/kernel/v3/graph.Diagnostics; registry *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; aop AOP; orderedModules []Module; scopedMiddlewares []github.com/sao-lang/lania-g/kernel/v3/aop.ScopedMiddleware; mu sync.RWMutex}
+  type  ModuleNode struct{Module Module; Children []*ModuleNode}
+  type  ModuleReexport struct{Module Module; Tokens []any}
+  type  ModuleRef struct{module Module; container *github.com/sao-lang/lania-g/kernel/v3/di.Container; modules map[reflect.Type][]Module; mu sync.RWMutex}
+  type  OnApplicationBootstrap interface{OnApplicationBootstrap() error}
+  type  OnApplicationShutdown interface{OnApplicationShutdown() error}
+  type  OnModuleDestroy interface{OnModuleDestroy() error}
+  type  OnModuleInit interface{OnModuleInit() error}
+
+github.com/sao-lang/lania-g/kernel/v3/registry
+  func  New() *Registry
+  method GlobalAOPRegistration.ScopedMiddlewaresFor(method string, path string) []github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  method Registry.ClearDecl(pluginID string, kind string)
+  method Registry.GetBindings() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver
+  method Registry.GetGlobalAOP() GlobalAOPRegistration
+  method Registry.ListDecl(pluginID string, kind string) []any
+  method Registry.RecordFallbackUsage(source string)
+  method Registry.RegisterBindings(resolvers ...github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver)
+  method Registry.RegisterDecl(pluginID string, kind string, items ...any)
+  method Registry.SetScopedMiddlewares(items ...github.com/sao-lang/lania-g/kernel/v3/aop.ScopedMiddleware)
+  method Registry.SnapshotDeclCounts() map[string]map[string]int
+  method Registry.SnapshotFallbackUsage() map[string]int
+  method Registry.UseGlobalFilters(items ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter)
+  method Registry.UseGlobalGuards(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard)
+  method Registry.UseGlobalInterceptors(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor)
+  method Registry.UseGlobalMiddlewares(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware)
+  method Registry.UseGlobalPipes(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe)
+  type  GlobalAOPRegistration struct{Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter; ScopedMiddlewares []github.com/sao-lang/lania-g/kernel/v3/aop.ScopedMiddleware}
+  type  Registry struct{mu sync.RWMutex; decls map[string]map[string][]any; globalAOP GlobalAOPRegistration; bindings []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver; fallbackUsage map[string]int}
+
+github.com/sao-lang/lania-g/kernel/v3/runtime
+  func  AcquireHandlerContext(protocol Protocol) *HandlerContext
+  func  BuildRouteKey(protocol Protocol, method string, path string) string
+  func  NewBindingRegistry() *BindingRegistry
+  func  NewBindingResolver(reg BindingRegistration) BindingResolver
+  func  NewBindingResolvers(regs ...BindingRegistration) []BindingResolver
+  func  NewExecutor(router *Router, pipeline *Pipeline) *Executor
+  func  NewHandler(instance interface{}, methodName string) (*Handler, error)
+  func  NewHandlerByToken(token interface{}, methodName string) (*Handler, error)
+  func  NewHandlerContext(protocol Protocol) *HandlerContext
+  func  NewPipeline() *Pipeline
+  func  NewRouter() *Router
+  func  NewRuntime() *Runtime
+  func  ParseRouteKey(key string) (RouteKey, error)
+  func  ReleaseHandlerContext(hc *HandlerContext)
+  method BindingRegistry.Find(paramType reflect.Type) (BindingResolver, WrapperDescriptor, bool)
+  method BindingRegistry.Register(resolver BindingResolver)
+  method BindingRegistry.RegisterBinding(reg BindingRegistration)
+  method BindingRegistry.RegisterFunc(matcher func(reflect.Type) bool, resolve func(ctx *HandlerContext, paramType reflect.Type) (interface{}, error))
+  method BindingRegistry.Resolve(ctx *HandlerContext, handler *Handler, paramType reflect.Type, paramIndex int) (interface{}, error)
+  method Executor.Execute(ctx *HandlerContext) (interface{}, error)
+  method Executor.RegisterBinding(resolver BindingResolver)
+  method Executor.RegisterBindingFunc(matcher func(reflect.Type) bool, resolve func(ctx *HandlerContext, paramType reflect.Type) (interface{}, error))
+  method Executor.SetRootContainer(container *github.com/sao-lang/lania-g/kernel/v3/di.Container) *Executor
+  method Executor.SetRouteContainers(items map[string]*github.com/sao-lang/lania-g/kernel/v3/di.Container) *Executor
+  method Executor.SetRouter(router *Router) *Executor
+  method Executor.WithBindingRegistry(registry *BindingRegistry) *Executor
+  method Handler.Invoke(ctx *HandlerContext, args []reflect.Value) ([]reflect.Value, error)
+  method Handler.NumParams() int
+  method Handler.NumReturns() int
+  method HandlerContext.Context() context.Context
+  method HandlerContext.Deadline() (time.Time, bool)
+  method HandlerContext.Done() <-chan struct{}
+  method HandlerContext.Err() error
+  method HandlerContext.Get(key string) (interface{}, bool)
+  method HandlerContext.GetContext() context.Context
+  method HandlerContext.MustGet(key string) interface{}
+  method HandlerContext.Require(key string) (interface{}, error)
+  method HandlerContext.Set(key string, value interface{})
+  method HandlerContext.Value(key interface{}) interface{}
+  method HandlerContext.WithContext(ctx context.Context) *HandlerContext
+  method HandlerContext.WithTimeout(timeout time.Duration) (*HandlerContext, context.CancelFunc)
+  method HandlerMeta.WithFilters(filters ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilterFunc) *HandlerMeta
+  method HandlerMeta.WithGuards(guards ...github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc) *HandlerMeta
+  method HandlerMeta.WithInterceptors(interceptors ...github.com/sao-lang/lania-g/kernel/v3/aop.InterceptorFunc) *HandlerMeta
+  method HandlerMeta.WithMiddleware(middlewares ...github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc) *HandlerMeta
+  method HandlerMeta.WithParamPipes(paramIndex int, pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.PipeFunc) *HandlerMeta
+  method HandlerMeta.WithPipes(pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.PipeFunc) *HandlerMeta
+  method Pipeline.HandleError(ctx *HandlerContext, handler *Handler, err error) error
+  method Pipeline.Run(ctx *HandlerContext, handler *Handler, args []reflect.Value) (result interface{}, err error)
+  method Pipeline.UseGlobalFilters(filters ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *Pipeline
+  method Pipeline.UseGlobalGuards(guards ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *Pipeline
+  method Pipeline.UseGlobalInterceptors(interceptors ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *Pipeline
+  method Pipeline.UseGlobalMiddlewares(middlewares ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *Pipeline
+  method Pipeline.UseGlobalPipes(pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *Pipeline
+  method RouteKey.String() string
+  method Router.AllRoutes() map[string]*Handler
+  method Router.Get(routeKey string) (*Handler, bool)
+  method Router.InstallCompiledProtocol(protocol Protocol, matcher RouteMatcher, routes map[string]*Handler) error
+  method Router.Match(ctx *HandlerContext) (*Handler, map[string]string, error)
+  method Router.Register(routeKey string, handler *Handler)
+  method Router.Remove(routeKey string)
+  method Router.SetMatcher(protocol Protocol, m RouteMatcher)
+  method Runtime.Execute(ctx *HandlerContext) (interface{}, error)
+  method Runtime.GetExecutor() *Executor
+  method Runtime.GetPipeline() *Pipeline
+  method Runtime.GetRouter() *Router
+  method Runtime.Register(builder HandlerBuilder) error
+  method Runtime.RegisterBinding(resolver BindingResolver)
+  method Runtime.RegisterBindingFunc(matcher func(reflect.Type) bool, resolve func(ctx *HandlerContext, paramType reflect.Type) (interface{}, error))
+  method Runtime.SetRouter(router *Router) *Runtime
+  method Runtime.UseGlobalFilters(filters ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *Runtime
+  method Runtime.UseGlobalGuards(guards ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *Runtime
+  method Runtime.UseGlobalInterceptors(interceptors ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *Runtime
+  method Runtime.UseGlobalMiddleware(middlewares ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *Runtime
+  method Runtime.UseGlobalPipes(pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *Runtime
+  type  AOPPlan struct{Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.InterceptorFunc; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.PipeFunc; ParamPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.PipeFunc; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilterFunc}
+  type  BindingRegistration struct{Name string; AllowedProtocols map[Protocol]bool; Match func(t reflect.Type) (WrapperDescriptor, bool); Resolve func(ctx *HandlerContext, desc WrapperDescriptor) (interface{}, error)}
+  type  BindingRegistry struct{resolvers []BindingResolver; mu sync.RWMutex; cache map[reflect.Type]bindingCacheEntry; protocolCache map[bindingCacheKey]bindingCacheEntry}
+  type  BindingResolver interface{AllowedProtocols() map[Protocol]bool; Match(paramType reflect.Type) (WrapperDescriptor, bool); Name() string; Resolve(ctx *HandlerContext, desc WrapperDescriptor) (interface{}, error)}
+  type  CompiledRouteNode struct{Static map[string]*CompiledRouteNode; Param *CompiledRouteNode; ParamName string; RouteKey string}
+  type  CompiledRouteTree struct{Methods map[string]*CompiledRouteNode; All *CompiledRouteNode}
+  type  Executor struct{router *Router; pipeline *Pipeline; bindingRegistry *BindingRegistry; rootContainer *github.com/sao-lang/lania-g/kernel/v3/di.Container; routeContainers map[string]*github.com/sao-lang/lania-g/kernel/v3/di.Container}
+  type  Handler struct{ReceiverToken interface{}; Instance interface{}; MethodIndex int; Method reflect.Value; MethodType reflect.Type; Meta *HandlerMeta}
+  type  HandlerBuilder interface{Register(router *Router) error}
+  type  HandlerContext struct{ctx context.Context; Protocol Protocol; RouteKey string; Container *github.com/sao-lang/lania-g/kernel/v3/di.Container; Request *Request; Response *Response; Metadata map[string]interface{}; mu sync.RWMutex}
+  type  HandlerMeta struct{Name string; RouteKey string; Protocol Protocol; ModuleKey string; ParamTypes []reflect.Type; ParamPlans []ParamPlan; CompiledAOP *AOPPlan; ReturnTypes []reflect.Type; Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.InterceptorFunc; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.PipeFunc; ParamPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.PipeFunc; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilterFunc; StatusCode int; Headers map[string]string; RedirectURL string; RedirectCode int; Render string; mu sync.RWMutex}
+  type  ParamPlan struct{Index int; Type reflect.Type; BindingName string}
+  type  Pipeline struct{globalMiddlewares []github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc; globalGuards []github.com/sao-lang/lania-g/kernel/v3/aop.GuardFunc; globalInterceptors []github.com/sao-lang/lania-g/kernel/v3/aop.InterceptorFunc; globalPipes []github.com/sao-lang/lania-g/kernel/v3/aop.PipeFunc; globalFilters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilterFunc}
+  type  Protocol string
+  type  Request struct{Method string; Path string; Headers map[string]string; HeadersMulti map[string][]string; Query map[string]string; QueryMulti map[string][]string; Params map[string]string; Body interface{}; BodyBytes []byte; Raw interface{}}
+  type  Response struct{Status int; Headers map[string]string; Body interface{}; Raw interface{}}
+  type  RouteKey struct{Protocol Protocol; Method string; Path string}
+  type  RouteMatcher interface{Match(ctx *HandlerContext) (*Handler, map[string]string)}
+  type  Router struct{routes map[string]*Handler; matchers map[Protocol]RouteMatcher; mu sync.RWMutex}
+  type  Runtime struct{router *Router; pipeline *Pipeline; executor *Executor}
+  type  WrapperDescriptor struct{BindingName string; Kind string; WrapperType reflect.Type; InnerType reflect.Type; ParamIndex int}
+  var   ErrBindingFailed error
+  var   ErrBindingNotFound error
+  var   ErrBindingNotSupported error
+  var   ErrDIResolveFailed error
+  var   ErrExecutionFailed error
+  var   ErrGuardRejected error
+  var   ErrInvalidHandler error
+  var   ErrInvalidParamType error
+  var   ErrInvalidProtocol error
+  var   ErrInvalidReturnType error
+  var   ErrMethodNotFound error
+  var   ErrMiddlewareAborted error
+  var   ErrRouteNotFound error
+
+github.com/sao-lang/lania-g/kernel/v3/runtime/enhancers
+  const DefaultRequestIDHeader untyped string
+  const RequestIDMetadataKey untyped string
+  func  AccessLog(logger func(AccessEntry)) github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  func  ErrorEnvelope(body func(*github.com/sao-lang/lania-g/kernel/v3/aop.HttpException) any) github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilterFunc
+  func  Recovery(reporter func(recovered any)) github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  func  RequestID(header string, generator func() string) github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  func  Timeout(timeout time.Duration) github.com/sao-lang/lania-g/kernel/v3/aop.MiddlewareFunc
+  type  AccessEntry struct{Protocol string; ModuleKey string; RouteKey string; RequestID string; Method string; Path string; Status int; Duration time.Duration; Err error}
+  type  ErrorBody struct{Code string "json:\"code\""; Message string "json:\"message\""; Details any "json:\"details,omitempty\""}
+
+github.com/sao-lang/lania-g/kernel/v3/scanner
+  func  BuildSnapshot(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef) *Snapshot
+  type  ModuleOwner struct{ModuleKey string; ModuleType reflect.Type; Container *github.com/sao-lang/lania-g/kernel/v3/di.Container}
+  type  Snapshot struct{Modules []github.com/sao-lang/lania-g/kernel/v3/module.Module; Providers map[interface{}]*github.com/sao-lang/lania-g/kernel/v3/di.Provider; Controllers []interface{}; Resolvers []interface{}; ModuleOwners map[reflect.Type]ModuleOwner; ControllerOwners map[reflect.Type][]ModuleOwner; ResolverOwners map[reflect.Type][]ModuleOwner}
+
+github.com/sao-lang/lania-g/protocol/graphql/v3
+  const AdapterID untyped string
+  const FieldTypeMutation FieldType
+  const FieldTypeObject FieldType
+  const FieldTypeQuery FieldType
+  const FieldTypeSubscription FieldType
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(addr ...string) *Adapter
+  func  NewPlugin() github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  func  NewRoutes(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, resolver any) *Routes
+  func  WithDefault(value any) ArgOption
+  func  WithDescription(desc string) ArgOption
+  func  WithRequired(required bool) ArgOption
+  method Adapter.Handler() net/http.Handler
+  method Adapter.ID() string
+  method Adapter.Mount(host github.com/sao-lang/lania-g/kernel/v3/adapter.Host) error
+  method Adapter.MountPlayground(path string) *Adapter
+  method Adapter.Plugins() []github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  method Adapter.ServeHTTP(w net/http.ResponseWriter, r *net/http.Request)
+  method Adapter.Start() error
+  method Adapter.Stop() error
+  method Adapter.WithContextFactory(fn func(*net/http.Request) *github.com/sao-lang/lania-g/protocol/graphql/v3/binding.GraphQLContext) *Adapter
+  method Adapter.WithErrorFormatter(fn func(error) any) *Adapter
+  method Adapter.WithMaxBodyBytes(n int64) *Adapter
+  method Adapter.WithPath(path string) *Adapter
+  method Adapter.WithPlayground(enabled bool) *Adapter
+  method Adapter.WithSchema(schema *Schema) *Adapter
+  method Adapter.WithValidator(v github.com/sao-lang/lania-g/protocol/graphql/v3/binding.Validator) *Adapter
+  method Adapter.WithValidatorV10() *Adapter
+  method FieldBuilder.Arg(name string, options ...ArgOption) *FieldBuilder
+  method FieldBuilder.Args(args ...*ArgBuilder) *FieldBuilder
+  method FieldBuilder.CacheControl(control string) *FieldBuilder
+  method FieldBuilder.Complexity(complexity int) *FieldBuilder
+  method FieldBuilder.Deprecation(reason string) *FieldBuilder
+  method FieldBuilder.Description(desc string) *FieldBuilder
+  method FieldBuilder.Mutation(fieldName string, handler any) *FieldBuilder
+  method FieldBuilder.Object(fieldName string, handler any) *FieldBuilder
+  method FieldBuilder.ObjectType(typeName string) *FieldBuilder
+  method FieldBuilder.Query(fieldName string, handler any) *FieldBuilder
+  method FieldBuilder.RateLimit(limit int, period int64) *FieldBuilder
+  method FieldBuilder.RequirePermission(permission string) *FieldBuilder
+  method FieldBuilder.Return(typeName string) *FieldBuilder
+  method FieldBuilder.Returns(typeName string) *FieldBuilder
+  method FieldBuilder.Subscription(fieldName string, handler any) *FieldBuilder
+  method FieldBuilder.Timeout(milliseconds int64) *FieldBuilder
+  method FieldBuilder.UseFilters(items ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *FieldBuilder
+  method FieldBuilder.UseGuards(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *FieldBuilder
+  method FieldBuilder.UseInterceptors(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *FieldBuilder
+  method FieldBuilder.UseMiddlewares(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *FieldBuilder
+  method FieldBuilder.UseParamPipes(paramIndex int, items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *FieldBuilder
+  method FieldBuilder.UsePipes(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *FieldBuilder
+  method GraphQLError.Error() string
+  method Plugin.Compile(scan any, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration) (*github.com/sao-lang/lania-g/kernel/v3/compiler.CompiledProtocol, error)
+  method Plugin.ID() string
+  method Plugin.Protocol() github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+  method Plugin.Register(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method Plugin.Scan(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) (any, error)
+  method ResolverBuilder.Err() error
+  method ResolverBuilder.Mutation(fieldName string, handler any) *FieldBuilder
+  method ResolverBuilder.Object(fieldName string, handler any) *FieldBuilder
+  method ResolverBuilder.Query(fieldName string, handler any) *FieldBuilder
+  method ResolverBuilder.Subscription(fieldName string, handler any) *FieldBuilder
+  method ResolverBuilder.UseFilters(items ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *ResolverBuilder
+  method ResolverBuilder.UseGuards(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *ResolverBuilder
+  method ResolverBuilder.UseInterceptors(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *ResolverBuilder
+  method ResolverBuilder.UseMiddlewares(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *ResolverBuilder
+  method ResolverBuilder.UseParamPipes(paramIndex int, items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *ResolverBuilder
+  method ResolverBuilder.UsePipes(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *ResolverBuilder
+  method Routes.DisableIntrospection() *Routes
+  method Routes.Err() error
+  method Routes.Resolver(name string) *ResolverBuilder
+  method Routes.UseComplexityLimit(limit int) *Routes
+  method Routes.UseExtensions(extensions ...Extension) *Routes
+  method Routes.UseSchema(schema *Schema) *Routes
+  type  Adapter struct{reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; host github.com/sao-lang/lania-g/kernel/v3/adapter.Host; path string; addr string; server *net/http.Server; playgroundEnabled bool; playgroundPath string; maxBodyBytes int64; errorFormatter func(error) any; contextFactory func(*net/http.Request) *github.com/sao-lang/lania-g/protocol/graphql/v3/binding.GraphQLContext; validator github.com/sao-lang/lania-g/protocol/graphql/v3/binding.Validator; localSchema *Schema; mountedToHTTP bool; listener net.Listener; standalone bool; schema *compiledSchema; mu sync.RWMutex}
+  type  ArgBuilder struct{name string; description string; required bool; defaultValue any}
+  type  ArgDefinition struct{Name string; Description string; Required bool; DefaultValue any}
+  type  ArgOption func(*ArgBuilder)
+  type  ArgSchema struct{Name string; TypeName string; List bool; NonNull bool; Description string; DefaultValue any}
+  type  Config struct{Addr string; Path string; Playground bool; PlaygroundPath string; MaxBodyBytes int64; Validator bool; ValidatorImpl github.com/sao-lang/lania-g/protocol/graphql/v3/binding.Validator; ErrorFormatter func(error) any; ContextFactory func(*net/http.Request) *github.com/sao-lang/lania-g/protocol/graphql/v3/binding.GraphQLContext}
+  type  ConfigDecl struct{Schema *Schema; DisableIntrospection bool; ComplexityLimit int; Extensions []Extension}
+  type  Controller interface{Declare(*Routes)}
+  type  ExecutionInfo struct{Field *github.com/graphql-go/graphql/language/ast.Field; ParentType string; ReturnType string; Path []string; OperationName string}
+  type  Extension interface{AfterOperation(*OperationContext, *GraphQLResponse); BeforeOperation(*OperationContext) error}
+  type  FieldBuilder struct{resolverBuilder *ResolverBuilder; fieldType FieldType; fieldName string; handler any; handlerName string; returns string; description string; deprecation string; args []*ArgBuilder; guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; paramPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter; cacheControl string; permissions []string; timeout int64; complexity int; rateLimit *RateLimitConfig}
+  type  FieldDefinition struct{FieldType FieldType; FieldName string; Handler any; HandlerName string; Returns string; Description string; Deprecation string; Args []*ArgDefinition; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; ParamPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter; CacheControl string; Permissions []string; Timeout int64; Complexity int; RateLimit *RateLimitConfig}
+  type  FieldSchema struct{Name string; TypeName string; List bool; NonNull bool; Description string; Deprecation string; Args map[string]*ArgSchema; Complexity int; CacheControl string}
+  type  FieldType string
+  type  GraphQLError struct{Message string "json:\"message\""; Path []string "json:\"path,omitempty\""; Extensions map[string]any "json:\"extensions,omitempty\""}
+  type  GraphQLRequest struct{Query string "json:\"query\""; Variables map[string]any "json:\"variables\""; OperationName string "json:\"operationName\""; Extensions map[string]any "json:\"extensions\""}
+  type  GraphQLResponse struct{Data any "json:\"data,omitempty\""; Errors []any "json:\"errors,omitempty\""; Extensions any "json:\"extensions,omitempty\""}
+  type  ObjectSchema struct{Name string; Fields map[string]*FieldSchema}
+  type  OperationContext struct{Context context.Context; HTTPRequest *net/http.Request; HTTPResponse net/http.ResponseWriter; Request *GraphQLRequest; Operation *github.com/graphql-go/graphql/language/ast.OperationDefinition; Schema *compiledSchema; Fragments map[string]*github.com/graphql-go/graphql/language/ast.FragmentDefinition; Variables map[string]any; Response *GraphQLResponse; Errors []*GraphQLError}
+  type  Plugin struct{}
+  type  RateLimitConfig struct{Limit int; Period int64}
+  type  ResolverBuilder struct{name string; resolver any; fields []*FieldBuilder; guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; paramPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter; routes *Routes; sealed bool; err error; mu sync.RWMutex}
+  type  ResolverDefinition struct{Name string; Resolver any; Fields []*FieldDefinition; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; ParamPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter}
+  type  Routes struct{reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; resolver any; current *ResolverBuilder; err error}
+  type  Schema struct{Query *ObjectSchema; Mutation *ObjectSchema; Objects map[string]*ObjectSchema; ScalarNames map[string]bool}
+
+github.com/sao-lang/lania-g/protocol/graphql/v3/binding
+  const MetadataKeyContext untyped string
+  const MetadataKeyExtensions untyped string
+  const MetadataKeyField untyped string
+  const MetadataKeyFieldName untyped string
+  const MetadataKeyFieldTyp untyped string
+  const MetadataKeyHeaders untyped string
+  const MetadataKeyInfo untyped string
+  const MetadataKeyOperationName untyped string
+  const MetadataKeyRawQuery untyped string
+  const MetadataKeyRoot untyped string
+  const MetadataKeySelectionSet untyped string
+  const MetadataKeySession untyped string
+  const MetadataKeyValidator untyped string
+  const MetadataKeyVars untyped string
+  func  BindArgsInto(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, obj any) error
+  func  DefaultRegistrations() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingRegistration
+  func  DefaultResolvers() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver
+  func  InitContext(c *GraphQLContext, base context.Context, req *net/http.Request, w net/http.ResponseWriter, operationName string, rawQuery string, fieldType string, fieldName string, path []string, selection *github.com/graphql-go/graphql/language/ast.SelectionSet, root any, info any, vars map[string]any, headers map[string][]string, extensions map[string]any, session map[string]any, args map[string]any)
+  func  NewValidatorV10() *V10Validator
+  func  PackagePath() string
+  func  RegisterDefaults(rt *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime)
+  func  RegisterDefaultsToRegistry(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method GraphQLContext.Arg(key string) (any, bool)
+  method GraphQLContext.Args() map[string]any
+  method GraphQLContext.AttachHandlerContext(rctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext)
+  method GraphQLContext.Extensions() map[string]any
+  method GraphQLContext.FieldName() string
+  method GraphQLContext.FieldType() string
+  method GraphQLContext.Get(key string) (any, bool)
+  method GraphQLContext.Header(key string) string
+  method GraphQLContext.Headers() map[string][]string
+  method GraphQLContext.Info() any
+  method GraphQLContext.OperationName() string
+  method GraphQLContext.Path() []string
+  method GraphQLContext.Query() string
+  method GraphQLContext.Request() *net/http.Request
+  method GraphQLContext.Root() any
+  method GraphQLContext.SelectionSet() *github.com/graphql-go/graphql/language/ast.SelectionSet
+  method GraphQLContext.Session() map[string]any
+  method GraphQLContext.Set(key string, value any)
+  method GraphQLContext.ShouldBindArgs(obj any) error
+  method GraphQLContext.Var(key string) (any, bool)
+  method GraphQLContext.Variables() map[string]any
+  method GraphQLContext.Writer() net/http.ResponseWriter
+  method V10Validator.Validate(obj any) error
+  type  Arg struct{Value T}
+  type  ArgValue struct{Value T}
+  type  Context interface{Arg(key string) (any, bool); Args() map[string]any; Extensions() map[string]any; FieldName() string; FieldType() string; Get(key string) (any, bool); Header(key string) string; Headers() map[string][]string; Info() any; OperationName() string; Path() []string; Query() string; Request() *net/http.Request; Root() any; SelectionSet() *github.com/graphql-go/graphql/language/ast.SelectionSet; Session() map[string]any; Set(key string, value any); ShouldBindArgs(obj any) error; Var(key string) (any, bool); Variables() map[string]any; Writer() net/http.ResponseWriter; context.Context}
+  type  Extensions map[string]any
+  type  FieldName string
+  type  GraphQLContext struct{context.Context; request *net/http.Request; writer net/http.ResponseWriter; vars map[string]any; headers map[string][]string; ext map[string]any; session map[string]any; rawArgs map[string]any; root any; info any; opName string; query string; fieldTyp string; field string; selection *github.com/graphql-go/graphql/language/ast.SelectionSet; path []string; kv map[string]any; rctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext}
+  type  Header struct{Value T}
+  type  Headers map[string][]string
+  type  Host string
+  type  IP string
+  type  Info any
+  type  Method string
+  type  OperationName string
+  type  Parent struct{Value T}
+  type  Path string
+  type  RawQuery string
+  type  Request = Request
+  type  Response = Response
+  type  Root any
+  type  SelectionSet struct{Raw *github.com/graphql-go/graphql/language/ast.SelectionSet; Fields []string}
+  type  Session map[string]any
+  type  URL string
+  type  V10Validator struct{v *github.com/go-playground/validator/v10.Validate}
+  type  Validator interface{Validate(obj any) error}
+  type  Variables map[string]any
+
+github.com/sao-lang/lania-g/protocol/graphql/v3/protocol
+  const Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+
+github.com/sao-lang/lania-g/protocol/grpc/v3
+  const AdapterID untyped string
+  const RPCModeBidiStream RPCMode
+  const RPCModeClientStream RPCMode
+  const RPCModeServerStream RPCMode
+  const RPCModeUnary RPCMode
+  func  InferMethodRequestType(def *MethodDefinition) (reflect.Type, error)
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(addr ...string) *Adapter
+  func  NewPlugin() github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  func  NewRoutes(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, receiver any) *Routes
+  method Adapter.ID() string
+  method Adapter.Mount(host github.com/sao-lang/lania-g/kernel/v3/adapter.Host) error
+  method Adapter.Plugins() []github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  method Adapter.Server() *google.golang.org/grpc.Server
+  method Adapter.Start() error
+  method Adapter.Stop() error
+  method Adapter.WithServer(server *google.golang.org/grpc.Server) *Adapter
+  method Adapter.WithServerOptions(opts ...google.golang.org/grpc.ServerOption) *Adapter
+  method MethodBuilder.BidiStreamMethod(method string, handler any) *MethodBuilder
+  method MethodBuilder.BindParam(paramIndex int, name string) *MethodBuilder
+  method MethodBuilder.ClientStreamMethod(method string, handler any) *MethodBuilder
+  method MethodBuilder.Method(method string, handler any) *MethodBuilder
+  method MethodBuilder.ServerStreamMethod(method string, handler any) *MethodBuilder
+  method MethodBuilder.UseFilters(items ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *MethodBuilder
+  method MethodBuilder.UseGuards(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *MethodBuilder
+  method MethodBuilder.UseInterceptors(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *MethodBuilder
+  method MethodBuilder.UseMiddlewares(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *MethodBuilder
+  method MethodBuilder.UseParamPipes(paramIndex int, pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *MethodBuilder
+  method MethodBuilder.UsePipes(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *MethodBuilder
+  method MethodBuilder.WithReqType(t any) *MethodBuilder
+  method MethodBuilder.WithRespType(t any) *MethodBuilder
+  method Plugin.Compile(scan any, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration) (*github.com/sao-lang/lania-g/kernel/v3/compiler.CompiledProtocol, error)
+  method Plugin.ID() string
+  method Plugin.Protocol() github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+  method Plugin.Register(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method Plugin.Scan(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) (any, error)
+  method RPCMode.ClientStreams() bool
+  method RPCMode.Normalize() RPCMode
+  method RPCMode.ServerStreams() bool
+  method Routes.Err() error
+  method Routes.Service(name string) *ServiceBuilder
+  method ServiceBuilder.BidiStreamMethod(method string, handler any) *MethodBuilder
+  method ServiceBuilder.ClientStreamMethod(method string, handler any) *MethodBuilder
+  method ServiceBuilder.Err() error
+  method ServiceBuilder.Method(method string, handler any) *MethodBuilder
+  method ServiceBuilder.ServerStreamMethod(method string, handler any) *MethodBuilder
+  method ServiceBuilder.UseFilters(items ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *ServiceBuilder
+  method ServiceBuilder.UseGuards(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *ServiceBuilder
+  method ServiceBuilder.UseInterceptors(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *ServiceBuilder
+  method ServiceBuilder.UseMiddlewares(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *ServiceBuilder
+  method ServiceBuilder.UseParamPipes(paramIndex int, pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *ServiceBuilder
+  method ServiceBuilder.UsePipes(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *ServiceBuilder
+  type  Adapter struct{host github.com/sao-lang/lania-g/kernel/v3/adapter.Host; reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; addr string; opts []google.golang.org/grpc.ServerOption; server *google.golang.org/grpc.Server; listener net.Listener; serverProvided bool; started bool; registered bool}
+  type  Config struct{Addr string; Server *google.golang.org/grpc.Server; ServerOptions []google.golang.org/grpc.ServerOption}
+  type  Controller interface{Declare(*Routes)}
+  type  MethodBuilder struct{serviceBuilder *ServiceBuilder; method string; mode RPCMode; handler any; handlerName string; paramBindings map[int]string; reqType reflect.Type; respType reflect.Type; guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; paramPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter}
+  type  MethodDefinition struct{Service string; Method string; Mode RPCMode; Receiver any; HandlerName string; RequestType reflect.Type; ResponseType reflect.Type; ParamBindings map[int]string; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; ParamPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter}
+  type  Plugin struct{}
+  type  RPCMode string
+  type  Routes struct{reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; receiver any; current *ServiceBuilder; err error}
+  type  ServiceBuilder struct{service string; receiver any; methods []*MethodBuilder; guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; paramPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter; registry *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; routes *Routes; sealed bool; mu sync.RWMutex; err error}
+
+github.com/sao-lang/lania-g/protocol/grpc/v3/binding
+  const MetadataKeyContext untyped string
+  const MetadataKeyFullMethod untyped string
+  const MetadataKeyIncomingMetadata untyped string
+  const MetadataKeyMethod untyped string
+  const MetadataKeyMode untyped string
+  const MetadataKeyService untyped string
+  const MetadataKeyValidator untyped string
+  const TagHeader untyped string
+  const TagReq untyped string
+  const TagRequired untyped string
+  func  BindReqInto(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, obj any) error
+  func  BindStreamInto(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, msg any, obj any) error
+  func  DefaultRegistrations() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingRegistration
+  func  DefaultResolvers() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver
+  func  MatchGRPCContext(t reflect.Type) (github.com/sao-lang/lania-g/kernel/v3/runtime.WrapperDescriptor, bool)
+  func  NewGRPCContext(rctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) (GRPCContext, error)
+  func  NewValidatorV10() *V10Validator
+  func  PackagePath() string
+  func  RegisterDefaults(rt *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime)
+  func  RegisterDefaultsToRegistry(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  func  ResolveGRPCContext(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, desc github.com/sao-lang/lania-g/kernel/v3/runtime.WrapperDescriptor) (any, error)
+  method BidiStream.Recv() (Req, error)
+  method BidiStream.Send(msg Resp) error
+  method ClientStream.Recv() (T, error)
+  method ServerStream.Send(msg T) error
+  method V10Validator.Validate(obj any) error
+  type  BidiStream struct{Raw google.golang.org/grpc.ServerStream}
+  type  ClientStream struct{Raw google.golang.org/grpc.ServerStream}
+  type  Context = Context
+  type  FullMethod string
+  type  GRPCContext interface{FullMethod() FullMethod; HandlerContext() *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext; Header(key string) string; Metadata() Metadata; Method() Method; Service() Service; ShouldBindReq(obj any) error; ShouldBindStream(msg any, obj any) error; context.Context}
+  type  Header struct{Value T}
+  type  Headers = Headers
+  type  Metadata map[string][]string
+  type  Method string
+  type  RawServerStream struct{google.golang.org/grpc.ServerStream}
+  type  Req struct{Value T}
+  type  ServerStream struct{Raw google.golang.org/grpc.ServerStream}
+  type  Service string
+  type  V10Validator struct{v *github.com/go-playground/validator/v10.Validate}
+  type  Validator interface{Validate(obj any) error}
+
+github.com/sao-lang/lania-g/protocol/grpc/v3/grpcvalue
+  func  ToMessage(v any) (google.golang.org/protobuf/proto.Message, error)
+  func  ToStruct(v any) (*google.golang.org/protobuf/types/known/structpb.Struct, error)
+
+github.com/sao-lang/lania-g/protocol/grpc/v3/protocol
+  const Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+
+github.com/sao-lang/lania-g/protocol/http/v3
+  const ALL Method
+  const AdapterID untyped string
+  const DELETE Method
+  const GET Method
+  const HEAD Method
+  const OPTIONS Method
+  const PATCH Method
+  const POST Method
+  const PUT Method
+  func  DefaultCorsConfig() *CorsConfig
+  func  DefaultHelmetConfig() *HelmetConfig
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(cfg Config) *Adapter
+  func  NewPlugin() github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  func  NewRoutes(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, controller any) *Routes
+  func  WriteError(w net/http.ResponseWriter, r *net/http.Request, ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, err error)
+  method Adapter.Addr() string
+  method Adapter.ConfigureSharedListen(addr string) error
+  method Adapter.EnableCors(config *CorsConfig) *Adapter
+  method Adapter.EnableHelmet(config *HelmetConfig) *Adapter
+  method Adapter.HandleHTTP(pattern string, handler net/http.Handler)
+  method Adapter.ID() string
+  method Adapter.Mount(host github.com/sao-lang/lania-g/kernel/v3/adapter.Host) error
+  method Adapter.MountHandler(pattern string, handler net/http.Handler) *Adapter
+  method Adapter.Plugins() []github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  method Adapter.RequiresSharedListen() bool
+  method Adapter.ServeHTTP(w net/http.ResponseWriter, r *net/http.Request)
+  method Adapter.ServeStatic(prefix string, root string) *Adapter
+  method Adapter.Start() error
+  method Adapter.Static(prefix string, root string)
+  method Adapter.Stop() error
+  method Adapter.UsePreRouting(mws ...func(*github.com/sao-lang/lania-g/protocol/http/v3/binding.HttpContext) error) *Adapter
+  method Adapter.WithBasePath(prefix string) *Adapter
+  method Adapter.WithMaxBodyBytes(n int64) *Adapter
+  method Adapter.WithNextHandler(h net/http.Handler) *Adapter
+  method Adapter.WithRenderer(r github.com/sao-lang/lania-g/protocol/http/v3/binding.Renderer) *Adapter
+  method Adapter.WithValidator(v github.com/sao-lang/lania-g/protocol/http/v3/binding.Validator) *Adapter
+  method Adapter.WithValidatorV10() *Adapter
+  method Plugin.Compile(scan any, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration) (*github.com/sao-lang/lania-g/kernel/v3/compiler.CompiledProtocol, error)
+  method Plugin.ID() string
+  method Plugin.Protocol() github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+  method Plugin.Register(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method Plugin.Scan(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) (any, error)
+  method Routes.All(path string, handler any) *Routes
+  method Routes.Defs() ([]*RouteDefinition, error)
+  method Routes.Delete(path string, handler any) *Routes
+  method Routes.Description(description string) *Routes
+  method Routes.Err() error
+  method Routes.ErrorResponse(status int, description string) *Routes
+  method Routes.Get(path string, handler any) *Routes
+  method Routes.Head(path string, handler any) *Routes
+  method Routes.Header(key string, value string) *Routes
+  method Routes.Headers(headers map[string]string) *Routes
+  method Routes.HideFromDocs() *Routes
+  method Routes.Options(path string, handler any) *Routes
+  method Routes.Patch(path string, handler any) *Routes
+  method Routes.Post(path string, handler any) *Routes
+  method Routes.Prefix(prefix string) *Routes
+  method Routes.Put(path string, handler any) *Routes
+  method Routes.Redirect(url string, status ...int) *Routes
+  method Routes.Render(template string) *Routes
+  method Routes.ResponseBody(example any) *Routes
+  method Routes.ResponseEnvelope(envelope any, field string) *Routes
+  method Routes.Security(name string, scopes ...string) *Routes
+  method Routes.Status(code int) *Routes
+  method Routes.Summary(summary string) *Routes
+  method Routes.Tags(tags ...string) *Routes
+  method Routes.UseFilters(filters ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *Routes
+  method Routes.UseGuards(guards ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *Routes
+  method Routes.UseInterceptors(interceptors ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *Routes
+  method Routes.UseMiddlewares(middlewares ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *Routes
+  method Routes.UseParamPipes(paramIndex int, pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *Routes
+  method Routes.UsePipes(pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *Routes
+  type  Adapter struct{host github.com/sao-lang/lania-g/kernel/v3/adapter.Host; addr string; basePath string; server *net/http.Server; nextHandler net/http.Handler; maxBodyBytes int64; renderer github.com/sao-lang/lania-g/protocol/http/v3/binding.Renderer; mu sync.Mutex; mountMu sync.RWMutex; mounted []mountedHandler; cors *CorsConfig; helmet *HelmetConfig; preRouting []func(*github.com/sao-lang/lania-g/protocol/http/v3/binding.HttpContext) error; validator github.com/sao-lang/lania-g/protocol/http/v3/binding.Validator}
+  type  Config struct{Addr string; BasePath string; Validator bool; ValidatorImpl github.com/sao-lang/lania-g/protocol/http/v3/binding.Validator; Renderer github.com/sao-lang/lania-g/protocol/http/v3/binding.Renderer; MaxBodyBytes int64; PreRouting []func(*github.com/sao-lang/lania-g/protocol/http/v3/binding.HttpContext) error; CORS *CorsConfig; Helmet *HelmetConfig; NotFound net/http.Handler}
+  type  Controller interface{Declare(*Routes)}
+  type  CorsConfig struct{AllowOrigins []string; AllowOriginFunc func(origin string) bool; AllowMethods []string; AllowHeaders []string; AllowAllHeaders bool; ExposeHeaders []string; AllowCredentials bool; MaxAge int}
+  type  ErrorResponse struct{Code string "json:\"code\""; Message string "json:\"message\""; Details any "json:\"details,omitempty\""; Status int "json:\"status\""; Path string "json:\"path,omitempty\""; Kind string "json:\"kind,omitempty\""; RequestID string "json:\"requestId,omitempty\""}
+  type  HelmetConfig struct{ContentSecurityPolicy string; XContentTypeOptions string; XFrameOptions string; XSSProtection string; StrictTransportSecurity string; ReferrerPolicy string; PermissionsPolicy string; XDNSPrefetchControl string; XDownloadOptions string; XPermittedCrossDomainPolicies string}
+  type  Method string
+  type  Mountable interface{MountHTTP(github.com/sao-lang/lania-g/kernel/v3/adapter.HTTPMountRequest) error}
+  type  Plugin struct{}
+  type  RedirectConfig struct{URL string; Status int}
+  type  RouteDefinition struct{Method Method; Path string; Controller any; MethodName string; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; ParamPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter; StatusCode int; Headers map[string]string; Redirect *RedirectConfig; Render string; Doc *RouteDoc}
+  type  RouteDoc struct{Hidden bool; Summary string; Description string; Tags []string; Security []SecurityRequirement; ResponseType any; ResponseField string; ErrorResponses map[int]string}
+  type  Routes struct{reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; prefix string; controller any; errs []string; scope aopScope; drafts []*routeDraft; cur *routeDraft}
+  type  SecurityRequirement struct{Name string; Scopes []string}
+
+github.com/sao-lang/lania-g/protocol/http/v3/binding
+  const MetadataKeyAuthOptionalToken untyped string
+  const MetadataKeyAuthOptionalUser untyped string
+  const MetadataKeyAuthToken untyped string
+  const MetadataKeyAuthUser untyped string
+  const MetadataKeyAuthUserID untyped string
+  const MetadataKeyContext untyped string
+  const MetadataKeyCookies untyped string
+  const MetadataKeyFiles untyped string
+  const MetadataKeyForm untyped string
+  const MetadataKeyNext untyped string
+  const MetadataKeyRenderer untyped string
+  const MetadataKeySession untyped string
+  const MetadataKeyValidator untyped string
+  const MetadataKeyWritten untyped string
+  const TagBody untyped string
+  const TagCookie untyped string
+  const TagFile untyped string
+  const TagFiles untyped string
+  const TagForm untyped string
+  const TagHeader untyped string
+  const TagJSON untyped string
+  const TagParam untyped string
+  const TagQuery untyped string
+  const TagRequired untyped string
+  func  BindInto(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, obj any) error
+  func  BindStrictInto(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, obj any) error
+  func  DefaultRegistrations() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingRegistration
+  func  DefaultResolvers() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver
+  func  MustBindInto(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, obj any)
+  func  NewHttpContext(rctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) (*HttpContext, error)
+  func  NewSSEStream(w net/http.ResponseWriter) SSEStream
+  func  NewSSEStreamFromContext(ctx Context) SSEStream
+  func  NewUploadedFile(fh *mime/multipart.FileHeader) *UploadedFile
+  func  NewValidatorV10() *V10Validator
+  func  PackagePath() string
+  func  RegisterDefaults(rt *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime)
+  func  RegisterDefaultsToRegistry(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method HttpContext.Abort()
+  method HttpContext.AbortWithError(code int, err error)
+  method HttpContext.Aborted() bool
+  method HttpContext.Bind(obj any) error
+  method HttpContext.BodyBytes() []byte
+  method HttpContext.Cookie(name string) string
+  method HttpContext.Cookies() map[string]string
+  method HttpContext.Data(code int, contentType string, data []byte)
+  method HttpContext.File(key string) *UploadedFile
+  method HttpContext.Files(key string) []*UploadedFile
+  method HttpContext.Get(key string) (any, bool)
+  method HttpContext.GetHeader(key string) string
+  method HttpContext.Header(key string, value string)
+  method HttpContext.JSON(code int, obj any)
+  method HttpContext.Next() error
+  method HttpContext.Param(key string) string
+  method HttpContext.Query(key string) string
+  method HttpContext.QueryDefault(key string, defaultValue string) string
+  method HttpContext.Redirect(code int, location string) error
+  method HttpContext.Render(template string, data any) error
+  method HttpContext.Request() *net/http.Request
+  method HttpContext.ServeFile(path string) error
+  method HttpContext.ServeFileAttachment(path string, filename string) error
+  method HttpContext.Set(key string, value any)
+  method HttpContext.SetCookie(cookie *net/http.Cookie)
+  method HttpContext.ShouldBind(obj any) error
+  method HttpContext.ShouldBindForm(obj any) error
+  method HttpContext.ShouldBindHeader(obj any) error
+  method HttpContext.ShouldBindJSON(obj any) error
+  method HttpContext.ShouldBindQuery(obj any) error
+  method HttpContext.ShouldBindUri(obj any) error
+  method HttpContext.Status(code int)
+  method HttpContext.String(code int, s string)
+  method HttpContext.WriteJSON(code int, obj any) error
+  method HttpContext.Writer() net/http.ResponseWriter
+  method SSEEvent.String() string
+  method UploadedFile.FileHeader() *mime/multipart.FileHeader
+  method UploadedFile.Open() (mime/multipart.File, error)
+  method V10Validator.Validate(obj any) error
+  type  AuthOptionalToken struct{Value string; Claims map[string]any; Authenticated bool}
+  type  AuthOptionalUser struct{Value any; Authenticated bool}
+  type  AuthPermission struct{}
+  type  AuthRole struct{}
+  type  AuthToken struct{Value string; Claims map[string]any}
+  type  AuthUser struct{Value any}
+  type  AuthUserID struct{Value string}
+  type  Bind struct{Value T}
+  type  Body struct{Value T}
+  type  BodyAs struct{Value T}
+  type  BodyBytes []byte
+  type  Context interface{Abort(); AbortWithError(code int, err error); Aborted() bool; Bind(obj any) error; BodyBytes() []byte; Cookie(name string) string; Cookies() map[string]string; Data(code int, contentType string, data []byte); File(key string) *UploadedFile; Files(key string) []*UploadedFile; Get(key string) (any, bool); GetHeader(key string) string; Header(key string, value string); JSON(code int, obj any); Next() error; Param(key string) string; Query(key string) string; QueryDefault(key string, defaultValue string) string; Redirect(code int, location string) error; Render(template string, data any) error; Request() *net/http.Request; ServeFile(path string) error; ServeFileAttachment(path string, filename string) error; Set(key string, value any); SetCookie(cookie *net/http.Cookie); ShouldBind(obj any) error; ShouldBindForm(obj any) error; ShouldBindHeader(obj any) error; ShouldBindJSON(obj any) error; ShouldBindQuery(obj any) error; ShouldBindUri(obj any) error; Status(code int); String(code int, s string); Writer() net/http.ResponseWriter}
+  type  Cookie struct{Value T}
+  type  Cookies map[string]string
+  type  File struct{Value *UploadedFile}
+  type  Files struct{Value []*UploadedFile}
+  type  Form struct{Value T}
+  type  Header struct{Value T}
+  type  Headers map[string][]string
+  type  Host string
+  type  HttpContext struct{rctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext; req *net/http.Request; writer net/http.ResponseWriter; aborted bool}
+  type  IP string
+  type  Method string
+  type  MustBind struct{Value T}
+  type  MustBodyAs struct{Value T}
+  type  MustBodyBytes []byte
+  type  Next func() error
+  type  Original *net/http.Request
+  type  Param struct{Value T}
+  type  Path string
+  type  Query struct{Value T}
+  type  Renderer interface{Render(w net/http.ResponseWriter, r *net/http.Request, template string, data any) error}
+  type  SSEEvent struct{Event string; Data string; ID string; Retry int}
+  type  SSEStream interface{Close() error; Done() <-chan struct{}; Write(event SSEEvent) error}
+  type  Session map[string]any
+  type  URL string
+  type  UploadedFile struct{Filename string; Size int64; Header map[string][]string; fileHeader *mime/multipart.FileHeader}
+  type  V10Validator struct{v *github.com/go-playground/validator/v10.Validate}
+  type  Validator interface{Validate(obj any) error}
+
+github.com/sao-lang/lania-g/protocol/http/v3/protocol
+  const AllMethod string
+  const Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+
+github.com/sao-lang/lania-g/protocol/mq/v3
+  const AdapterID untyped string
+  func  CollectConsumerConfigs(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) []ConsumerConfig
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(driver Driver) *Adapter
+  func  NewPlugin() github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  func  NewRoutes(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, receiver any) *Routes
+  method Adapter.ID() string
+  method Adapter.Mount(host github.com/sao-lang/lania-g/kernel/v3/adapter.Host) error
+  method Adapter.Plugins() []github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  method Adapter.Start() error
+  method Adapter.Stop() error
+  method ConsumerBuilder.Concurrency(n int) *ConsumerBuilder
+  method ConsumerBuilder.Err() error
+  method ConsumerBuilder.Group(group string) *ConsumerBuilder
+  method ConsumerBuilder.On(topic string, handler any) *SubscriptionBuilder
+  method Plugin.Compile(scan any, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration) (*github.com/sao-lang/lania-g/kernel/v3/compiler.CompiledProtocol, error)
+  method Plugin.ID() string
+  method Plugin.Protocol() github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+  method Plugin.Register(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method Plugin.Scan(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) (any, error)
+  method Routes.Consumer(name string) *ConsumerBuilder
+  method Routes.Err() error
+  method SubscriptionBuilder.BindParam(paramIndex int, name string) *SubscriptionBuilder
+  method SubscriptionBuilder.On(topic string, handler any) *SubscriptionBuilder
+  type  Adapter struct{host github.com/sao-lang/lania-g/kernel/v3/adapter.Host; reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; driver Driver; mu sync.Mutex; cancel context.CancelFunc; sessions []Session; started bool}
+  type  Config struct{Driver Driver}
+  type  ConsumerBuilder struct{consumer string; group string; concurrency int; receiver any; routes *Routes; subscriptions []*SubscriptionBuilder; sealed bool; err error; mu sync.RWMutex}
+  type  ConsumerConfig struct{Consumer string; Group string; Topics []string}
+  type  ConsumerDefinition struct{Consumer string; Group string; Concurrency int}
+  type  Controller interface{Declare(*Routes)}
+  type  Driver interface{Open(ctx context.Context, cfg ConsumerConfig) (Session, error)}
+  type  Message struct{Topic string; Key string; Headers map[string][]string; Body []byte; Raw any; RetryCount int; Ack func() error; Nack func(error) error}
+  type  Plugin struct{}
+  type  Routes struct{reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; receiver any; current *ConsumerBuilder; err error}
+  type  Session interface{Close() error; Poll(ctx context.Context) (*Message, error)}
+  type  SubscriptionBuilder struct{consumerBuilder *ConsumerBuilder; topic string; handler any; handlerName string; paramBindings map[int]string}
+  type  SubscriptionDefinition struct{Consumer string; Group string; Topic string; Receiver any; HandlerName string; Concurrency int; ParamBindings map[int]string}
+
+github.com/sao-lang/lania-g/protocol/mq/v3/binding
+  const MetadataKeyAck untyped string
+  const MetadataKeyConsumer untyped string
+  const MetadataKeyHeaders untyped string
+  const MetadataKeyKey untyped string
+  const MetadataKeyNack untyped string
+  const MetadataKeyRetryCount untyped string
+  const MetadataKeyTopic untyped string
+  func  DefaultRegistrations() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingRegistration
+  func  DefaultResolvers() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver
+  func  PackagePath() string
+  func  RegisterDefaults(rt *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime)
+  func  RegisterDefaultsToRegistry(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  type  Ack func() error
+  type  Consumer string
+  type  Context = Context
+  type  Header struct{Value T}
+  type  Headers map[string][]string
+  type  Key string
+  type  Message struct{Value T}
+  type  Nack func(error) error
+  type  RetryCount int
+  type  Topic string
+
+github.com/sao-lang/lania-g/protocol/mq/v3/kafka
+  func  New(cfg Config) *Driver
+  func  NewSession(r Reader) github.com/sao-lang/lania-g/protocol/mq/v3.Session
+  func  NewWithClient(client *github.com/sao-lang/lania-g/integrations/kafka/v3.Client, cfg Config) *Driver
+  func  NewWithReaderFactory(factory github.com/sao-lang/lania-g/integrations/kafka/v3.ReaderFactory, cfg Config) *Driver
+  method Driver.Open(ctx context.Context, cfg github.com/sao-lang/lania-g/protocol/mq/v3.ConsumerConfig) (github.com/sao-lang/lania-g/protocol/mq/v3.Session, error)
+  method Driver.WithReaderFactory(factory func(github.com/segmentio/kafka-go.ReaderConfig) Reader) *Driver
+  type  Config struct{Brokers []string; GroupID string; MinBytes int; MaxBytes int; MaxWait time.Duration; CommitInterval time.Duration; QueueCapacity int; StartOffset int64}
+  type  Driver struct{cfg Config; newReader func(github.com/segmentio/kafka-go.ReaderConfig) reader}
+  type  Reader interface{Close() error; CommitMessages(ctx context.Context, msgs ...github.com/segmentio/kafka-go.Message) error; FetchMessage(ctx context.Context) (github.com/segmentio/kafka-go.Message, error)}
+
+github.com/sao-lang/lania-g/protocol/mq/v3/protocol
+  const Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+
+github.com/sao-lang/lania-g/protocol/scheduler/v3
+  const AdapterID untyped string
+  const MisfireQueue MisfirePolicy
+  const MisfireSkip MisfirePolicy
+  const TriggerAfter TriggerKind
+  const TriggerCron TriggerKind
+  const TriggerEvery TriggerKind
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  MountHTTPBridge(host github.com/sao-lang/lania-g/kernel/v3/adapter.HTTPMountHost, adp *Adapter, pattern string) error
+  func  New() *Adapter
+  func  NewInMemoryUniqueLocker() UniqueLocker
+  func  NewPlugin() github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  func  NewRoutes(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, receiver any) *Routes
+  func  SnapshotHandler(adp *Adapter) net/http.Handler
+  method Adapter.ID() string
+  method Adapter.Mount(host github.com/sao-lang/lania-g/kernel/v3/adapter.Host) error
+  method Adapter.Plugins() []github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  method Adapter.SetHistoryLimit(limit int)
+  method Adapter.SetUniqueLocker(locker UniqueLocker)
+  method Adapter.Snapshot() map[string]JobSnapshot
+  method Adapter.Start() error
+  method Adapter.Stop() error
+  method JobBuilder.After(duration time.Duration, handler any) *JobBuilder
+  method JobBuilder.BindParam(paramIndex int, name string) *JobBuilder
+  method JobBuilder.Cron(expr string, handler any) *JobBuilder
+  method JobBuilder.Err() error
+  method JobBuilder.Every(duration time.Duration, handler any) *JobBuilder
+  method JobBuilder.MaxConcurrency(n int) *JobBuilder
+  method JobBuilder.Misfire(policy MisfirePolicy) *JobBuilder
+  method JobBuilder.Retry(attempts int, backoff time.Duration) *JobBuilder
+  method JobBuilder.Unique(key ...string) *JobBuilder
+  method JobBuilder.WithTimeout(timeout time.Duration) *JobBuilder
+  method Plugin.Compile(scan any, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration) (*github.com/sao-lang/lania-g/kernel/v3/compiler.CompiledProtocol, error)
+  method Plugin.ID() string
+  method Plugin.Protocol() github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+  method Plugin.Register(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method Plugin.Scan(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) (any, error)
+  method Routes.Err() error
+  method Routes.Job(name string) *JobBuilder
+  type  Adapter struct{host github.com/sao-lang/lania-g/kernel/v3/adapter.Host; reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; mu sync.Mutex; cancel context.CancelFunc; started bool; limiters map[string]chan struct{}; uniqueLocker UniqueLocker; historyLimit int; definitions map[string]*JobDefinition; metrics map[string]*JobMetrics; history map[string][]JobRunRecord}
+  type  Config struct{UniqueLocker UniqueLocker; HistoryLimit int}
+  type  Controller interface{Declare(*Routes)}
+  type  JobBuilder struct{name string; receiver any; routes *Routes; definition *JobDefinition; paramBindings map[int]string; sealed bool; err error; mu sync.RWMutex}
+  type  JobDefinition struct{Name string; TriggerKind TriggerKind; Expression string; Duration time.Duration; Receiver any; HandlerName string; MaxConcurrency int; RetryAttempts int; RetryBackoff time.Duration; Unique bool; UniqueKey string; Timeout time.Duration; MisfirePolicy MisfirePolicy; ParamBindings map[int]string}
+  type  JobMetrics struct{JobName string "json:\"jobName\""; Trigger TriggerKind "json:\"trigger\""; TotalRuns int64 "json:\"totalRuns\""; SuccessRuns int64 "json:\"successRuns\""; FailureRuns int64 "json:\"failureRuns\""; LastStartedAt time.Time "json:\"lastStartedAt\""; LastFinishedAt time.Time "json:\"lastFinishedAt\""; LastDuration time.Duration "json:\"lastDuration\""; LastError string "json:\"lastError,omitempty\""; NextRunAt time.Time "json:\"nextRunAt\""}
+  type  JobRunRecord struct{RunID string "json:\"runId\""; JobName string "json:\"jobName\""; Trigger TriggerKind "json:\"trigger\""; ScheduledAt time.Time "json:\"scheduledAt\""; StartedAt time.Time "json:\"startedAt\""; FinishedAt time.Time "json:\"finishedAt\""; Duration time.Duration "json:\"duration\""; Success bool "json:\"success\""; Attempts int "json:\"attempts\""; Error string "json:\"error,omitempty\""}
+  type  JobSnapshot struct{Definition *JobDefinition "json:\"definition,omitempty\""; Metrics JobMetrics "json:\"metrics\""; RecentRuns []JobRunRecord "json:\"recentRuns,omitempty\""}
+  type  MisfirePolicy string
+  type  Plugin struct{}
+  type  Routes struct{reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; receiver any; current *JobBuilder; err error}
+  type  TriggerKind string
+  type  UniqueLocker interface{TryLock(key string) bool; Unlock(key string)}
+
+github.com/sao-lang/lania-g/protocol/scheduler/v3/binding
+  const MetadataKeyJobName untyped string
+  const MetadataKeyRunID untyped string
+  const MetadataKeyScheduledAt untyped string
+  const MetadataKeyTriggerType untyped string
+  func  DefaultRegistrations() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingRegistration
+  func  DefaultResolvers() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver
+  func  RegisterDefaults(rt *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime)
+  func  RegisterDefaultsToRegistry(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  type  Context = Context
+  type  JobName string
+  type  RunID string
+  type  ScheduledAt struct{wall uint64; ext int64; loc *time.Location}
+  type  TriggerType string
+
+github.com/sao-lang/lania-g/protocol/scheduler/v3/protocol
+  const Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+
+github.com/sao-lang/lania-g/protocol/ws/v3
+  const AdapterID untyped string
+  func  Module(cfg Config) github.com/sao-lang/lania-g/kernel/v3/module.Module
+  func  New(addr ...string) *Adapter
+  func  NewPlugin() github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  func  NewRoutes(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, gateway any) *Routes
+  method Adapter.BroadcastToNamespace(namespace string, event string, args ...any) bool
+  method Adapter.BroadcastToRoom(namespace string, room string, event string, args ...any) bool
+  method Adapter.Handler() net/http.Handler
+  method Adapter.ID() string
+  method Adapter.Mount(host github.com/sao-lang/lania-g/kernel/v3/adapter.Host) error
+  method Adapter.Plugins() []github.com/sao-lang/lania-g/kernel/v3/compiler.ProtocolPlugin
+  method Adapter.Reload() error
+  method Adapter.RoomLen(namespace string, room string) int
+  method Adapter.Start() error
+  method Adapter.Stop() error
+  method Adapter.WithErrorEventSuffix(suffix string) *Adapter
+  method Adapter.WithResponseEventSuffix(suffix string) *Adapter
+  method Adapter.WithSocketPath(path string) *Adapter
+  method GatewayBuilder.Err() error
+  method GatewayBuilder.On(event string, handler any) *HandlerBuilder
+  method GatewayBuilder.UseFilters(items ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *GatewayBuilder
+  method GatewayBuilder.UseGuards(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *GatewayBuilder
+  method GatewayBuilder.UseInterceptors(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *GatewayBuilder
+  method GatewayBuilder.UseMiddlewares(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *GatewayBuilder
+  method GatewayBuilder.UseParamPipes(paramIndex int, pipes ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *GatewayBuilder
+  method GatewayBuilder.UsePipes(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *GatewayBuilder
+  method HandlerBuilder.Err() error
+  method HandlerBuilder.On(event string, handler any) *HandlerBuilder
+  method HandlerBuilder.UseFilters(items ...github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter) *HandlerBuilder
+  method HandlerBuilder.UseGuards(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Guard) *HandlerBuilder
+  method HandlerBuilder.UseInterceptors(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor) *HandlerBuilder
+  method HandlerBuilder.UseMiddlewares(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Middleware) *HandlerBuilder
+  method HandlerBuilder.UseParamPipes(paramIndex int, items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *HandlerBuilder
+  method HandlerBuilder.UsePipes(items ...github.com/sao-lang/lania-g/kernel/v3/aop.Pipe) *HandlerBuilder
+  method Plugin.Compile(scan any, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry, global github.com/sao-lang/lania-g/kernel/v3/registry.GlobalAOPRegistration) (*github.com/sao-lang/lania-g/kernel/v3/compiler.CompiledProtocol, error)
+  method Plugin.ID() string
+  method Plugin.Protocol() github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol
+  method Plugin.Register(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method Plugin.Scan(moduleRef *github.com/sao-lang/lania-g/kernel/v3/module.ModuleRef, reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry) (any, error)
+  method Routes.Err() error
+  method Routes.Gateway(prefix string) *GatewayBuilder
+  type  Adapter struct{reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; host github.com/sao-lang/lania-g/kernel/v3/adapter.Host; server *github.com/zishang520/socket.io/socket.Server; handler net/http.Handler; path string; addr string; gatewayMu sync.RWMutex; gatewaysByNS map[string][]gatewayRef; nsMu sync.Mutex; registeredNamespaces map[string]bool; registeredEvents map[string]map[string]string; standalone bool; responseSuffix string; errorSuffix string; mountedToHTTP bool; listener net.Listener; httpServer *net/http.Server; mu sync.Mutex}
+  type  Config struct{Addr string; SocketPath string; ResponseEventSuffix string; ErrorEventSuffix string}
+  type  Controller interface{Declare(*Routes)}
+  type  GatewayBuilder struct{prefix string; gateway any; handlers []*HandlerBuilder; guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; paramPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter; registry *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; routes *Routes; err error}
+  type  HandlerBuilder struct{gatewayBuilder *GatewayBuilder; event string; handler any; methodName string; guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; paramPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter}
+  type  HandlerDefinition struct{Prefix string; Event string; Gateway any; MethodName string; Guards []github.com/sao-lang/lania-g/kernel/v3/aop.Guard; Interceptors []github.com/sao-lang/lania-g/kernel/v3/aop.Interceptor; Middlewares []github.com/sao-lang/lania-g/kernel/v3/aop.Middleware; Pipes []github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; ParamPipes map[int][]github.com/sao-lang/lania-g/kernel/v3/aop.Pipe; Filters []github.com/sao-lang/lania-g/kernel/v3/aop.ExceptionFilter}
+  type  OnWebSocketConnect interface{OnWebSocketConnect(conn any) error}
+  type  OnWebSocketDisconnect interface{OnWebSocketDisconnect(conn any, reason string)}
+  type  OnWebSocketError interface{OnWebSocketError(conn any, err error)}
+  type  Plugin struct{}
+  type  Routes struct{reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry; gateway any; current *GatewayBuilder; err error}
+
+github.com/sao-lang/lania-g/protocol/ws/v3/binding
+  const MetadataKeyContext untyped string
+  const MetadataKeyEvent untyped string
+  const MetadataKeyHeaders untyped string
+  const MetadataKeyServer untyped string
+  const MetadataKeySocket untyped string
+  const MetadataKeyValidator untyped string
+  const TagBody untyped string
+  const TagHeader untyped string
+  const TagJSON untyped string
+  const TagRequired untyped string
+  func  BindInto(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext, obj any) error
+  func  DefaultRegistrations() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingRegistration
+  func  DefaultResolvers() []github.com/sao-lang/lania-g/kernel/v3/runtime.BindingResolver
+  func  NewValidatorV10() *V10Validator
+  func  NewWsContext(ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext) *WsContext
+  func  PackagePath() string
+  func  RegisterDefaults(rt *github.com/sao-lang/lania-g/kernel/v3/runtime.Runtime)
+  func  RegisterDefaultsToRegistry(reg *github.com/sao-lang/lania-g/kernel/v3/registry.Registry)
+  method V10Validator.Validate(obj any) error
+  method WsContext.BroadcastTo(room string, event string, args ...any) error
+  method WsContext.BroadcastToNamespace(event string, args ...any) error
+  method WsContext.Conn() any
+  method WsContext.Disconnect() error
+  method WsContext.Emit(event string, args ...any) error
+  method WsContext.Event() string
+  method WsContext.HandlerContext() *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext
+  method WsContext.Headers() net/http.Header
+  method WsContext.ID() string
+  method WsContext.Join(room string) error
+  method WsContext.Leave(room string) error
+  method WsContext.LeaveAll() error
+  method WsContext.Message() any
+  method WsContext.Namespace() string
+  method WsContext.Query(key string) string
+  method WsContext.RemoteAddr() string
+  method WsContext.Request() *net/http.Request
+  method WsContext.RoomLen(room string) int
+  method WsContext.Rooms() []string
+  method WsContext.Server() any
+  method WsContext.ShouldBindMessage(obj any) error
+  method WsContext.URL() string
+  type  Context interface{BroadcastTo(room string, event string, args ...any) error; BroadcastToNamespace(event string, args ...any) error; Conn() any; Disconnect() error; Emit(event string, args ...any) error; Event() string; HandlerContext() *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext; Headers() net/http.Header; ID() string; Join(room string) error; Leave(room string) error; LeaveAll() error; Message() any; Namespace() string; Query(key string) string; RemoteAddr() string; Request() *net/http.Request; RoomLen(room string) int; Rooms() []string; Server() any; ShouldBindMessage(obj any) error; URL() string}
+  type  Header struct{Value T}
+  type  Headers map[string][]string
+  type  V10Validator struct{v *github.com/go-playground/validator/v10.Validate}
+  type  Validator interface{Validate(obj any) error}
+  type  WSConnectedSocket struct{Value any}
+  type  WSEvent struct{Value string}
+  type  WSHeaders = WSHeaders[T any]
+  type  WSMessageBody struct{Value T}
+  type  WSRooms struct{Value []string}
+  type  WSSocketID struct{Value string}
+  type  WsContext struct{ctx *github.com/sao-lang/lania-g/kernel/v3/runtime.HandlerContext}
+
+github.com/sao-lang/lania-g/protocol/ws/v3/protocol
+  const Protocol github.com/sao-lang/lania-g/kernel/v3/runtime.Protocol

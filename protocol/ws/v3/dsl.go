@@ -1,6 +1,8 @@
 // dsl.go 提供 WS adapter 的声明式注册 DSL。
 package ws
 
+import "github.com/sao-lang/lania-g/kernel/v3/aop"
+
 import (
 	"fmt"
 	"strings"
@@ -66,12 +68,12 @@ type GatewayBuilder struct {
 	prefix         string
 	gateway        any
 	handlers       []*HandlerBuilder
-	guards         []any
-	interceptors   []any
-	middlewares    []any
-	pipes          []any
-	paramPipes     map[int][]any
-	filters        []any
+	guards         []aop.Guard
+	interceptors   []aop.Interceptor
+	middlewares    []aop.Middleware
+	pipes          []aop.Pipe
+	paramPipes     map[int][]aop.Pipe
+	filters        []aop.ExceptionFilter
 	registry       *registry.Registry
 	routes         *Routes
 	err            error
@@ -83,12 +85,12 @@ type HandlerBuilder struct {
 	event          string
 	handler        any
 	methodName     string
-	guards         []any
-	interceptors   []any
-	middlewares    []any
-	pipes          []any
-	paramPipes     map[int][]any
-	filters        []any
+	guards         []aop.Guard
+	interceptors   []aop.Interceptor
+	middlewares    []aop.Middleware
+	pipes          []aop.Pipe
+	paramPipes     map[int][]aop.Pipe
+	filters        []aop.ExceptionFilter
 }
 
 // newGatewayBuilder 构建 GatewayBuilder，并绑定到给定 registry。
@@ -99,7 +101,7 @@ func newGatewayBuilder(prefix string, gateway any, routes *Routes) *GatewayBuild
 		prefix:     prefix,
 		gateway:    gateway,
 		handlers:   make([]*HandlerBuilder, 0),
-		paramPipes: make(map[int][]any),
+		paramPipes: make(map[int][]aop.Pipe),
 		routes:     routes,
 		registry:   routes.reg,
 	}
@@ -108,40 +110,40 @@ func newGatewayBuilder(prefix string, gateway any, routes *Routes) *GatewayBuild
 // UseParamPipes 为 gateway 下的所有 handler 追加“参数级 pipes”。
 //
 // 参数级 pipes 会在运行时对指定参数索引的值做 Transform（见 runtime.Executor.applyParamPipes）。
-func (b *GatewayBuilder) UseParamPipes(paramIndex int, pipes ...any) *GatewayBuilder {
+func (b *GatewayBuilder) UseParamPipes(paramIndex int, pipes ...aop.Pipe) *GatewayBuilder {
 	if b.paramPipes[paramIndex] == nil {
-		b.paramPipes[paramIndex] = make([]any, 0)
+		b.paramPipes[paramIndex] = make([]aop.Pipe, 0)
 	}
 	b.paramPipes[paramIndex] = append(b.paramPipes[paramIndex], pipes...)
 	return b
 }
 
 // UseGuards 为 gateway 下的所有 handler 追加 guards。
-func (b *GatewayBuilder) UseGuards(items ...any) *GatewayBuilder {
+func (b *GatewayBuilder) UseGuards(items ...aop.Guard) *GatewayBuilder {
 	b.guards = append(b.guards, items...)
 	return b
 }
 
 // UseInterceptors 为 gateway 下的所有 handler 追加 interceptors。
-func (b *GatewayBuilder) UseInterceptors(items ...any) *GatewayBuilder {
+func (b *GatewayBuilder) UseInterceptors(items ...aop.Interceptor) *GatewayBuilder {
 	b.interceptors = append(b.interceptors, items...)
 	return b
 }
 
 // UseMiddlewares 为 gateway 下的所有 handler 追加 middlewares。
-func (b *GatewayBuilder) UseMiddlewares(items ...any) *GatewayBuilder {
+func (b *GatewayBuilder) UseMiddlewares(items ...aop.Middleware) *GatewayBuilder {
 	b.middlewares = append(b.middlewares, items...)
 	return b
 }
 
 // UsePipes 为 gateway 下的所有 handler 追加 pipes。
-func (b *GatewayBuilder) UsePipes(items ...any) *GatewayBuilder {
+func (b *GatewayBuilder) UsePipes(items ...aop.Pipe) *GatewayBuilder {
 	b.pipes = append(b.pipes, items...)
 	return b
 }
 
 // UseFilters 为 gateway 下的所有 handler 追加 exception filters。
-func (b *GatewayBuilder) UseFilters(items ...any) *GatewayBuilder {
+func (b *GatewayBuilder) UseFilters(items ...aop.ExceptionFilter) *GatewayBuilder {
 	b.filters = append(b.filters, items...)
 	return b
 }
@@ -155,12 +157,12 @@ func (b *GatewayBuilder) On(event string, handler any) *HandlerBuilder {
 		event:          event,
 		handler:        handler,
 		methodName:     coreadapter.FindMethodName(b.gateway, handler),
-		guards:         make([]any, 0),
-		interceptors:   make([]any, 0),
-		middlewares:    make([]any, 0),
-		pipes:          make([]any, 0),
-		paramPipes:     make(map[int][]any),
-		filters:        make([]any, 0),
+		guards:         make([]aop.Guard, 0),
+		interceptors:   make([]aop.Interceptor, 0),
+		middlewares:    make([]aop.Middleware, 0),
+		pipes:          make([]aop.Pipe, 0),
+		paramPipes:     make(map[int][]aop.Pipe),
+		filters:        make([]aop.ExceptionFilter, 0),
 	}
 	b.handlers = append(b.handlers, h)
 	return h
@@ -190,40 +192,40 @@ func (b *GatewayBuilder) seal() error {
 func (b *GatewayBuilder) Err() error { return b.err }
 
 // UseGuards 为单个 handler 追加 guards（仅对该事件生效）。
-func (hb *HandlerBuilder) UseGuards(items ...any) *HandlerBuilder {
+func (hb *HandlerBuilder) UseGuards(items ...aop.Guard) *HandlerBuilder {
 	hb.guards = append(hb.guards, items...)
 	return hb
 }
 
 // UseInterceptors 为单个 handler 追加 interceptors（仅对该事件生效）。
-func (hb *HandlerBuilder) UseInterceptors(items ...any) *HandlerBuilder {
+func (hb *HandlerBuilder) UseInterceptors(items ...aop.Interceptor) *HandlerBuilder {
 	hb.interceptors = append(hb.interceptors, items...)
 	return hb
 }
 
 // UseMiddlewares 为单个 handler 追加 middlewares（仅对该事件生效）。
-func (hb *HandlerBuilder) UseMiddlewares(items ...any) *HandlerBuilder {
+func (hb *HandlerBuilder) UseMiddlewares(items ...aop.Middleware) *HandlerBuilder {
 	hb.middlewares = append(hb.middlewares, items...)
 	return hb
 }
 
 // UsePipes 为单个 handler 追加 pipes（仅对该事件生效）。
-func (hb *HandlerBuilder) UsePipes(items ...any) *HandlerBuilder {
+func (hb *HandlerBuilder) UsePipes(items ...aop.Pipe) *HandlerBuilder {
 	hb.pipes = append(hb.pipes, items...)
 	return hb
 }
 
 // UseParamPipes 为单个 handler 追加参数级 pipes（仅对该事件生效）。
-func (hb *HandlerBuilder) UseParamPipes(paramIndex int, items ...any) *HandlerBuilder {
+func (hb *HandlerBuilder) UseParamPipes(paramIndex int, items ...aop.Pipe) *HandlerBuilder {
 	if hb.paramPipes[paramIndex] == nil {
-		hb.paramPipes[paramIndex] = make([]any, 0)
+		hb.paramPipes[paramIndex] = make([]aop.Pipe, 0)
 	}
 	hb.paramPipes[paramIndex] = append(hb.paramPipes[paramIndex], items...)
 	return hb
 }
 
 // UseFilters 为单个 handler 追加 exception filters（仅对该事件生效）。
-func (hb *HandlerBuilder) UseFilters(items ...any) *HandlerBuilder {
+func (hb *HandlerBuilder) UseFilters(items ...aop.ExceptionFilter) *HandlerBuilder {
 	hb.filters = append(hb.filters, items...)
 	return hb
 }
@@ -237,12 +239,12 @@ func (hb *HandlerBuilder) build(gb *GatewayBuilder) *HandlerDefinition {
 		Event:        hb.event,
 		Gateway:      gb.gateway,
 		MethodName:   hb.methodName,
-		Guards:       append(append([]any{}, gb.guards...), hb.guards...),
-		Interceptors: append(append([]any{}, gb.interceptors...), hb.interceptors...),
-		Middlewares:  append(append([]any{}, gb.middlewares...), hb.middlewares...),
-		Pipes:        append(append([]any{}, gb.pipes...), hb.pipes...),
+		Guards:       append(append([]aop.Guard{}, gb.guards...), hb.guards...),
+		Interceptors: append(append([]aop.Interceptor{}, gb.interceptors...), hb.interceptors...),
+		Middlewares:  append(append([]aop.Middleware{}, gb.middlewares...), hb.middlewares...),
+		Pipes:        append(append([]aop.Pipe{}, gb.pipes...), hb.pipes...),
 		ParamPipes:   coreadapter.MergeParamPipes(gb.paramPipes, hb.paramPipes),
-		Filters:      append(append([]any{}, gb.filters...), hb.filters...),
+		Filters:      append(append([]aop.ExceptionFilter{}, gb.filters...), hb.filters...),
 	}
 }
 

@@ -1,0 +1,87 @@
+{
+  "comment": [
+    "模块清单：唯一的模块依赖事实来源。",
+    "go run ./tools/cmd/modgen -write   # 按本清单重写各 go.mod 的内部 require/replace",
+    "go run ./tools/cmd/modgen -check   # CI：校验仓库与清单一致",
+    "go run ./tools/cmd/modrun build|test|vet|deps",
+    "deps 表示该模块允许依赖的内部模块；kernel 保持零依赖。"
+  ],
+  "modules": [
+    { "path": ".", "module": "github.com/sao-lang/lania-g", "deps": [] },
+    { "path": "kernel/v3", "module": "github.com/sao-lang/lania-g/kernel/v3", "deps": [] },
+    { "path": "application/v3", "module": "github.com/sao-lang/lania-g/application/v3", "deps": ["kernel/v3", "protocol/http/v3"] },
+    { "path": "protocol/http/v3", "module": "github.com/sao-lang/lania-g/protocol/http/v3", "deps": ["kernel/v3"] },
+    { "path": "protocol/grpc/v3", "module": "github.com/sao-lang/lania-g/protocol/grpc/v3", "deps": ["kernel/v3"] },
+    { "path": "protocol/graphql/v3", "module": "github.com/sao-lang/lania-g/protocol/graphql/v3", "deps": ["kernel/v3"] },
+    { "path": "protocol/ws/v3", "module": "github.com/sao-lang/lania-g/protocol/ws/v3", "deps": ["kernel/v3"] },
+    { "path": "protocol/mq/v3", "module": "github.com/sao-lang/lania-g/protocol/mq/v3", "deps": ["kernel/v3", "integrations/kafka/v3"] },
+    { "path": "protocol/scheduler/v3", "module": "github.com/sao-lang/lania-g/protocol/scheduler/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/auth/v3", "module": "github.com/sao-lang/lania-g/integrations/auth/v3", "deps": ["kernel/v3", "application/v3", "protocol/http/v3"] },
+    { "path": "integrations/cache/v3", "module": "github.com/sao-lang/lania-g/integrations/cache/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/config/v3", "module": "github.com/sao-lang/lania-g/integrations/config/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/es/v3", "module": "github.com/sao-lang/lania-g/integrations/es/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/events/v3", "module": "github.com/sao-lang/lania-g/integrations/events/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/grpc/v3", "module": "github.com/sao-lang/lania-g/integrations/grpc/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/http/v3", "module": "github.com/sao-lang/lania-g/integrations/http/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/kafka/v3", "module": "github.com/sao-lang/lania-g/integrations/kafka/v3", "deps": ["kernel/v3", "protocol/mq/v3"] },
+    { "path": "integrations/logger/v3", "module": "github.com/sao-lang/lania-g/integrations/logger/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/minio/v3", "module": "github.com/sao-lang/lania-g/integrations/minio/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/mongodb/v3", "module": "github.com/sao-lang/lania-g/integrations/mongodb/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/orm/v3", "module": "github.com/sao-lang/lania-g/integrations/orm/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/otel/v3", "module": "github.com/sao-lang/lania-g/integrations/otel/v3", "deps": ["kernel/v3", "application/v3", "integrations/logger/v3", "protocol/http/v3"] },
+    { "path": "integrations/outbox/v3", "module": "github.com/sao-lang/lania-g/integrations/outbox/v3", "deps": ["kernel/v3", "integrations/events/v3", "integrations/orm/v3"] },
+    { "path": "integrations/resilience/v3", "module": "github.com/sao-lang/lania-g/integrations/resilience/v3", "deps": ["kernel/v3"] },
+    { "path": "integrations/swagger/v3", "module": "github.com/sao-lang/lania-g/integrations/swagger/v3", "deps": ["kernel/v3", "application/v3", "protocol/http/v3"] },
+    { "path": "integrations/terminus/v3", "module": "github.com/sao-lang/lania-g/integrations/terminus/v3", "deps": ["kernel/v3", "application/v3", "protocol/http/v3"] },
+    {
+      "path": "cmd",
+      "module": "github.com/sao-lang/lania-g/cmd",
+      "deps": [
+        "kernel/v3",
+        "application/v3",
+        "protocol/http/v3",
+        "protocol/grpc/v3",
+        "protocol/graphql/v3",
+        "protocol/ws/v3",
+        "integrations/swagger/v3"
+      ]
+    },
+    {
+      "path": "tools",
+      "module": "github.com/sao-lang/lania-g/tools",
+      "deps": []
+    },
+    {
+      "path": "test",
+      "module": "github.com/sao-lang/lania-g/test",
+      "deps": [
+        "kernel/v3",
+        "application/v3",
+        "tools",
+        "protocol/http/v3",
+        "protocol/grpc/v3",
+        "protocol/graphql/v3",
+        "protocol/ws/v3",
+        "protocol/mq/v3",
+        "protocol/scheduler/v3",
+        "integrations/auth/v3",
+        "integrations/cache/v3",
+        "integrations/config/v3",
+        "integrations/events/v3",
+        "integrations/grpc/v3",
+        "integrations/kafka/v3",
+        "integrations/logger/v3",
+        "integrations/orm/v3",
+        "integrations/otel/v3",
+        "integrations/outbox/v3",
+        "integrations/resilience/v3",
+        "integrations/es/v3",
+        "integrations/http/v3",
+        "integrations/minio/v3",
+        "integrations/mongodb/v3",
+        "integrations/swagger/v3",
+        "integrations/terminus/v3"
+      ]
+    }
+  ]
+}

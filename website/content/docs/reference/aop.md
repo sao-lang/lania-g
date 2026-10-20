@@ -87,31 +87,48 @@ filter 返回 nil 表示已消费，此时由 filter 自己设置 `ctx.Response.
 HTTP/gRPC/GraphQL/WS 在编译期就把这三段拍平成 `HandlerMeta.CompiledAOP`，
 运行期不再二次合并。
 
-`Use*` 既可以接收 `aop.GuardFunc` / `aop.InterceptorFunc` 这类具名类型，
-也可以直接接收**同签名的裸函数**（编译器会自动转换），因此下面两种写法等价：
+`Use*` 的参数是 AOP 接口（`aop.Guard`、`aop.Interceptor`、`aop.Middleware`、`aop.Pipe`、
+`aop.ExceptionFilter`），`app.UseGlobal*` 与各协议 DSL 用的是同一套类型。因此：
 
 ```go
 func timingInterceptor(ctx *aop.ExecutionContext, next aop.CallHandler) (any, error) { ... }
 
-r.Get("/users", ctrl.List).UseInterceptors(timingInterceptor)
+// 裸函数需要显式转换（类型不符会在编译期报错，不会静默丢弃）
 r.Get("/users", ctrl.List).UseInterceptors(aop.InterceptorFunc(timingInterceptor))
+app.UseGlobalInterceptors(aop.InterceptorFunc(timingInterceptor))
 ```
 
 ## 4. 声明形态
 
-五类增强都支持同样的四种写法，编译器按顺序做类型收敛：
+DSL 的 `Use*` 方法参数是**接口类型**（`aop.Guard`、`aop.Interceptor`、`aop.Middleware`、
+`aop.Pipe`、`aop.ExceptionFilter`），所以下面四种写法都能直接传入：
 
 | # | 形态 | Middleware | Guard | Interceptor | Pipe | Filter |
 |---|------|-----------|-------|-------------|------|--------|
 | 1 | 接口实现 | `Use(ctx, next)` | `CanActivate` | `Intercept` | `Transform` | `Catch` |
 | 2 | 具名函数类型 | `aop.MiddlewareFunc` | `aop.GuardFunc` | `aop.InterceptorFunc` | `aop.PipeFunc` | `aop.ExceptionFilterFunc` |
-| 3 | 同签名裸函数 | `func(*aop.ExecutionContext, func() error) error` | `func(*aop.ExecutionContext) (bool, error)` | `func(*aop.ExecutionContext, aop.CallHandler) (any, error)` | `func(any, any) (any, error)` | `func(any, *aop.ExecutionContext) error` |
-| 4 | 延迟构造器 | `aop.MiddlewareConstructor` | `aop.GuardConstructor` | `aop.InterceptorConstructor` | `aop.PipeConstructor` | `aop.ExceptionFilterConstructor` |
+| 3 | 同签名裸函数 | 需包 `aop.MiddlewareFunc(...)` | 需包 `aop.GuardFunc(...)` | 需包 `aop.InterceptorFunc(...)` | 需包 `aop.PipeFunc(...)` | 需包 `aop.ExceptionFilterFunc(...)` |
+| 4 | 延迟构造器 | `aop.MiddlewareFactory(ctor)` | `aop.GuardFactory(ctor)` | `aop.InterceptorFactory(ctor)` | `aop.PipeFactory(ctor)` | `aop.FilterFactory(ctor)` |
 
-- 构造器在**编译期执行一次**，结果被该路由的所有请求复用；返回 `nil` 视为"不注册"。
-- 与 DSL 的 `Use*` 不同，`app.UseGlobal*` 只接受函数形态（第 2、3 种）。
-- **传错类型会直接编译失败**，返回 `*aop.ErrUnsupported`（包含种类、下标与期望签名），
-  不会再被静默丢弃。
+因为参数是接口而不是 `any`，第 3 种形态需要显式转换：
+
+```go
+r.Get("/users", c.List).UseGuards(aop.GuardFunc(func(ctx *aop.ExecutionContext) (bool, error) {
+	return true, nil
+}))
+```
+
+第 4 种形态用于"增强器依赖 DI 实例、不能提前构造"的场景：
+
+```go
+app.UseGlobalGuards(aop.GuardFactory(func() aop.Guard {
+	return &AuthGuard{Users: container.MustResolve(di.TokenFor[*UserRepo]())}
+}))
+```
+
+- 构造器在**首次调用时**实例化并缓存，之后复用同一个实例。
+- `app.UseGlobal*` 与 `Use*` 接收同一套接口类型，因此 `aop.GuardFactory` 这类包装产物在两边都能直接用。
+- **类型不符会在编译期报错**，不存在"传错类型被静默丢弃"的可能。
 
 ## 5. 内置 Pipe
 
@@ -246,7 +263,7 @@ func (m *AccessScopeModule) Configure(consumer aop.MiddlewareConsumer) {
 
 ```go
 type MiddlewareConsumer interface {
-	Apply(middlewares ...any) MiddlewareRouteConfigurator
+	Apply(middlewares ...Middleware) MiddlewareRouteConfigurator
 }
 
 type MiddlewareRouteConfigurator interface {
@@ -256,7 +273,7 @@ type MiddlewareRouteConfigurator interface {
 ```
 
 - **每次 `Apply` 是一条独立绑定**，不同中间件可以有不同的路由范围。
-- `Apply` 接受与 `UseMiddlewares` 完全相同的四种形态，类型写错会让启动阶段失败。
+- `Apply` 接受的类型与 `UseMiddlewares` 一致，都是 `aop.Middleware`；普通函数要写成 `aop.MiddlewareFunc(fn)`，类型不符会在编译期报错。
 - `Exclude` 优先级高于 `ForRoutes`；`ForRoutes` 为空时默认对所有路由生效。
 - 生效顺序：全局中间件 → 范围化中间件（按模块加载顺序）→ 路由级中间件。
 

@@ -108,13 +108,13 @@ if err != nil {
 ## 5. 全局拦截器
 
 ```go
-app.UseGlobalInterceptors(func(ctx *aop.ExecutionContext, next aop.CallHandler) (any, error) {
+app.UseGlobalInterceptors(aop.InterceptorFunc(func(ctx *aop.ExecutionContext, next aop.CallHandler) (any, error) {
 	result, err := next.Handle()
 	if err != nil {
 		return nil, err
 	}
 	return apiEnvelope{Code: 200, Msg: "ok", Data: result, Success: true}, nil
-})
+}))
 ```
 
 需要模块级 AOP（等价于 Nest 的 `APP_GUARD`/`APP_INTERCEPTOR`）时，

@@ -23,7 +23,7 @@ func Module(cfg Config) module.Module
 | `ValidatorImpl` | 自定义校验器（优先于 `Validator`） |
 | `Renderer` | 模板渲染器 |
 | `MaxBodyBytes` | 请求体上限（默认 10MB） |
-| `Middlewares` | adapter 层中间件（`func(*httpbinding.HttpContext) error`） |
+| `PreRouting` | 路由匹配**之前**的传输层中间件（`func(*httpbinding.HttpContext) error`，gin 风格） |
 | `CORS` / `Helmet` | 内建 CORS / 安全响应头 |
 | `NotFound` | 未命中路由兜底 handler |
 
@@ -39,10 +39,11 @@ root := module.New(module.Metadata{
 ### 命令式入口
 
 ```go
-func New(cfg Config) *Adapter            // 构造未挂载的 adapter（EnableCors/UseAfter 等链式 API）
+func New(cfg Config) *Adapter            // 构造未挂载的 adapter（EnableCors/UsePreRouting 等链式 API）
 func (a *Adapter) Addr() string          // 当前监听地址（app.Listen 可能已覆盖）
 func (a *Adapter) EnableCors(*CorsConfig) *Adapter
 func (a *Adapter) EnableHelmet(*HelmetConfig) *Adapter
+func (a *Adapter) UsePreRouting(mws ...func(*httpbinding.HttpContext) error) *Adapter
 
 // 复用框架统一错误响应（自定义 transport / 中间件用）
 func WriteError(w http.ResponseWriter, r *http.Request, ctx *runtime.HandlerContext, err error)
@@ -82,9 +83,17 @@ func (c *UserController) Declare(r *http.Routes) {
 
 ```go
 Prefix(prefix string) *Routes
-UseGuards / UseInterceptors / UseMiddlewares / UsePipes / UseFilters(items ...any) *Routes
-UseParamPipes(paramIndex int, items ...any) *Routes
+UseGuards(guards ...aop.Guard) *Routes
+UseInterceptors(interceptors ...aop.Interceptor) *Routes
+UseMiddlewares(middlewares ...aop.Middleware) *Routes
+UsePipes(pipes ...aop.Pipe) *Routes
+UseFilters(filters ...aop.ExceptionFilter) *Routes
+UseParamPipes(paramIndex int, pipes ...aop.Pipe) *Routes
 ```
+
+参数是接口类型，所以普通函数需显式包装：`aop.GuardFunc(fn)`、`aop.InterceptorFunc(fn)`、
+`aop.MiddlewareFunc(fn)`、`aop.PipeFunc(fn)`、`aop.ExceptionFilterFunc(fn)`；
+需要延迟构造（依赖 DI 实例）时用 `aop.GuardFactory(newXxx)` 等工厂包装器。
 
 动词方法（开始一条新路由）：
 

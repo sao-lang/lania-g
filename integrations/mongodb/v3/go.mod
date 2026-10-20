@@ -2,10 +2,7 @@ module github.com/sao-lang/lania-g/integrations/mongodb/v3
 
 go 1.25.0
 
-require (
-	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
-	go.mongodb.org/mongo-driver v1.17.9
-)
+require go.mongodb.org/mongo-driver v1.17.9
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
@@ -16,6 +13,7 @@ require (
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect

@@ -153,8 +153,8 @@ func (a *Adapter) executeMiddlewareChain(ctx *runtime.HandlerContext, httpCtx *h
 			return nil
 		}
 		index++
-		if index < len(a.middlewares) {
-			return a.middlewares[index](httpCtx)
+		if index < len(a.preRouting) {
+			return a.preRouting[index](httpCtx)
 		}
 		if !executed {
 			// 首次穿过 middleware 链时进入 runtime.Execute；

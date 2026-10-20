@@ -38,7 +38,7 @@ type Adapter struct {
 	mounted      []mountedHandler
 	cors         *CorsConfig
 	helmet       *HelmetConfig
-	middlewares  []func(*httpbinding.HttpContext) error
+	preRouting   []func(*httpbinding.HttpContext) error
 	validator    httpbinding.Validator
 }
 
@@ -58,7 +58,7 @@ func newAdapter(cfg Config) *Adapter {
 		nextHandler:  http.NotFoundHandler(),
 		maxBodyBytes: 10 << 20,
 		mounted:      make([]mountedHandler, 0),
-		middlewares:  make([]func(*httpbinding.HttpContext) error, 0),
+		preRouting:   make([]func(*httpbinding.HttpContext) error, 0),
 	}
 	if cfg.MaxBodyBytes > 0 {
 		a.maxBodyBytes = cfg.MaxBodyBytes
@@ -80,7 +80,7 @@ func newAdapter(cfg Config) *Adapter {
 	if cfg.Helmet != nil {
 		a.helmet = cfg.Helmet
 	}
-	a.middlewares = append(a.middlewares, cfg.Middlewares...)
+	a.preRouting = append(a.preRouting, cfg.PreRouting...)
 	return a
 }
 
@@ -266,9 +266,11 @@ func (a *Adapter) WithValidatorV10() *Adapter {
 	return a.WithValidator(httpbinding.NewValidatorV10())
 }
 
-// UseAfter 注册 HTTP middleware。
-// 这些 middleware 运行在 adapter 层，围绕 runtime.Execute 形成一条类 gin 的 `ctx.Next()` 链。
-func (a *Adapter) UseAfter(mws ...func(*httpbinding.HttpContext) error) *Adapter {
-	a.middlewares = append(a.middlewares, mws...)
+// UsePreRouting 注册路由匹配前的传输层中间件。
+//
+// 执行时机早于 runtime：mounted handler 与路由都会经过它，但 AOP 不会。
+// 业务横切逻辑请使用 AOP Middleware —— 见 docs/LAYERING.md。
+func (a *Adapter) UsePreRouting(mws ...func(*httpbinding.HttpContext) error) *Adapter {
+	a.preRouting = append(a.preRouting, mws...)
 	return a
 }

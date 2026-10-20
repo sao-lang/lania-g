@@ -1,6 +1,8 @@
 // defs.go 定义 GraphQL adapter 在 registry 与编译阶段使用的声明结构。
 package graphql
 
+import "github.com/sao-lang/lania-g/kernel/v3/aop"
+
 // FieldType 表示 GraphQL 字段类型（Query/Mutation/Object/Subscription）。
 type FieldType string
 
@@ -26,12 +28,12 @@ type ResolverDefinition struct {
 	Name         string
 	Resolver     any
 	Fields       []*FieldDefinition
-	Guards       []any
-	Interceptors []any
-	Middlewares  []any
-	Pipes        []any
-	ParamPipes   map[int][]any
-	Filters      []any
+	Guards       []aop.Guard
+	Interceptors []aop.Interceptor
+	Middlewares  []aop.Middleware
+	Pipes        []aop.Pipe
+	ParamPipes   map[int][]aop.Pipe
+	Filters      []aop.ExceptionFilter
 }
 
 // FieldDefinition 表示 resolver 上某个字段的编译期声明。
@@ -46,12 +48,12 @@ type FieldDefinition struct {
 	Description  string
 	Deprecation  string
 	Args         []*ArgDefinition
-	Guards       []any
-	Interceptors []any
-	Middlewares  []any
-	Pipes        []any
-	ParamPipes   map[int][]any
-	Filters      []any
+	Guards       []aop.Guard
+	Interceptors []aop.Interceptor
+	Middlewares  []aop.Middleware
+	Pipes        []aop.Pipe
+	ParamPipes   map[int][]aop.Pipe
+	Filters      []aop.ExceptionFilter
 	CacheControl string
 	Permissions  []string
 	Timeout      int64

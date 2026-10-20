@@ -163,7 +163,7 @@ func compileMethod(item *methodOwnership, global registry.GlobalAOPRegistration)
 	}
 
 	// gRPC adapter 没有单独发明一套 AOP 机制，而是继续复用统一编译器生成的执行计划。
-	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{
+	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{
 		Middlewares:  def.Middlewares,
 		Guards:       def.Guards,
 		Interceptors: def.Interceptors,
@@ -172,9 +172,6 @@ func compileMethod(item *methodOwnership, global registry.GlobalAOPRegistration)
 		Filters:      def.Filters,
 		RoutePath:    grpcRoutePath(def),
 	})
-	if err != nil {
-		return nil, "", err
-	}
 	h.Meta.CompiledAOP = &plan
 
 	// gRPC 参数名通常不是从函数签名里猜，而是由 DSL 显式记录到 ParamBindings。

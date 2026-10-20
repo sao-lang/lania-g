@@ -89,9 +89,9 @@ func NewCacheModule() *CacheModule {
 	cache := NewCache()
 	p, _ := di.ProviderFromValue[*Cache](cache, di.Singleton)
 	return &CacheModule{
-		BaseModule: module.NewBaseModule(&module.ModuleMetadata{
+		BaseModule: module.New(module.Metadata{
 			Providers: []*di.Provider{p},
-			Exports:   []any{di.TokenFor[*Cache]()},
+						Exports:   []any{di.TokenFor[*Cache]()},
 		}),
 		cache: cache,
 	}

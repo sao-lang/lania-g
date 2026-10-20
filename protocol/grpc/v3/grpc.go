@@ -54,19 +54,6 @@ func New(addr ...string) *Adapter {
 	return a
 }
 
-// Listen 仅为兼容旧写法保留。
-// Deprecated: 请改用 `grpc.New(":addr")`。
-func Listen(addr string) *Adapter { return New(addr) }
-
-// WithAddr 仅为兼容旧写法保留。
-// Deprecated: 请改用 `grpc.New(":addr")`。
-func (a *Adapter) WithAddr(addr string) *Adapter {
-	if strings.TrimSpace(addr) != "" {
-		a.addr = addr
-	}
-	return a
-}
-
 // ID 返回 adapter 标识。
 func (a *Adapter) ID() string { return AdapterID }
 

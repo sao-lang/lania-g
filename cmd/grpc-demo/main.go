@@ -696,7 +696,7 @@ func main() {
 
 	// 这里保留全局 interceptor，用来在一个文件里同时演示鉴权与响应整形；
 	// 它会刻意比业务 app demo 更偏高级能力展示。
-	app.UseGlobalInterceptors(grpcEnvelopeInterceptor, grpcAuthInterceptor(store))
+	app.UseGlobalInterceptors(aop.InterceptorFunc(grpcEnvelopeInterceptor), grpcAuthInterceptor(store))
 
 
 	if err := app.Run(); err != nil {

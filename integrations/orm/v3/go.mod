@@ -2,10 +2,7 @@ module github.com/sao-lang/lania-g/integrations/orm/v3
 
 go 1.25.0
 
-require (
-	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
-	gorm.io/gorm v1.31.1
-)
+require gorm.io/gorm v1.31.1
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
@@ -15,6 +12,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect

@@ -10,15 +10,16 @@ package application
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/sao-lang/lania-g/kernel/v3/adapter"
 	"github.com/sao-lang/lania-g/kernel/v3/aop"
 	"github.com/sao-lang/lania-g/kernel/v3/compiler"
+	"github.com/sao-lang/lania-g/kernel/v3/di"
 	"github.com/sao-lang/lania-g/kernel/v3/graph"
 	"github.com/sao-lang/lania-g/kernel/v3/module"
 	"github.com/sao-lang/lania-g/kernel/v3/registry"
 	"github.com/sao-lang/lania-g/kernel/v3/runtime"
-	"sync"
 )
 
 // Application 持有模块树、声明仓库、适配器与运行期状态。
@@ -45,6 +46,10 @@ type Application struct {
 type Options struct {
 	// Logger 非空时输出启动报告。
 	Logger io.Writer
+	// StrictInjection 为 true 时，导出零值字段如果没有对应 provider 会直接报错。
+	//
+	// 用 `di:"optional"` 标记的字段不受影响。建议在测试与示例项目中开启。
+	StrictInjection bool
 }
 
 // New 基于根模块创建应用。
@@ -65,6 +70,9 @@ func New(root module.Module, opts Options) (*Application, error) {
 	rt := runtime.NewRuntime()
 	if ref := loader.GetModuleRef(); ref != nil {
 		rt.GetExecutor().SetRootContainer(ref.GetContainer())
+		if opts.StrictInjection {
+			ref.GetContainer().SetStrictInjection(true)
+		}
 	}
 
 	app := &Application{
@@ -132,6 +140,16 @@ func (a *Application) LastCompileDiagnostics() *compiler.CompileDiagnostics {
 	return a.lastDiagnostics.Clone()
 }
 
+// InjectionProblems 返回模块容器里的注入问题（缺失 provider / 类型不匹配）。
+//
+// 典型用法：在启动自检或测试里断言它为空。
+func (a *Application) InjectionProblems() []di.InjectionRecord {
+	if a == nil || a.moduleRef == nil {
+		return nil
+	}
+	return a.moduleRef.GetContainer().InjectionProblems()
+}
+
 // Diagnostics 返回最近一次编译诊断快照。
 func (a *Application) Diagnostics() *compiler.CompileDiagnostics {
 	return a.LastCompileDiagnostics()
@@ -178,26 +196,26 @@ func (a *Application) Adapter(adapterID string) (adapter.Adapter, bool) {
 }
 
 // UseGlobalMiddlewares 注册全局 middlewares（对所有协议路由生效）。
-func (a *Application) UseGlobalMiddlewares(mws ...aop.MiddlewareFunc) {
+func (a *Application) UseGlobalMiddlewares(mws ...aop.Middleware) {
 	a.registry.UseGlobalMiddlewares(mws...)
 }
 
 // UseGlobalGuards 注册全局 guards（对所有协议路由生效）。
-func (a *Application) UseGlobalGuards(gs ...aop.GuardFunc) {
+func (a *Application) UseGlobalGuards(gs ...aop.Guard) {
 	a.registry.UseGlobalGuards(gs...)
 }
 
 // UseGlobalInterceptors 注册全局 interceptors（对所有协议路由生效）。
-func (a *Application) UseGlobalInterceptors(is ...aop.InterceptorFunc) {
+func (a *Application) UseGlobalInterceptors(is ...aop.Interceptor) {
 	a.registry.UseGlobalInterceptors(is...)
 }
 
 // UseGlobalPipes 注册全局 pipes（对所有协议路由生效）。
-func (a *Application) UseGlobalPipes(ps ...aop.PipeFunc) {
+func (a *Application) UseGlobalPipes(ps ...aop.Pipe) {
 	a.registry.UseGlobalPipes(ps...)
 }
 
 // UseGlobalFilters 注册全局 exception filters（对所有协议路由生效）。
-func (a *Application) UseGlobalFilters(fs ...aop.ExceptionFilterFunc) {
+func (a *Application) UseGlobalFilters(fs ...aop.ExceptionFilter) {
 	a.registry.UseGlobalFilters(fs...)
 }

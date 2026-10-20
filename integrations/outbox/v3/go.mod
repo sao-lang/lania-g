@@ -3,9 +3,6 @@ module github.com/sao-lang/lania-g/integrations/outbox/v3
 go 1.25.0
 
 require (
-	github.com/sao-lang/lania-g/integrations/events/v3 v3.0.0
-	github.com/sao-lang/lania-g/integrations/orm/v3 v3.0.0
-	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 	github.com/google/uuid v1.6.0
 	go.mongodb.org/mongo-driver v1.17.9
 	gorm.io/gorm v1.31.1
@@ -22,6 +19,9 @@ require (
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/sao-lang/lania-g/integrations/events/v3 v3.0.0
+	github.com/sao-lang/lania-g/integrations/orm/v3 v3.0.0
+	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
@@ -32,8 +32,8 @@ require (
 	golang.org/x/text v0.35.0 // indirect
 )
 
-replace github.com/sao-lang/lania-g/integrations/events/v3 => ../../../integrations/events/v3
+replace github.com/sao-lang/lania-g/integrations/events/v3 => ../../events/v3
 
-replace github.com/sao-lang/lania-g/integrations/orm/v3 => ../../../integrations/orm/v3
+replace github.com/sao-lang/lania-g/integrations/orm/v3 => ../../orm/v3
 
 replace github.com/sao-lang/lania-g/kernel/v3 => ../../../kernel/v3

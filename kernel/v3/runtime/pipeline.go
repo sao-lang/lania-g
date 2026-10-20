@@ -38,32 +38,32 @@ func NewPipeline() *Pipeline {
 }
 
 // UseGlobalMiddlewares 注册全局中间件。
-func (p *Pipeline) UseGlobalMiddlewares(middlewares ...aop.MiddlewareFunc) *Pipeline {
-	p.globalMiddlewares = append(p.globalMiddlewares, middlewares...)
+func (p *Pipeline) UseGlobalMiddlewares(middlewares ...aop.Middleware) *Pipeline {
+	p.globalMiddlewares = append(p.globalMiddlewares, aop.WrapMiddlewares(middlewares)...)
 	return p
 }
 
 // UseGlobalGuards 注册全局守卫。
-func (p *Pipeline) UseGlobalGuards(guards ...aop.GuardFunc) *Pipeline {
-	p.globalGuards = append(p.globalGuards, guards...)
+func (p *Pipeline) UseGlobalGuards(guards ...aop.Guard) *Pipeline {
+	p.globalGuards = append(p.globalGuards, aop.WrapGuards(guards)...)
 	return p
 }
 
 // UseGlobalInterceptors 注册全局拦截器。
-func (p *Pipeline) UseGlobalInterceptors(interceptors ...aop.InterceptorFunc) *Pipeline {
-	p.globalInterceptors = append(p.globalInterceptors, interceptors...)
+func (p *Pipeline) UseGlobalInterceptors(interceptors ...aop.Interceptor) *Pipeline {
+	p.globalInterceptors = append(p.globalInterceptors, aop.WrapInterceptors(interceptors)...)
 	return p
 }
 
 // UseGlobalPipes 注册全局管道。
-func (p *Pipeline) UseGlobalPipes(pipes ...aop.PipeFunc) *Pipeline {
-	p.globalPipes = append(p.globalPipes, pipes...)
+func (p *Pipeline) UseGlobalPipes(pipes ...aop.Pipe) *Pipeline {
+	p.globalPipes = append(p.globalPipes, aop.WrapPipes(pipes)...)
 	return p
 }
 
 // UseGlobalFilters 注册全局异常过滤器。
-func (p *Pipeline) UseGlobalFilters(filters ...aop.ExceptionFilterFunc) *Pipeline {
-	p.globalFilters = append(p.globalFilters, filters...)
+func (p *Pipeline) UseGlobalFilters(filters ...aop.ExceptionFilter) *Pipeline {
+	p.globalFilters = append(p.globalFilters, aop.WrapFilters(filters)...)
 	return p
 }
 

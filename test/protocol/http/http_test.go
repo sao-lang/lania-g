@@ -301,7 +301,7 @@ func TestAdapter_ReadBody_RestoresForDownstream(t *testing.T) {
 	}))
 
 	// 调用两次 `Next()`，确保 `runtime.Execute` 之后还能继续进入下游 `nextHandler`。
-	a.UseAfter(func(ctx *httpbinding.HttpContext) error {
+	a.UsePreRouting(func(ctx *httpbinding.HttpContext) error {
 		if err := ctx.Next(); err != nil {
 			return err
 		}

@@ -144,8 +144,8 @@ func (m *integrationModule) Init() error {
 	)
 	registerBindings(reg)
 	m.Context().Use(module.AOP{
-		Middlewares:  []aop.MiddlewareFunc{m.telemetry.Middleware()},
-		Interceptors: []aop.InterceptorFunc{m.telemetry.Interceptor()},
+		Middlewares:  []aop.Middleware{m.telemetry.Middleware()},
+		Interceptors: []aop.Interceptor{m.telemetry.Interceptor()},
 	})
 	return nil
 }

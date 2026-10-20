@@ -26,31 +26,16 @@ func httpStatusText(status int) string {
 	return "HTTP " + strconv.Itoa(status)
 }
 
-// NewHttpExceptionWithStatus 创建一个指定状态码的异常。
-//
-// message 为空时使用该状态码的标准文案。
-func NewHttpExceptionWithStatus(status int, message string) *HttpException {
-	return statusException(status, message)
-}
-
-// statusException 是内部构造入口：message 为空时回退到状态码标准文案。
-func statusException(status int, message string) *HttpException {
-	if message == "" {
-		message = httpStatusText(status)
-	}
-	return NewHttpException(message, status)
-}
-
 // PaymentRequiredException 创建 402 Payment Required 异常。
 func PaymentRequiredException(message string) *HttpException {
-	return statusException(http.StatusPaymentRequired, message)
+	return NewHttpException(http.StatusPaymentRequired, message)
 }
 
 // MethodNotAllowedException 创建 405 Method Not Allowed 异常。
 //
 // allow 会写入 `Allow` 响应头；为空时保持不写。
 func MethodNotAllowedException(message string, allow ...string) *HttpException {
-	e := statusException(http.StatusMethodNotAllowed, message)
+	e := NewHttpException(http.StatusMethodNotAllowed, message)
 	if len(allow) > 0 {
 		e.WithHeaders(map[string]string{"Allow": joinHeaderValues(allow)})
 	}
@@ -59,54 +44,54 @@ func MethodNotAllowedException(message string, allow ...string) *HttpException {
 
 // LengthRequiredException 创建 411 Length Required 异常。
 func LengthRequiredException(message string) *HttpException {
-	return statusException(http.StatusLengthRequired, message)
+	return NewHttpException(http.StatusLengthRequired, message)
 }
 
 // PreconditionFailedException 创建 412 Precondition Failed 异常。
 func PreconditionFailedException(message string) *HttpException {
-	return statusException(http.StatusPreconditionFailed, message)
+	return NewHttpException(http.StatusPreconditionFailed, message)
 }
 
 // URITooLongException 创建 414 URI Too Long 异常。
 func URITooLongException(message string) *HttpException {
-	return statusException(http.StatusRequestURITooLong, message)
+	return NewHttpException(http.StatusRequestURITooLong, message)
 }
 
 // RangeNotSatisfiableException 创建 416 Range Not Satisfiable 异常。
 func RangeNotSatisfiableException(message string) *HttpException {
-	return statusException(http.StatusRequestedRangeNotSatisfiable, message)
+	return NewHttpException(http.StatusRequestedRangeNotSatisfiable, message)
 }
 
 // ExpectationFailedException 创建 417 Expectation Failed 异常。
 func ExpectationFailedException(message string) *HttpException {
-	return statusException(http.StatusExpectationFailed, message)
+	return NewHttpException(http.StatusExpectationFailed, message)
 }
 
 // LockedException 创建 423 Locked 异常。
 func LockedException(message string) *HttpException {
-	return statusException(http.StatusLocked, message)
+	return NewHttpException(http.StatusLocked, message)
 }
 
 // FailedDependencyException 创建 424 Failed Dependency 异常。
 func FailedDependencyException(message string) *HttpException {
-	return statusException(http.StatusFailedDependency, message)
+	return NewHttpException(http.StatusFailedDependency, message)
 }
 
 // UpgradeRequiredException 创建 426 Upgrade Required 异常。
 func UpgradeRequiredException(message string) *HttpException {
-	return statusException(http.StatusUpgradeRequired, message)
+	return NewHttpException(http.StatusUpgradeRequired, message)
 }
 
 // PreconditionRequiredException 创建 428 Precondition Required 异常。
 func PreconditionRequiredException(message string) *HttpException {
-	return statusException(http.StatusPreconditionRequired, message)
+	return NewHttpException(http.StatusPreconditionRequired, message)
 }
 
 // TooManyRequestsException 创建 429 Too Many Requests 异常。
 //
 // retryAfter > 0 时会写入 `Retry-After` 响应头（单位：秒）。
 func TooManyRequestsException(message string, retryAfter time.Duration) *HttpException {
-	e := statusException(http.StatusTooManyRequests, message)
+	e := NewHttpException(http.StatusTooManyRequests, message)
 	if retryAfter > 0 {
 		seconds := int(retryAfter.Round(time.Second) / time.Second)
 		if seconds < 1 {
@@ -119,32 +104,32 @@ func TooManyRequestsException(message string, retryAfter time.Duration) *HttpExc
 
 // RequestHeaderFieldsTooLargeException 创建 431 Request Header Fields Too Large 异常。
 func RequestHeaderFieldsTooLargeException(message string) *HttpException {
-	return statusException(http.StatusRequestHeaderFieldsTooLarge, message)
+	return NewHttpException(http.StatusRequestHeaderFieldsTooLarge, message)
 }
 
 // UnavailableForLegalReasonsException 创建 451 Unavailable For Legal Reasons 异常。
 func UnavailableForLegalReasonsException(message string) *HttpException {
-	return statusException(http.StatusUnavailableForLegalReasons, message)
+	return NewHttpException(http.StatusUnavailableForLegalReasons, message)
 }
 
 // HTTPVersionNotSupportedException 创建 505 HTTP Version Not Supported 异常。
 func HTTPVersionNotSupportedException(message string) *HttpException {
-	return statusException(http.StatusHTTPVersionNotSupported, message)
+	return NewHttpException(http.StatusHTTPVersionNotSupported, message)
 }
 
 // InsufficientStorageException 创建 507 Insufficient Storage 异常。
 func InsufficientStorageException(message string) *HttpException {
-	return statusException(http.StatusInsufficientStorage, message)
+	return NewHttpException(http.StatusInsufficientStorage, message)
 }
 
 // LoopDetectedException 创建 508 Loop Detected 异常。
 func LoopDetectedException(message string) *HttpException {
-	return statusException(http.StatusLoopDetected, message)
+	return NewHttpException(http.StatusLoopDetected, message)
 }
 
 // NetworkAuthenticationRequiredException 创建 511 Network Authentication Required 异常。
 func NetworkAuthenticationRequiredException(message string) *HttpException {
-	return statusException(http.StatusNetworkAuthenticationRequired, message)
+	return NewHttpException(http.StatusNetworkAuthenticationRequired, message)
 }
 
 // FromError 把任意 error 归一化成 *HttpException。
@@ -172,30 +157,30 @@ func FromError(err error) (*HttpException, bool) {
 
 	var validation *ValidationException
 	if stderrors.As(err, &validation) && validation != nil {
-		return NewHttpException(validation.Message, http.StatusUnprocessableEntity).
+		return NewHttpException(http.StatusUnprocessableEntity, validation.Message).
 			WithCode("VALIDATION_FAILED").
 			WithDetails(validation.Errors).
 			WithCause(err), true
 	}
 
 	if stderrors.Is(err, context.DeadlineExceeded) {
-		return NewHttpException("request timeout", http.StatusGatewayTimeout).WithCause(err), true
+		return NewHttpException(http.StatusGatewayTimeout, "request timeout").WithCause(err), true
 	}
 	if stderrors.Is(err, context.Canceled) {
-		return NewHttpException("request canceled", statusClientClosedRequest).WithCause(err), true
+		return NewHttpException(statusClientClosedRequest, "request canceled").WithCause(err), true
 	}
 
 	var kernelErr *kerrors.KernelError
 	if stderrors.As(err, &kernelErr) && kernelErr != nil {
 		status := StatusFromKind(kernelErr.Kind)
-		return NewHttpException(kernelErr.Error(), status).WithCause(err), true
+		return NewHttpException(status, kernelErr.Error()).WithCause(err), true
 	}
 
 	status := StatusFromKind(kerrors.Classify(err))
 	if status == 0 {
 		status = http.StatusInternalServerError
 	}
-	return NewHttpException(httpStatusText(status), status).WithCause(err), true
+	return NewHttpException(status, "").WithCause(err), true
 }
 
 // statusClientClosedRequest 是 nginx 约定俗成的 499（客户端提前断开）。

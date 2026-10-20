@@ -26,12 +26,12 @@ import (
 //
 // 它通常由协议 DSL/声明结构转换而来，随后会在编译期与全局 AOP 合并。
 type AOPSources struct {
-	Middlewares  []any
-	Guards       []any
-	Interceptors []any
-	Pipes        []any
-	ParamPipes   map[int][]any
-	Filters      []any
+	Middlewares  []aop.Middleware
+	Guards       []aop.Guard
+	Interceptors []aop.Interceptor
+	Pipes        []aop.Pipe
+	ParamPipes   map[int][]aop.Pipe
+	Filters      []aop.ExceptionFilter
 
 	// RoutePath / RouteMethod 是该声明在协议内的路由标识，用于匹配
 	// 模块通过 MiddlewareConsumer 声明的「范围化中间件」。
@@ -260,52 +260,21 @@ func ownerCandidateKeys(candidates []ModuleOwner) []string {
 
 // CompileAOPPlan 将全局 AOP 声明与本地 AOPSources 合并，并转换为 runtime.AOPPlan。
 //
-// 合并规则：
-// - 全局 → 范围化（MiddlewareConsumer）→ 本地，越靠后越靠近 handler
-// - 本地 AOPSources 以 []any 形式接收，支持四种写法：
-//   - Func：aop.MiddlewareFunc / GuardFunc / InterceptorFunc / PipeFunc / ExceptionFilterFunc
-//   - 裸函数：与上面的 Func 同签名的普通函数（自动转换）
-//   - 对象：aop.Middleware / Guard / Interceptor / Pipe / ExceptionFilter
-//   - 构造器：对应的 *Constructor（编译期调用一次创建对象）
+// 合并规则：全局 → 范围化（MiddlewareConsumer）→ 本地，越靠后越靠近 handler。
 //
-// 遇到无法识别的类型会返回 *aop.ErrUnsupported，由调用方转为编译错误，
-// 而不是静默丢弃。
-func CompileAOPPlan(global registry.GlobalAOPRegistration, local AOPSources) (runtime.AOPPlan, error) {
-	middlewares, err := aop.CoerceMiddlewares(local.Middlewares)
-	if err != nil {
-		return runtime.AOPPlan{}, err
-	}
-	guards, err := aop.CoerceGuards(local.Guards)
-	if err != nil {
-		return runtime.AOPPlan{}, err
-	}
-	interceptors, err := aop.CoerceInterceptors(local.Interceptors)
-	if err != nil {
-		return runtime.AOPPlan{}, err
-	}
-	pipes, err := aop.CoercePipes(local.Pipes)
-	if err != nil {
-		return runtime.AOPPlan{}, err
-	}
-	paramPipes, err := aop.CoerceParamPipes(local.ParamPipes)
-	if err != nil {
-		return runtime.AOPPlan{}, err
-	}
-	filters, err := aop.CoerceFilters(local.Filters)
-	if err != nil {
-		return runtime.AOPPlan{}, err
-	}
-
+// 由于 AOPSources 全部是类型化接口，这里只做一次"接口 → 函数切片"的展平，
+// 不存在类型错误的可能，因此没有 error 返回值。
+func CompileAOPPlan(global registry.GlobalAOPRegistration, local AOPSources) runtime.AOPPlan {
 	scoped := global.ScopedMiddlewaresFor(local.RouteMethod, local.RoutePath)
 
 	return runtime.AOPPlan{
-		Middlewares:  concatAOP(global.Middlewares, scoped, middlewares),
-		Guards:       concatAOP(global.Guards, guards),
-		Interceptors: concatAOP(global.Interceptors, interceptors),
-		Pipes:        concatAOP(global.Pipes, pipes),
-		ParamPipes:   paramPipes,
-		Filters:      concatAOP(global.Filters, filters),
-	}, nil
+		Middlewares:  concatAOP(aop.WrapMiddlewares(global.Middlewares), scoped, aop.WrapMiddlewares(local.Middlewares)),
+		Guards:       concatAOP(aop.WrapGuards(global.Guards), aop.WrapGuards(local.Guards)),
+		Interceptors: concatAOP(aop.WrapInterceptors(global.Interceptors), aop.WrapInterceptors(local.Interceptors)),
+		Pipes:        concatAOP(aop.WrapPipes(global.Pipes), aop.WrapPipes(local.Pipes)),
+		ParamPipes:   aop.WrapParamPipes(local.ParamPipes),
+		Filters:      concatAOP(aop.WrapFilters(global.Filters), aop.WrapFilters(local.Filters)),
+	}
 }
 
 // concatAOP 按顺序拼接多段 AOP 列表，返回一个新切片（不共享底层数组）。

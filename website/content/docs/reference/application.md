@@ -55,17 +55,20 @@ root := module.New(module.Metadata{
 ## 3. 全局 AOP
 
 ```go
-func (a *Application) UseGlobalMiddlewares(mws ...aop.MiddlewareFunc)
-func (a *Application) UseGlobalGuards(gs ...aop.GuardFunc)
-func (a *Application) UseGlobalInterceptors(is ...aop.InterceptorFunc)
-func (a *Application) UseGlobalPipes(ps ...aop.PipeFunc)
-func (a *Application) UseGlobalFilters(fs ...aop.ExceptionFilterFunc)
+func (a *Application) UseGlobalMiddlewares(mws ...aop.Middleware)
+func (a *Application) UseGlobalGuards(gs ...aop.Guard)
+func (a *Application) UseGlobalInterceptors(is ...aop.Interceptor)
+func (a *Application) UseGlobalPipes(ps ...aop.Pipe)
+func (a *Application) UseGlobalFilters(fs ...aop.ExceptionFilter)
 ```
+
+参数是接口类型，所以 `aop.GuardFunc` / `aop.GuardFactory(...)` 以及任意实现该接口的对象
+都能直接传入；同签名的裸函数需要包一层（`aop.InterceptorFunc(fn)` 等）。
 
 模块也可以在 `Init` 阶段贡献全局 AOP（等价 NestJS 的 `APP_*` 提供者）：
 
 ```go
-m.Context().Use(module.AOP{Interceptors: []aop.InterceptorFunc{...}})
+m.Context().Use(module.AOP{Interceptors: []aop.Interceptor{aop.InterceptorFunc(myInterceptor)}})
 ```
 
 两种来源在 `New` 阶段合并，顺序为：模块加载顺序 → `UseGlobal*` 调用顺序。

@@ -332,9 +332,3 @@ func Load(path string, target any) error {
 	}
 	return loader.Unmarshal("", target)
 }
-
-// MustLoad 保留为兼容别名。
-// Deprecated: use Load. Despite the name, this function returns error instead of panicking.
-func MustLoad(path string, target any) error {
-	return Load(path, target)
-}

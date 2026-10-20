@@ -116,10 +116,6 @@ func New(addr ...string) *Adapter {
 	return a
 }
 
-// Listen 仅为兼容旧写法保留。
-// Deprecated: 请改用 `graphql.New(":addr")`。
-func Listen(addr string) *Adapter { return New(addr) }
-
 // ID 返回 adapter ID。
 func (a *Adapter) ID() string { return AdapterID }
 
@@ -137,26 +133,6 @@ func (a *Adapter) WithPath(path string) *Adapter {
 		path = "/" + path
 	}
 	a.path = path
-	return a
-}
-
-// WithAddr 仅为兼容旧写法保留。
-// Deprecated: 请改用 `graphql.New(":addr")`。
-func (a *Adapter) WithAddr(addr string) *Adapter {
-	a.standalone = true
-	if addr != "" {
-		a.addr = addr
-	}
-	return a
-}
-
-// AsStandalone 仅为兼容旧写法保留。
-// Deprecated: 请改用 `graphql.New(":addr")`。
-func (a *Adapter) AsStandalone(addr string) *Adapter {
-	a.standalone = true
-	if addr != "" {
-		a.addr = addr
-	}
 	return a
 }
 

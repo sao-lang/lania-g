@@ -152,22 +152,6 @@ func (a *Adapter) Start() error {
 	return nil
 }
 
-// WithAddr 仅为兼容旧写法保留。
-// Deprecated: 请改用 `ws.New(":addr")`。
-func (a *Adapter) WithAddr(addr string) *Adapter {
-	a.standalone = true
-	a.addr = addr
-	return a
-}
-
-// AsStandalone 仅为兼容旧写法保留。
-// Deprecated: 请改用 `ws.New(":addr")`。
-func (a *Adapter) AsStandalone(addr string) *Adapter {
-	a.standalone = true
-	a.addr = addr
-	return a
-}
-
 // tryMountToSharedHTTP 尝试将 socket.io server 挂载到共享 HTTP adapter。
 //
 // 需要 host 实现 adapter.HTTPMountHost；否则返回错误（由上层决定是否 fallback 到 standalone）。

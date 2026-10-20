@@ -1,10 +1,7 @@
 package aop_test
 
 import . "github.com/sao-lang/lania-g/kernel/v3/aop"
-import (
-	"errors"
-	"testing"
-)
+import "testing"
 
 func noopMiddleware(ctx *ExecutionContext, next func() error) error { return next() }
 
@@ -59,10 +56,6 @@ func TestMiddlewareConsumerCollectsIndependentBindings(t *testing.T) {
 	consumer.Apply(users).ForRoutes("/users/*").Exclude("GET /users")
 	consumer.Apply(admin).ForRoutes("GET /admin/*")
 
-	if err := consumer.Err(); err != nil {
-		t.Fatalf("unexpected consumer error: %v", err)
-	}
-
 	bindings := consumer.Bindings()
 	if len(bindings) != 2 {
 		t.Fatalf("bindings = %d, want 2", len(bindings))
@@ -84,36 +77,3 @@ func TestMiddlewareConsumerCollectsIndependentBindings(t *testing.T) {
 	}
 }
 
-func TestMiddlewareConsumerRecordsInvalidType(t *testing.T) {
-	consumer := NewMiddlewareConsumer()
-	consumer.Apply(func() {}).ForRoutes("*")
-
-	err := consumer.Err()
-	if err == nil {
-		t.Fatalf("expected error for unsupported middleware type")
-	}
-	var unsupported *ErrUnsupported
-	if !errors.As(err, &unsupported) {
-		t.Fatalf("error = %T, want *ErrUnsupported", err)
-	}
-	if unsupported.Kind != "middleware" {
-		t.Fatalf("kind = %q, want middleware", unsupported.Kind)
-	}
-	if len(consumer.Bindings()) != 0 {
-		t.Fatalf("invalid binding should not be recorded")
-	}
-}
-
-func TestMiddlewareConsumerRequiresMiddleware(t *testing.T) {
-	consumer := NewMiddlewareConsumer()
-	consumer.Apply()
-	if consumer.Err() == nil {
-		t.Fatalf("expected error for empty Apply")
-	}
-}
-
-func TestCoerceGuardsRejectsUnsupportedType(t *testing.T) {
-	if _, err := CoerceGuards([]any{"not-a-guard"}); err == nil {
-		t.Fatalf("expected error for unsupported guard type")
-	}
-}

@@ -1,6 +1,8 @@
 // defs.go 定义 gRPC adapter 在 registry 与编译阶段使用的声明结构。
 package grpc
 
+import "github.com/sao-lang/lania-g/kernel/v3/aop"
+
 import (
 	"reflect"
 )
@@ -76,10 +78,10 @@ type MethodDefinition struct {
 
 	// 下面这些 AOP 字段都是纯声明数据；
 	// 真正的合并与执行顺序在编译阶段由 plugin 写入 handler.Meta.CompiledAOP。
-	Guards       []any
-	Interceptors []any
-	Middlewares  []any
-	Pipes        []any
-	ParamPipes   map[int][]any
-	Filters      []any
+	Guards       []aop.Guard
+	Interceptors []aop.Interceptor
+	Middlewares  []aop.Middleware
+	Pipes        []aop.Pipe
+	ParamPipes   map[int][]aop.Pipe
+	Filters      []aop.ExceptionFilter
 }

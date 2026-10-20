@@ -1,6 +1,8 @@
 // dsl.go 提供 gRPC adapter 的声明式注册 DSL。
 package grpc
 
+import "github.com/sao-lang/lania-g/kernel/v3/aop"
+
 import (
 	"fmt"
 	"reflect"
@@ -68,12 +70,12 @@ type ServiceBuilder struct {
 	service        string
 	receiver       any
 	methods        []*MethodBuilder
-	guards         []any
-	interceptors   []any
-	middlewares    []any
-	pipes          []any
-	paramPipes     map[int][]any
-	filters        []any
+	guards         []aop.Guard
+	interceptors   []aop.Interceptor
+	middlewares    []aop.Middleware
+	pipes          []aop.Pipe
+	paramPipes     map[int][]aop.Pipe
+	filters        []aop.ExceptionFilter
 	registry       *registry.Registry
 	routes         *Routes
 	sealed         bool
@@ -97,12 +99,12 @@ type MethodBuilder struct {
 	reqType       reflect.Type
 	respType      reflect.Type
 
-	guards       []any
-	interceptors []any
-	middlewares  []any
-	pipes        []any
-	paramPipes   map[int][]any
-	filters      []any
+	guards       []aop.Guard
+	interceptors []aop.Interceptor
+	middlewares  []aop.Middleware
+	pipes        []aop.Pipe
+	paramPipes   map[int][]aop.Pipe
+	filters      []aop.ExceptionFilter
 }
 
 func newServiceBuilder(name string, receiver any, routes *Routes) *ServiceBuilder {
@@ -110,51 +112,51 @@ func newServiceBuilder(name string, receiver any, routes *Routes) *ServiceBuilde
 		service:    name,
 		receiver:   receiver,
 		methods:    make([]*MethodBuilder, 0),
-		paramPipes: make(map[int][]any),
+		paramPipes: make(map[int][]aop.Pipe),
 		routes:     routes,
 	}
 }
 
 // UseGuards 在 service 级别追加守卫，后续方法都会继承。
-func (b *ServiceBuilder) UseGuards(items ...any) *ServiceBuilder {
+func (b *ServiceBuilder) UseGuards(items ...aop.Guard) *ServiceBuilder {
 	b.assertCanConfigureServiceScope()
 	b.guards = append(b.guards, items...)
 	return b
 }
 
 // UseInterceptors 在 service 级别追加拦截器，后续方法都会继承。
-func (b *ServiceBuilder) UseInterceptors(items ...any) *ServiceBuilder {
+func (b *ServiceBuilder) UseInterceptors(items ...aop.Interceptor) *ServiceBuilder {
 	b.assertCanConfigureServiceScope()
 	b.interceptors = append(b.interceptors, items...)
 	return b
 }
 
 // UseMiddlewares 在 service 级别追加中间件，后续方法都会继承。
-func (b *ServiceBuilder) UseMiddlewares(items ...any) *ServiceBuilder {
+func (b *ServiceBuilder) UseMiddlewares(items ...aop.Middleware) *ServiceBuilder {
 	b.assertCanConfigureServiceScope()
 	b.middlewares = append(b.middlewares, items...)
 	return b
 }
 
 // UsePipes 在 service 级别追加 Pipe，后续方法都会继承。
-func (b *ServiceBuilder) UsePipes(items ...any) *ServiceBuilder {
+func (b *ServiceBuilder) UsePipes(items ...aop.Pipe) *ServiceBuilder {
 	b.assertCanConfigureServiceScope()
 	b.pipes = append(b.pipes, items...)
 	return b
 }
 
 // UseParamPipes 在 service 级别追加参数级 Pipe，后续方法都会继承。
-func (b *ServiceBuilder) UseParamPipes(paramIndex int, pipes ...any) *ServiceBuilder {
+func (b *ServiceBuilder) UseParamPipes(paramIndex int, pipes ...aop.Pipe) *ServiceBuilder {
 	b.assertCanConfigureServiceScope()
 	if b.paramPipes[paramIndex] == nil {
-		b.paramPipes[paramIndex] = make([]any, 0)
+		b.paramPipes[paramIndex] = make([]aop.Pipe, 0)
 	}
 	b.paramPipes[paramIndex] = append(b.paramPipes[paramIndex], pipes...)
 	return b
 }
 
 // UseFilters 在 service 级别追加异常过滤器，后续方法都会继承。
-func (b *ServiceBuilder) UseFilters(items ...any) *ServiceBuilder {
+func (b *ServiceBuilder) UseFilters(items ...aop.ExceptionFilter) *ServiceBuilder {
 	b.assertCanConfigureServiceScope()
 	b.filters = append(b.filters, items...)
 	return b
@@ -198,12 +200,12 @@ func (b *ServiceBuilder) newMethod(method string, mode RPCMode, handler any) *Me
 		handler:        handler,
 		handlerName:    coreadapter.FindMethodName(b.receiver, handler),
 		paramBindings:  make(map[int]string),
-		guards:         make([]any, 0),
-		interceptors:   make([]any, 0),
-		middlewares:    make([]any, 0),
-		pipes:          make([]any, 0),
-		paramPipes:     make(map[int][]any),
-		filters:        make([]any, 0),
+		guards:         make([]aop.Guard, 0),
+		interceptors:   make([]aop.Interceptor, 0),
+		middlewares:    make([]aop.Middleware, 0),
+		pipes:          make([]aop.Pipe, 0),
+		paramPipes:     make(map[int][]aop.Pipe),
+		filters:        make([]aop.ExceptionFilter, 0),
 	}
 	// 一个 service 可以同时声明多种模式的方法；
 	// 构建顺序会被保留，最终在 BuildE 时统一转成 MethodDefinition 列表。
@@ -212,40 +214,40 @@ func (b *ServiceBuilder) newMethod(method string, mode RPCMode, handler any) *Me
 }
 
 // UseGuards 为当前 RPC 方法追加 guards。
-func (mb *MethodBuilder) UseGuards(items ...any) *MethodBuilder {
+func (mb *MethodBuilder) UseGuards(items ...aop.Guard) *MethodBuilder {
 	mb.guards = append(mb.guards, items...)
 	return mb
 }
 
 // UseInterceptors 为当前 RPC 方法追加 interceptors。
-func (mb *MethodBuilder) UseInterceptors(items ...any) *MethodBuilder {
+func (mb *MethodBuilder) UseInterceptors(items ...aop.Interceptor) *MethodBuilder {
 	mb.interceptors = append(mb.interceptors, items...)
 	return mb
 }
 
 // UseMiddlewares 为当前 RPC 方法追加 middlewares。
-func (mb *MethodBuilder) UseMiddlewares(items ...any) *MethodBuilder {
+func (mb *MethodBuilder) UseMiddlewares(items ...aop.Middleware) *MethodBuilder {
 	mb.middlewares = append(mb.middlewares, items...)
 	return mb
 }
 
 // UsePipes 为当前 RPC 方法追加 pipes。
-func (mb *MethodBuilder) UsePipes(items ...any) *MethodBuilder {
+func (mb *MethodBuilder) UsePipes(items ...aop.Pipe) *MethodBuilder {
 	mb.pipes = append(mb.pipes, items...)
 	return mb
 }
 
 // UseParamPipes 为指定参数位置追加 pipes。
-func (mb *MethodBuilder) UseParamPipes(paramIndex int, pipes ...any) *MethodBuilder {
+func (mb *MethodBuilder) UseParamPipes(paramIndex int, pipes ...aop.Pipe) *MethodBuilder {
 	if mb.paramPipes[paramIndex] == nil {
-		mb.paramPipes[paramIndex] = make([]any, 0)
+		mb.paramPipes[paramIndex] = make([]aop.Pipe, 0)
 	}
 	mb.paramPipes[paramIndex] = append(mb.paramPipes[paramIndex], pipes...)
 	return mb
 }
 
 // UseFilters 为当前 RPC 方法追加 filters。
-func (mb *MethodBuilder) UseFilters(items ...any) *MethodBuilder {
+func (mb *MethodBuilder) UseFilters(items ...aop.ExceptionFilter) *MethodBuilder {
 	mb.filters = append(mb.filters, items...)
 	return mb
 }
@@ -362,12 +364,12 @@ func (mb *MethodBuilder) build(sb *ServiceBuilder) *MethodDefinition {
 		ResponseType:  mb.respType,
 		// 这里全部做拷贝，避免 builder 在 Build 后被误复用时污染已经产出的声明对象。
 		ParamBindings: coreadapter.CopyIntStringMap(mb.paramBindings),
-		Guards:        append(append([]any{}, sb.guards...), mb.guards...),
-		Interceptors:  append(append([]any{}, sb.interceptors...), mb.interceptors...),
-		Middlewares:   append(append([]any{}, sb.middlewares...), mb.middlewares...),
-		Pipes:         append(append([]any{}, sb.pipes...), mb.pipes...),
+		Guards:        append(append([]aop.Guard{}, sb.guards...), mb.guards...),
+		Interceptors:  append(append([]aop.Interceptor{}, sb.interceptors...), mb.interceptors...),
+		Middlewares:   append(append([]aop.Middleware{}, sb.middlewares...), mb.middlewares...),
+		Pipes:         append(append([]aop.Pipe{}, sb.pipes...), mb.pipes...),
 		ParamPipes:    coreadapter.MergeParamPipes(sb.paramPipes, mb.paramPipes),
-		Filters:       append(append([]any{}, sb.filters...), mb.filters...),
+		Filters:       append(append([]aop.ExceptionFilter{}, sb.filters...), mb.filters...),
 	}
 }
 

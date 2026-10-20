@@ -259,7 +259,7 @@ func (s *Store) CountAccounts() int {
 // StoreModule 把 Store 作为 provider 导出给其他模块。
 func StoreModule(store *Store) module.Module {
 	// 免 reflect：ProviderFromValue 以泛型参数 *Store 作为 token。
-	provider, _ := di.ProviderFromValue[*Store](store, di.Singleton)
+	provider, _ := di.ProviderFromValue(store, di.Singleton)
 	return module.New(module.Metadata{
 		Providers: []*di.Provider{provider},
 		Exports:   []any{di.TokenFor[*Store]()},
@@ -844,7 +844,7 @@ func (c *UserController) Delete(args deleteUserArgs) (any, error) {
 // Declare 声明用户路由。
 func (c *UserController) Declare(r *httpadapter.Routes) {
 	// 前缀之后、第一条路由之前的 Use* 作用于整个控制器。
-	r.Prefix("/users").UseInterceptors(timingInterceptor)
+	r.Prefix("/users").UseInterceptors(aop.InterceptorFunc(timingInterceptor))
 
 	r.Get("", c.List).
 		Summary("List Users").
@@ -974,7 +974,7 @@ func main() {
 		enhancers.Timeout(5*time.Second),
 	)
 	app.UseGlobalPipes(aop.WrapPipe(pipes.NewTrimSpacePipe()))
-	app.UseGlobalInterceptors(responseEnvelopeInterceptor, authInterceptor(store))
+	app.UseGlobalInterceptors(aop.InterceptorFunc(responseEnvelopeInterceptor), authInterceptor(store))
 	app.UseGlobalFilters(enhancers.ErrorEnvelope(func(httpErr *aop.HttpException) any {
 		return apiEnvelope{Msg: httpErr.Message, Code: httpErr.Status, Data: nil, Success: false}
 	}))

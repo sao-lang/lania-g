@@ -1,0 +1,30 @@
+goos: windows
+goarch: amd64
+pkg: github.com/sao-lang/lania-g/test/bench
+cpu: AMD Ryzen 7 4800H with Radeon Graphics         
+BenchmarkHTTP_StaticJSON-16      	  263215	      4564 ns/op	    2438 B/op	      38 allocs/op
+BenchmarkHTTP_StaticJSON-16      	  273546	      4287 ns/op	    2438 B/op	      38 allocs/op
+BenchmarkHTTP_StaticJSON-16      	  276662	      4631 ns/op	    2438 B/op	      38 allocs/op
+BenchmarkHTTP_StaticJSON-16      	  250938	      4794 ns/op	    2438 B/op	      38 allocs/op
+BenchmarkHTTP_StaticJSON-16      	  239722	      4992 ns/op	    2438 B/op	      38 allocs/op
+BenchmarkHTTP_StaticJSON-16      	  206989	      4886 ns/op	    2438 B/op	      38 allocs/op
+BenchmarkHTTP_AOPDepth10-16      	  220141	      5252 ns/op	    2567 B/op	      42 allocs/op
+BenchmarkHTTP_AOPDepth10-16      	  232036	      5179 ns/op	    2566 B/op	      42 allocs/op
+BenchmarkHTTP_AOPDepth10-16      	  235864	      5227 ns/op	    2566 B/op	      42 allocs/op
+BenchmarkHTTP_AOPDepth10-16      	  208221	      5298 ns/op	    2567 B/op	      42 allocs/op
+BenchmarkHTTP_AOPDepth10-16      	  248461	      5158 ns/op	    2567 B/op	      42 allocs/op
+BenchmarkHTTP_AOPDepth10-16      	  200600	      5274 ns/op	    2567 B/op	      42 allocs/op
+BenchmarkHTTP_BindValidate-16    	   77476	     15211 ns/op	    9383 B/op	      73 allocs/op
+BenchmarkHTTP_BindValidate-16    	   79503	     15394 ns/op	    9386 B/op	      73 allocs/op
+BenchmarkHTTP_BindValidate-16    	   75120	     15527 ns/op	    9385 B/op	      73 allocs/op
+BenchmarkHTTP_BindValidate-16    	   72904	     15627 ns/op	    9369 B/op	      73 allocs/op
+BenchmarkHTTP_BindValidate-16    	   76543	     15811 ns/op	    9402 B/op	      73 allocs/op
+BenchmarkHTTP_BindValidate-16    	   68984	     16080 ns/op	    9399 B/op	      73 allocs/op
+BenchmarkDI_ResolveNested-16     	  389224	      3083 ns/op	     176 B/op	      12 allocs/op
+BenchmarkDI_ResolveNested-16     	  383749	      2986 ns/op	     176 B/op	      12 allocs/op
+BenchmarkDI_ResolveNested-16     	  396706	      3110 ns/op	     176 B/op	      12 allocs/op
+BenchmarkDI_ResolveNested-16     	  392145	      3049 ns/op	     176 B/op	      12 allocs/op
+BenchmarkDI_ResolveNested-16     	  373101	      3110 ns/op	     176 B/op	      12 allocs/op
+BenchmarkDI_ResolveNested-16     	  416308	      3041 ns/op	     176 B/op	      12 allocs/op
+PASS
+ok  	github.com/sao-lang/lania-g/test/bench	31.290s

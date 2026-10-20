@@ -39,7 +39,7 @@ func NewRuntime() *Runtime {
 // UseGlobalMiddleware 注册全局中间件。
 //
 // 全局中间件会参与每一次 handler 执行（除非该 handler 使用了编译期 AOP 计划，见 Pipeline.Run 注释）。
-func (r *Runtime) UseGlobalMiddleware(middlewares ...aop.MiddlewareFunc) *Runtime {
+func (r *Runtime) UseGlobalMiddleware(middlewares ...aop.Middleware) *Runtime {
 	r.pipeline.UseGlobalMiddlewares(middlewares...)
 	return r
 }
@@ -47,7 +47,7 @@ func (r *Runtime) UseGlobalMiddleware(middlewares ...aop.MiddlewareFunc) *Runtim
 // UseGlobalGuards 注册全局守卫。
 //
 // 守卫通常用于鉴权/限流/开关控制等：当任意 guard 返回 (false, nil) 时，会中断执行并返回 ErrGuardRejected。
-func (r *Runtime) UseGlobalGuards(guards ...aop.GuardFunc) *Runtime {
+func (r *Runtime) UseGlobalGuards(guards ...aop.Guard) *Runtime {
 	r.pipeline.UseGlobalGuards(guards...)
 	return r
 }
@@ -55,7 +55,7 @@ func (r *Runtime) UseGlobalGuards(guards ...aop.GuardFunc) *Runtime {
 // UseGlobalInterceptors 注册全局拦截器。
 //
 // 拦截器用于包裹 handler 调用，适合做 tracing、metrics、缓存、重试等横切能力。
-func (r *Runtime) UseGlobalInterceptors(interceptors ...aop.InterceptorFunc) *Runtime {
+func (r *Runtime) UseGlobalInterceptors(interceptors ...aop.Interceptor) *Runtime {
 	r.pipeline.UseGlobalInterceptors(interceptors...)
 	return r
 }
@@ -63,7 +63,7 @@ func (r *Runtime) UseGlobalInterceptors(interceptors ...aop.InterceptorFunc) *Ru
 // UseGlobalPipes 注册全局 Pipe（管道）。
 //
 // Pipe 既可用于入参 Transform，也可用于返回值 Transform（见 Pipeline.Run）。
-func (r *Runtime) UseGlobalPipes(pipes ...aop.PipeFunc) *Runtime {
+func (r *Runtime) UseGlobalPipes(pipes ...aop.Pipe) *Runtime {
 	r.pipeline.UseGlobalPipes(pipes...)
 	return r
 }
@@ -71,7 +71,7 @@ func (r *Runtime) UseGlobalPipes(pipes ...aop.PipeFunc) *Runtime {
 // UseGlobalFilters 注册全局异常过滤器。
 //
 // 当执行链路产生 error 时，filters 会按顺序处理/包装该错误；返回 nil 表示错误已被消费。
-func (r *Runtime) UseGlobalFilters(filters ...aop.ExceptionFilterFunc) *Runtime {
+func (r *Runtime) UseGlobalFilters(filters ...aop.ExceptionFilter) *Runtime {
 	r.pipeline.UseGlobalFilters(filters...)
 	return r
 }

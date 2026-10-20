@@ -121,10 +121,7 @@ func compileJob(item *routeOwnership, global registry.GlobalAOPRegistration) (*r
 	if err != nil {
 		return nil, "", err
 	}
-	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{RoutePath: def.Name})
-	if err != nil {
-		return nil, "", err
-	}
+	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{RoutePath: def.Name})
 	h.Meta.CompiledAOP = &plan
 	// 参数绑定名由 DSL 预先记录，编译阶段只负责转成 runtime.ParamPlan。
 	h.Meta.ParamPlans = compiler.BuildBoundParamPlans(h.Meta.ParamTypes, def.ParamBindings)

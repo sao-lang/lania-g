@@ -3,7 +3,6 @@ module github.com/sao-lang/lania-g/integrations/swagger/v3
 go 1.25.0
 
 require (
-	github.com/sao-lang/lania-g/application/v3 v3.0.0
 	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 	github.com/sao-lang/lania-g/protocol/http/v3 v3.0.0
 )
@@ -18,8 +17,6 @@ require (
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 )
-
-replace github.com/sao-lang/lania-g/application/v3 => ../../../application/v3
 
 replace github.com/sao-lang/lania-g/kernel/v3 => ../../../kernel/v3
 

@@ -169,7 +169,7 @@ func compileField(item *fieldOwnership, global registry.GlobalAOPRegistration) (
 		method = item.resolverDef.Name
 	}
 
-	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{
+	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{
 		Middlewares:  append(item.resolverDef.Middlewares, def.Middlewares...),
 		Guards:       append(item.resolverDef.Guards, def.Guards...),
 		Interceptors: append(item.resolverDef.Interceptors, def.Interceptors...),
@@ -178,9 +178,6 @@ func compileField(item *fieldOwnership, global registry.GlobalAOPRegistration) (
 		Filters:      append(item.resolverDef.Filters, def.Filters...),
 		RoutePath:    method + "." + def.FieldName,
 	})
-	if err != nil {
-		return nil, "", err
-	}
 
 	h.Meta.CompiledAOP = &plan
 	h.Meta.ParamPlans = buildParamPlan(h, def)

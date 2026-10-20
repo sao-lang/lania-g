@@ -49,7 +49,7 @@ func TestNew_RequiresRootModule(t *testing.T) {
 
 func TestNew_MergesModuleAOP(t *testing.T) {
 	root := module.New(module.Metadata{
-		AOP: module.AOP{Guards: []aop.GuardFunc{func(*aop.ExecutionContext) (bool, error) { return true, nil }}},
+		AOP: module.AOP{Guards: []aop.Guard{aop.GuardFunc(func(*aop.ExecutionContext) (bool, error) { return true, nil })}},
 	})
 	app, err := New(root, Options{})
 	if err != nil {
@@ -74,19 +74,6 @@ func (m *scopedMiddlewareModule) Configure(consumer aop.MiddlewareConsumer) {
 	})).ForRoutes("/users/*")
 }
 
-type brokenMiddlewareModule struct {
-	*module.BaseModule
-}
-
-func newBrokenMiddlewareModule() *brokenMiddlewareModule {
-	return &brokenMiddlewareModule{BaseModule: module.New(module.Metadata{})}
-}
-
-func (m *brokenMiddlewareModule) Configure(consumer aop.MiddlewareConsumer) {
-	// 签名不匹配的裸函数应当让启动失败，而不是被静默丢弃。
-	consumer.Apply(func() {}).ForRoutes("*")
-}
-
 func TestNew_CollectsScopedMiddlewares(t *testing.T) {
 	root := module.New(module.Metadata{Imports: []module.Module{newScopedMiddlewareModule()}})
 
@@ -107,10 +94,3 @@ func TestNew_CollectsScopedMiddlewares(t *testing.T) {
 	}
 }
 
-func TestNew_FailsOnInvalidScopedMiddlewareType(t *testing.T) {
-	root := module.New(module.Metadata{Imports: []module.Module{newBrokenMiddlewareModule()}})
-
-	if _, err := New(root, Options{}); err == nil {
-		t.Fatalf("expected error for unsupported middleware type")
-	}
-}

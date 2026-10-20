@@ -146,13 +146,13 @@ type listArgs struct {
 	Trace grpcbinding.Header[string]       `metadata:"x-trace-id"`
 }
 
-app.UseGlobalInterceptors(func(ctx *aop.InvocationContext, next func() (any, error)) (any, error) {
-	md, _ := metadata.FromIncomingContext(ctx.Context())
+app.UseGlobalInterceptors(aop.InterceptorFunc(func(ctx *aop.ExecutionContext, next aop.CallHandler) (any, error) {
+	md, _ := metadata.FromIncomingContext(ctx.Context)
 	tokens := md.Get("authorization")
 	...
 	ctx.Set(authAccountKey, acc)
-	return next()
-})
+	return next.Handle()
+}))
 ```
 
 ## 7. 错误传递

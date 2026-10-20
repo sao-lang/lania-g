@@ -2,10 +2,7 @@ module github.com/sao-lang/lania-g/application/v3
 
 go 1.25.0
 
-require (
-	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
-	github.com/sao-lang/lania-g/protocol/http/v3 v3.0.0-00010101000000-000000000000
-)
+require github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
@@ -19,5 +16,3 @@ require (
 )
 
 replace github.com/sao-lang/lania-g/kernel/v3 => ../../kernel/v3
-
-replace github.com/sao-lang/lania-g/protocol/http/v3 => ../../protocol/http/v3

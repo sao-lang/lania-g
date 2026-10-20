@@ -76,8 +76,13 @@ lania-g/
 │   ├── resilience/v3/     弹性策略（熔断、限流、幂等）
 │   ├── swagger/v3/        Swagger 文档自动生成
 │   └── terminus/v3/       健康检查
-├── cmd/                    示例工程（HTTP/gRPC/GraphQL/WS Demo）
-└── docs/                   文档
+├── cmd/                    示例工程（HTTP/gRPC/GraphQL/WS/MQ/Scheduler Demo，含 all-in-one）
+├── test/                   全量测试（独立模块，与源码目录分离）
+├── tools/                  质量工具链（modgen / modrun / apicheck / doccheck / benchcheck）
+├── api/api.txt             公开 API 快照（由 apicheck 生成，CI 校验）
+├── modules.json            29 个模块的清单与依赖边界策略
+├── website/                Hugo 文档站
+└── docs/                   文档（archive/ 为历史归档）
 ```
 
 ## 快速开始
@@ -131,11 +136,25 @@ func main() {
 
 ### 运行测试
 
+所有测试集中在仓库根目录的 `test/` 模块里（与源码目录分离）：
+
 ```bash
-cd application/v3 && go test ./...
-cd protocol/http/v3 && go test ./...
-cd integrations/logger/v3 && go test ./...
+cd test && go test ./...        # 全量（含 api / docs 门禁）
+cd test && go test -short ./... # 跳过耗时的 API 快照对比
 ```
+
+多模块构建与质量门禁统一由 `tools/` 里的命令行负责：
+
+```bash
+cd tools
+go run ./cmd/modgen  -check -dir ..   # 校验 go.mod 与 modules.json 一致
+go run ./cmd/modrun  build            # 逐模块 go build
+go run ./cmd/modrun  deps             # 依赖边界检查
+go run ./cmd/apicheck -dir ..         # 公开 API 快照对比
+go run ./cmd/doccheck -dir ..         # 文档符号/示例校验
+```
+
+细节见文档站「深入原理 → 质量工具链」。
 
 ## 推荐接入路径
 
@@ -153,8 +172,8 @@ cd integrations/logger/v3 && go test ./...
 # 首次：拉取主题模块
 hugo mod tidy --source website
 
-# 本地预览
-hugo server --source website
+# 本地预览（覆盖 baseURL，否则默认 baseURL 带 /lania-g/ 子路径，根路径会 404）
+hugo server --source website --renderToMemory --baseURL http://localhost:1313/
 
 # 构建静态站点（产物在 website/public）
 hugo --source website --minify

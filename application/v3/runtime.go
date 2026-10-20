@@ -108,11 +108,7 @@ func (a *Application) prepare() error {
 		}
 	}
 	// 范围化中间件随模块树重新收集：热加载后新增模块的 Configure 也能生效。
-	scoped, err := module.CollectScopedMiddlewares(modules)
-	if err != nil {
-		return err
-	}
-	a.registry.SetScopedMiddlewares(scoped...)
+	a.registry.SetScopedMiddlewares(module.CollectScopedMiddlewares(modules)...)
 	if err := module.DeclareAll(a.moduleRef, declarers...); err != nil {
 		return err
 	}

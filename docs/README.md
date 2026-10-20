@@ -1,54 +1,35 @@
-# docs 文档导航
+# docs/
 
-当前 `docs/` 已按“主入口优先、专项文档补充、历史判断收敛归档”的思路整理。建议先从下面几篇开始：
+这个目录只保留**面向使用者的活文档**。完整文档站在 [`website/`](../website)。
 
-## 0. 执行台账
+```text
+docs/
+├── README.md              # 本文件：文档地图
+├── API-STABILITY.md       # 公开 API 的稳定性承诺
+├── LAYERING.md            # 分层规则：什么逻辑放 AOP、什么放 Transport
+├── 标准接入模板.md         # 从零接入一个服务的推荐写法
+├── API.md                 # 历史 API 全览（正在被文档站取代）
+└── archive/               # 历史设计文档，只读，不再维护
+```
 
-- [任务执行文档.md](任务执行文档.md)
-  - 全链路可用性验证 + 文档站建设的跨轮次执行记录：当前进度、已修复缺陷、遗留问题与后续任务分解。
+## 我要找什么？
 
-## 1. 主入口
+| 需求 | 去哪 |
+|------|------|
+| 快速跑起来 | [website/getting-started](../website/content/docs/getting-started) |
+| 查某个 API 签名 | [website/reference](../website/content/docs/reference) |
+| 理解编译 / 运行期原理 | [website/internals](../website/content/docs/internals) |
+| 接入某个集成（auth/orm/otel…） | [website/integrations](../website/content/docs/integrations) |
+| 什么是稳定 API | [API-STABILITY.md](./API-STABILITY.md) |
+| 该把逻辑放在哪一层 | [LAYERING.md](./LAYERING.md) |
+| 历史设计讨论 | [archive/](./archive)（只读） |
 
-- [API.md](API.md)
-  - 对外公开使用面、接入方式、协议能力、integration 常见用法。
-- [模块与链路全景说明.md](模块与链路全景说明.md)
-  - 按模块、联动关系和完整执行链路解释当前项目全貌。
-- [标准接入模板.md](标准接入模板.md)
-  - 最小业务接入模板，适合直接照着起服务。
-- [技术方案.md](技术方案.md)
-  - 整体架构、核心执行链路、目录职责、读码顺序。
-- [学习路线图.md](学习路线图.md)
-  - 按天拆分的阅读和练习路径。
+## 关于 archive/
 
-## 2. 架构与演进
+`archive/` 里的文档写于不同阶段，**可能与当前代码不一致**，保留价值是记录设计推理过程。
+需要准确行为时，一律以文档站与源码为准。
 
-- [架构收敛文档.md](架构收敛文档.md)
-  - 当前架构问题、收敛判断、阶段归档和后续治理重点。
-- [plan.md](plan.md)
-  - 演进 roadmap 和里程碑。
-- [代码精简与收敛方案.md](代码精简与收敛方案.md)
-  - 代码减重、重复骨架收敛和阶段收益。
-- [runtime.md](runtime.md)
-  - `kernel/v3/runtime` 的内部机制。
-- [错误模型约定.md](错误模型约定.md)
-  - 错误边界、`Must...` 语义和阶段化错误表达。
+## 关于 `v3`
 
-## 3. 专项接入
-
-- [auth接入.md](auth接入.md)
-- [mongodb接入.md](mongodb接入.md)
-- [otel接入.md](otel接入.md)
-- [outbox接入.md](outbox接入.md)
-- [resilience接入.md](resilience接入.md)
-- [grpc四种模式完整支持方案.md](grpc四种模式完整支持方案.md)
-
-这些文档保留为独立专题，因为它们包含各自的接入步骤、能力边界和示例代码。
-
-## 4. 其他
-
-- 旧的 `public-api.md`、`协议绑定与集成使用指南.md`、`架构学习指南.md`、`目录结构参考.md`
-  - 内容已合并进 `API.md`、`技术方案.md`、`学习路线图.md`，不再单独维护。
-- 旧的阶段计划与收官总结
-  - 内容已归档进 `架构收敛文档.md`，不再拆成独立文件维护。
-- [ootd.md](ootd.md)
-  - 独立练手项目设计，不属于框架主文档。
+目录名和 module 路径里的 `v3`（`github.com/sao-lang/lania-g/kernel/v3`）是 Go
+major version 的标准写法，不是历史遗留，也不能省略。详见 [API-STABILITY.md](./API-STABILITY.md)。

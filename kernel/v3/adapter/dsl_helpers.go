@@ -42,10 +42,13 @@ func FindMethodName(receiver any, handler any) string {
 
 // MergeParamPipes 合并参数级 pipe 配置，并保证不原地修改输入 map。
 // 执行顺序保持“base 在前、extra 在后”，这样路由级配置会自然追加到上层共享配置后面。
-func MergeParamPipes(base map[int][]any, extra map[int][]any) map[int][]any {
-	merged := make(map[int][]any, len(base)+len(extra))
+func MergeParamPipes[T any](base map[int][]T, extra map[int][]T) map[int][]T {
+	if len(base) == 0 && len(extra) == 0 {
+		return nil
+	}
+	merged := make(map[int][]T, len(base)+len(extra))
 	for idx, pipes := range base {
-		merged[idx] = append([]any{}, pipes...)
+		merged[idx] = append([]T{}, pipes...)
 	}
 	for idx, pipes := range extra {
 		merged[idx] = append(merged[idx], pipes...)

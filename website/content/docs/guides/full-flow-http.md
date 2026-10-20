@@ -61,7 +61,7 @@ func NewStoreModule() *StoreModule {
 	store := NewStore()
 	p, _ := di.ProviderFromValue[*Store](store, di.Singleton)
 	return &StoreModule{
-		BaseModule: module.NewBaseModule(&module.ModuleMetadata{
+		BaseModule: module.New(module.Metadata{
 			Providers: []*di.Provider{p},
 			Exports:   []any{storeToken},
 		}),

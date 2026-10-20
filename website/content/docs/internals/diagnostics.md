@@ -2,7 +2,7 @@
 title: 诊断能力
 weight: 3
 prev: /docs/internals/adapter-plugin
-next: /docs/best-practices
+next: /docs/internals/tooling
 ---
 
 框架提供三层诊断。编译诊断与声明冲突会在 `app.Run()` 阶段直接以 `error` 返回。

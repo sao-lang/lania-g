@@ -21,11 +21,11 @@ import (
 // 它的语义等价于 NestJS 的 APP_GUARD / APP_INTERCEPTOR / APP_PIPE / APP_FILTER：
 // 模块在装配阶段声明，应用在启动阶段按模块加载顺序合并。
 type AOP struct {
-	Middlewares  []aop.MiddlewareFunc
-	Guards       []aop.GuardFunc
-	Interceptors []aop.InterceptorFunc
-	Pipes        []aop.PipeFunc
-	Filters      []aop.ExceptionFilterFunc
+	Middlewares  []aop.Middleware
+	Guards       []aop.Guard
+	Interceptors []aop.Interceptor
+	Pipes        []aop.Pipe
+	Filters      []aop.ExceptionFilter
 }
 
 // IsZero 判断当前 AOP 是否为空。

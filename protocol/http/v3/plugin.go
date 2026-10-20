@@ -163,7 +163,7 @@ func compileRoute(route *routeOwnership, global registry.GlobalAOPRegistration) 
 		return nil, "", err
 	}
 
-	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{
+	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{
 		Middlewares:  def.Middlewares,
 		Guards:       def.Guards,
 		Interceptors: def.Interceptors,
@@ -173,9 +173,6 @@ func compileRoute(route *routeOwnership, global registry.GlobalAOPRegistration) 
 		RoutePath:    def.Path,
 		RouteMethod:  string(def.Method),
 	})
-	if err != nil {
-		return nil, "", err
-	}
 
 	paramPlan := buildParamPlan(handler, def.Path)
 	handler.Meta.ParamPlans = paramPlan

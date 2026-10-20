@@ -499,7 +499,7 @@ func main() {
 
 	// 这里使用全局 interceptor 来演示跨 socket event 的 envelope / 鉴权行为；
 	// `cmd/ws-app-demo` 则是更精简、更偏业务起步的版本。
-	app.UseGlobalInterceptors(wsEnvelopeInterceptor, wsAuthInterceptor(store))
+	app.UseGlobalInterceptors(aop.InterceptorFunc(wsEnvelopeInterceptor), wsAuthInterceptor(store))
 
 
 	if err := app.Run(); err != nil {

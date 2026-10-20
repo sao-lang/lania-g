@@ -1,10 +1,7 @@
 // middleware.go 定义中间件抽象，以及「按路由范围声明中间件」的消费者模型。
 package aop
 
-import (
-	"errors"
-	"strings"
-)
+import "strings"
 
 // NestMiddleware 定义中间件的核心行为：在 handler 执行前后包裹一层通用逻辑。
 type NestMiddleware interface {
@@ -52,7 +49,7 @@ type MiddlewareRouteConfigurator interface {
 // 每次 Apply 产生一条独立绑定，因此可以给不同的中间件配置不同的路由范围，
 // 这等价于 NestJS 的 `consumer.apply(A).forRoutes(...)`。
 type MiddlewareConsumer interface {
-	Apply(middlewares ...any) MiddlewareRouteConfigurator
+	Apply(middlewares ...Middleware) MiddlewareRouteConfigurator
 }
 
 // MiddlewareConfigurable 表示某个模块可以声明式注册中间件。
@@ -167,7 +164,6 @@ func splitRoutePath(path string) []string {
 // DefaultMiddlewareConsumer 是 MiddlewareConsumer 的默认实现。
 type DefaultMiddlewareConsumer struct {
 	bindings []*middlewareBinding
-	errs     []error
 }
 
 type middlewareBinding struct {
@@ -193,23 +189,21 @@ func NewMiddlewareConsumer() *DefaultMiddlewareConsumer {
 
 // Apply 追加一组中间件，并返回该组中间件的路由范围配置器。
 //
-// 参数与 UseMiddlewares 一致：支持接口实现、具名函数类型、裸函数与延迟构造器。
-// 类型不支持时错误会被记录下来，最终由 Err 返回（模块加载阶段会终止启动）。
-func (c *DefaultMiddlewareConsumer) Apply(middlewares ...any) MiddlewareRouteConfigurator {
+// 参数是 `Middleware` 接口：`MiddlewareFunc` 已实现它，因此具名函数类型可直接传入；
+// 裸函数需要显式转换 `aop.MiddlewareFunc(fn)`，这样签名错误在编译期就会暴露。
+func (c *DefaultMiddlewareConsumer) Apply(middlewares ...Middleware) MiddlewareRouteConfigurator {
 	binding := &middlewareBinding{}
 	if c == nil {
 		return binding
 	}
-	if len(middlewares) == 0 {
-		c.errs = append(c.errs, errors.New("aop: MiddlewareConsumer.Apply requires at least one middleware"))
-		return binding
+	for _, middleware := range middlewares {
+		if middleware == nil {
+			continue
+		}
+		binding.middlewares = append(binding.middlewares, func(ctx *ExecutionContext, next func() error) error {
+			return middleware.Use(ctx, next)
+		})
 	}
-	converted, err := CoerceMiddlewares(middlewares)
-	if err != nil {
-		c.errs = append(c.errs, err)
-		return binding
-	}
-	binding.middlewares = converted
 	c.bindings = append(c.bindings, binding)
 	return binding
 }
@@ -228,12 +222,4 @@ func (c *DefaultMiddlewareConsumer) Bindings() []ScopedMiddleware {
 		})
 	}
 	return out
-}
-
-// Err 返回 Apply 期间累积的配置错误。
-func (c *DefaultMiddlewareConsumer) Err() error {
-	if c == nil || len(c.errs) == 0 {
-		return nil
-	}
-	return errors.Join(c.errs...)
 }

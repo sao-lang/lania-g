@@ -1,5 +1,7 @@
 package aop
 
+import "net/http"
+
 // ExceptionFilter 定义异常过滤器的核心行为：接收错误并决定是否消费它。
 type ExceptionFilter interface {
 	Catch(exception interface{}, ctx *ExecutionContext) error
@@ -91,140 +93,95 @@ func (e *HttpException) WithCause(cause error) *HttpException {
 	return e
 }
 
-// NewHttpException 创建一个带 HTTP status 的异常对象。
+// NewHttpException 创建一个带 HTTP 状态码的异常对象。
 //
-// 该类型主要用于 HTTP 适配器：adapter 可以把 Status 映射到响应码，并把 Message 写入响应体。
-func NewHttpException(message string, status int) *HttpException {
-	return &HttpException{
-		Status:  status,
-		Message: message,
+// 参数顺序与 Go 生态惯例一致（status 在前）：`NewHttpException(404, "not found")`。
+// message 为空时使用该状态码的标准文案。
+func NewHttpException(status int, message string) *HttpException {
+	if message == "" {
+		message = httpStatusText(status)
 	}
+	return &HttpException{Status: status, Message: message}
 }
 
-// BadRequestException 创建 400 Bad Request 异常；message 为空时使用默认文案。
+// 以下构造器覆盖最常用的 4xx / 5xx；更完整的列表见 http_error.go。
+
+// BadRequestException 创建 400 异常。
 func BadRequestException(message string) *HttpException {
-	if message == "" {
-		message = "Bad Request"
-	}
-	return NewHttpException(message, 400)
+	return NewHttpException(http.StatusBadRequest, message)
 }
 
-// UnauthorizedException 创建 401 Unauthorized 异常；message 为空时使用默认文案。
+// UnauthorizedException 创建 401 异常。
 func UnauthorizedException(message string) *HttpException {
-	if message == "" {
-		message = "Unauthorized"
-	}
-	return NewHttpException(message, 401)
+	return NewHttpException(http.StatusUnauthorized, message)
 }
 
-// NotFoundException 创建 404 Not Found 异常；message 为空时使用默认文案。
-func NotFoundException(message string) *HttpException {
-	if message == "" {
-		message = "Not Found"
-	}
-	return NewHttpException(message, 404)
-}
-
-// ForbiddenException 创建 403 Forbidden 异常；message 为空时使用默认文案。
+// ForbiddenException 创建 403 异常。
 func ForbiddenException(message string) *HttpException {
-	if message == "" {
-		message = "Forbidden"
-	}
-	return NewHttpException(message, 403)
+	return NewHttpException(http.StatusForbidden, message)
 }
 
-// NotAcceptableException 创建 406 Not Acceptable 异常；message 为空时使用默认文案。
+// NotFoundException 创建 404 异常。
+func NotFoundException(message string) *HttpException {
+	return NewHttpException(http.StatusNotFound, message)
+}
+
+// NotAcceptableException 创建 406 异常。
 func NotAcceptableException(message string) *HttpException {
-	if message == "" {
-		message = "Not Acceptable"
-	}
-	return NewHttpException(message, 406)
+	return NewHttpException(http.StatusNotAcceptable, message)
 }
 
-// RequestTimeoutException 创建 408 Request Timeout 异常；message 为空时使用默认文案。
+// RequestTimeoutException 创建 408 异常。
 func RequestTimeoutException(message string) *HttpException {
-	if message == "" {
-		message = "Request Timeout"
-	}
-	return NewHttpException(message, 408)
+	return NewHttpException(http.StatusRequestTimeout, message)
 }
 
-// ConflictException 创建 409 Conflict 异常；message 为空时使用默认文案。
+// ConflictException 创建 409 异常。
 func ConflictException(message string) *HttpException {
-	if message == "" {
-		message = "Conflict"
-	}
-	return NewHttpException(message, 409)
+	return NewHttpException(http.StatusConflict, message)
 }
 
-// GoneException 创建 410 Gone 异常；message 为空时使用默认文案。
+// GoneException 创建 410 异常。
 func GoneException(message string) *HttpException {
-	if message == "" {
-		message = "Gone"
-	}
-	return NewHttpException(message, 410)
+	return NewHttpException(http.StatusGone, message)
 }
 
-// PayloadTooLargeException 创建 413 Payload Too Large 异常；message 为空时使用默认文案。
+// PayloadTooLargeException 创建 413 异常。
 func PayloadTooLargeException(message string) *HttpException {
-	if message == "" {
-		message = "Payload Too Large"
-	}
-	return NewHttpException(message, 413)
+	return NewHttpException(http.StatusRequestEntityTooLarge, message)
 }
 
-// UnsupportedMediaTypeException 创建 415 Unsupported Media Type 异常；message 为空时使用默认文案。
+// UnsupportedMediaTypeException 创建 415 异常。
 func UnsupportedMediaTypeException(message string) *HttpException {
-	if message == "" {
-		message = "Unsupported Media Type"
-	}
-	return NewHttpException(message, 415)
+	return NewHttpException(http.StatusUnsupportedMediaType, message)
 }
 
-// UnprocessableEntityException 创建 422 Unprocessable Entity 异常；message 为空时使用默认文案。
+// UnprocessableEntityException 创建 422 异常。
 func UnprocessableEntityException(message string) *HttpException {
-	if message == "" {
-		message = "Unprocessable Entity"
-	}
-	return NewHttpException(message, 422)
+	return NewHttpException(http.StatusUnprocessableEntity, message)
 }
 
-// InternalServerErrorException 创建 500 Internal Server Error 异常；message 为空时使用默认文案。
+// InternalServerErrorException 创建 500 异常。
 func InternalServerErrorException(message string) *HttpException {
-	if message == "" {
-		message = "Internal Server Error"
-	}
-	return NewHttpException(message, 500)
+	return NewHttpException(http.StatusInternalServerError, message)
 }
 
-// NotImplementedException 创建 501 Not Implemented 异常；message 为空时使用默认文案。
+// NotImplementedException 创建 501 异常。
 func NotImplementedException(message string) *HttpException {
-	if message == "" {
-		message = "Not Implemented"
-	}
-	return NewHttpException(message, 501)
+	return NewHttpException(http.StatusNotImplemented, message)
 }
 
-// BadGatewayException 创建 502 Bad Gateway 异常；message 为空时使用默认文案。
+// BadGatewayException 创建 502 异常。
 func BadGatewayException(message string) *HttpException {
-	if message == "" {
-		message = "Bad Gateway"
-	}
-	return NewHttpException(message, 502)
+	return NewHttpException(http.StatusBadGateway, message)
 }
 
-// ServiceUnavailableException 创建 503 Service Unavailable 异常；message 为空时使用默认文案。
+// ServiceUnavailableException 创建 503 异常。
 func ServiceUnavailableException(message string) *HttpException {
-	if message == "" {
-		message = "Service Unavailable"
-	}
-	return NewHttpException(message, 503)
+	return NewHttpException(http.StatusServiceUnavailable, message)
 }
 
-// GatewayTimeoutException 创建 504 Gateway Timeout 异常；message 为空时使用默认文案。
+// GatewayTimeoutException 创建 504 异常。
 func GatewayTimeoutException(message string) *HttpException {
-	if message == "" {
-		message = "Gateway Timeout"
-	}
-	return NewHttpException(message, 504)
+	return NewHttpException(http.StatusGatewayTimeout, message)
 }

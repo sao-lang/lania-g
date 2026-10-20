@@ -3,6 +3,8 @@
 // 真正的编译、schema 构建和执行逻辑由 plugin / schema_* / execution 等文件负责。
 package graphql
 
+import "github.com/sao-lang/lania-g/kernel/v3/aop"
+
 import (
 	"fmt"
 	"reflect"
@@ -134,12 +136,12 @@ type ResolverBuilder struct {
 	name           string
 	resolver       any
 	fields         []*FieldBuilder
-	guards         []any
-	interceptors   []any
-	middlewares    []any
-	pipes          []any
-	paramPipes     map[int][]any
-	filters        []any
+	guards         []aop.Guard
+	interceptors   []aop.Interceptor
+	middlewares    []aop.Middleware
+	pipes          []aop.Pipe
+	paramPipes     map[int][]aop.Pipe
+	filters        []aop.ExceptionFilter
 	routes         *Routes
 	sealed         bool
 	err            error
@@ -157,12 +159,12 @@ type FieldBuilder struct {
 	description     string
 	deprecation     string
 	args            []*ArgBuilder
-	guards          []any
-	interceptors    []any
-	middlewares     []any
-	pipes           []any
-	paramPipes      map[int][]any
-	filters         []any
+	guards          []aop.Guard
+	interceptors    []aop.Interceptor
+	middlewares     []aop.Middleware
+	pipes           []aop.Pipe
+	paramPipes      map[int][]aop.Pipe
+	filters         []aop.ExceptionFilter
 	cacheControl    string
 	permissions     []string
 	timeout         int64
@@ -177,46 +179,46 @@ func newResolverBuilder(name string, resolver any, routes *Routes) *ResolverBuil
 		name:       name,
 		resolver:   resolver,
 		fields:     make([]*FieldBuilder, 0),
-		paramPipes: make(map[int][]any),
+		paramPipes: make(map[int][]aop.Pipe),
 		routes:     routes,
 	}
 }
 
 // UseGuards 为 resolver 级别追加 guards。
-func (rb *ResolverBuilder) UseGuards(items ...any) *ResolverBuilder {
+func (rb *ResolverBuilder) UseGuards(items ...aop.Guard) *ResolverBuilder {
 	rb.guards = append(rb.guards, items...)
 	return rb
 }
 
 // UseInterceptors 为 resolver 级别追加 interceptors。
-func (rb *ResolverBuilder) UseInterceptors(items ...any) *ResolverBuilder {
+func (rb *ResolverBuilder) UseInterceptors(items ...aop.Interceptor) *ResolverBuilder {
 	rb.interceptors = append(rb.interceptors, items...)
 	return rb
 }
 
 // UseMiddlewares 为 resolver 级别追加 middlewares。
-func (rb *ResolverBuilder) UseMiddlewares(items ...any) *ResolverBuilder {
+func (rb *ResolverBuilder) UseMiddlewares(items ...aop.Middleware) *ResolverBuilder {
 	rb.middlewares = append(rb.middlewares, items...)
 	return rb
 }
 
 // UsePipes 为 resolver 级别追加 pipes。
-func (rb *ResolverBuilder) UsePipes(items ...any) *ResolverBuilder {
+func (rb *ResolverBuilder) UsePipes(items ...aop.Pipe) *ResolverBuilder {
 	rb.pipes = append(rb.pipes, items...)
 	return rb
 }
 
 // UseParamPipes 为指定参数位置追加 pipes。
-func (rb *ResolverBuilder) UseParamPipes(paramIndex int, items ...any) *ResolverBuilder {
+func (rb *ResolverBuilder) UseParamPipes(paramIndex int, items ...aop.Pipe) *ResolverBuilder {
 	if rb.paramPipes[paramIndex] == nil {
-		rb.paramPipes[paramIndex] = make([]any, 0)
+		rb.paramPipes[paramIndex] = make([]aop.Pipe, 0)
 	}
 	rb.paramPipes[paramIndex] = append(rb.paramPipes[paramIndex], items...)
 	return rb
 }
 
 // UseFilters 为 resolver 级别追加 filters。
-func (rb *ResolverBuilder) UseFilters(items ...any) *ResolverBuilder {
+func (rb *ResolverBuilder) UseFilters(items ...aop.ExceptionFilter) *ResolverBuilder {
 	rb.filters = append(rb.filters, items...)
 	return rb
 }
@@ -256,12 +258,12 @@ func (rb *ResolverBuilder) addField(fieldType FieldType, fieldName string, handl
 		fieldName:       fieldName,
 		handler:         handler,
 		args:            make([]*ArgBuilder, 0),
-		guards:          make([]any, 0),
-		interceptors:    make([]any, 0),
-		middlewares:     make([]any, 0),
-		pipes:           make([]any, 0),
-		paramPipes:      make(map[int][]any),
-		filters:         make([]any, 0),
+		guards:          make([]aop.Guard, 0),
+		interceptors:    make([]aop.Interceptor, 0),
+		middlewares:     make([]aop.Middleware, 0),
+		pipes:           make([]aop.Pipe, 0),
+		paramPipes:      make(map[int][]aop.Pipe),
+		filters:         make([]aop.ExceptionFilter, 0),
 	}
 
 	val := reflect.ValueOf(handler)
@@ -295,12 +297,12 @@ func (rb *ResolverBuilder) seal() error {
 		Name:         rb.name,
 		Resolver:     rb.resolver,
 		Fields:       fields,
-		Guards:       append([]any{}, rb.guards...),
-		Interceptors: append([]any{}, rb.interceptors...),
-		Middlewares:  append([]any{}, rb.middlewares...),
-		Pipes:        append([]any{}, rb.pipes...),
+		Guards:       append([]aop.Guard{}, rb.guards...),
+		Interceptors: append([]aop.Interceptor{}, rb.interceptors...),
+		Middlewares:  append([]aop.Middleware{}, rb.middlewares...),
+		Pipes:        append([]aop.Pipe{}, rb.pipes...),
 		ParamPipes:   coreadapter.MergeParamPipes(rb.paramPipes, nil),
-		Filters:      append([]any{}, rb.filters...),
+		Filters:      append([]aop.ExceptionFilter{}, rb.filters...),
 	}
 	if rb.routes != nil && rb.routes.reg != nil {
 		rb.routes.reg.RegisterDecl(AdapterID, "resolvers", def)
@@ -356,40 +358,40 @@ func (fb *FieldBuilder) Args(args ...*ArgBuilder) *FieldBuilder {
 }
 
 // UseGuards 为字段级别追加 guards。
-func (fb *FieldBuilder) UseGuards(items ...any) *FieldBuilder {
+func (fb *FieldBuilder) UseGuards(items ...aop.Guard) *FieldBuilder {
 	fb.guards = append(fb.guards, items...)
 	return fb
 }
 
 // UseInterceptors 为字段级别追加 interceptors。
-func (fb *FieldBuilder) UseInterceptors(items ...any) *FieldBuilder {
+func (fb *FieldBuilder) UseInterceptors(items ...aop.Interceptor) *FieldBuilder {
 	fb.interceptors = append(fb.interceptors, items...)
 	return fb
 }
 
 // UseMiddlewares 为字段级别追加 middlewares。
-func (fb *FieldBuilder) UseMiddlewares(items ...any) *FieldBuilder {
+func (fb *FieldBuilder) UseMiddlewares(items ...aop.Middleware) *FieldBuilder {
 	fb.middlewares = append(fb.middlewares, items...)
 	return fb
 }
 
 // UsePipes 为字段级别追加 pipes。
-func (fb *FieldBuilder) UsePipes(items ...any) *FieldBuilder {
+func (fb *FieldBuilder) UsePipes(items ...aop.Pipe) *FieldBuilder {
 	fb.pipes = append(fb.pipes, items...)
 	return fb
 }
 
 // UseParamPipes 为指定参数位置追加 pipes。
-func (fb *FieldBuilder) UseParamPipes(paramIndex int, items ...any) *FieldBuilder {
+func (fb *FieldBuilder) UseParamPipes(paramIndex int, items ...aop.Pipe) *FieldBuilder {
 	if fb.paramPipes[paramIndex] == nil {
-		fb.paramPipes[paramIndex] = make([]any, 0)
+		fb.paramPipes[paramIndex] = make([]aop.Pipe, 0)
 	}
 	fb.paramPipes[paramIndex] = append(fb.paramPipes[paramIndex], items...)
 	return fb
 }
 
 // UseFilters 为字段级别追加 filters。
-func (fb *FieldBuilder) UseFilters(items ...any) *FieldBuilder {
+func (fb *FieldBuilder) UseFilters(items ...aop.ExceptionFilter) *FieldBuilder {
 	fb.filters = append(fb.filters, items...)
 	return fb
 }
@@ -459,12 +461,12 @@ func (fb *FieldBuilder) build() *FieldDefinition {
 		Description:  fb.description,
 		Deprecation:  fb.deprecation,
 		Args:         args,
-		Guards:       append([]any{}, fb.guards...),
-		Interceptors: append([]any{}, fb.interceptors...),
-		Middlewares:  append([]any{}, fb.middlewares...),
-		Pipes:        append([]any{}, fb.pipes...),
+		Guards:       append([]aop.Guard{}, fb.guards...),
+		Interceptors: append([]aop.Interceptor{}, fb.interceptors...),
+		Middlewares:  append([]aop.Middleware{}, fb.middlewares...),
+		Pipes:        append([]aop.Pipe{}, fb.pipes...),
 		ParamPipes:   coreadapter.MergeParamPipes(fb.paramPipes, nil),
-		Filters:      append([]any{}, fb.filters...),
+		Filters:      append([]aop.ExceptionFilter{}, fb.filters...),
 		CacheControl: fb.cacheControl,
 		Permissions:  append([]string{}, fb.permissions...),
 		Timeout:      fb.timeout,

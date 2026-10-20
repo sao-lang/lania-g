@@ -11,3 +11,4 @@ toc: false
 - [请求执行链](request-flow)：从传输层到 handler 的完整路径
 - [Adapter 扩展](adapter-plugin)：如何新增一种协议
 - [诊断能力](diagnostics)：编译诊断、启动报告、依赖图
+- [质量工具链](tooling)：API 快照、文档校验、模块清单、性能基线

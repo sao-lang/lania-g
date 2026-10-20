@@ -45,11 +45,11 @@ type Registry struct {
 // application 或 factory 写入的全局 AOP 最终都会先落在这里，
 // 再由 compiler 合并进各个 handler 的执行计划。
 type GlobalAOPRegistration struct {
-	Middlewares  []aop.MiddlewareFunc
-	Guards       []aop.GuardFunc
-	Interceptors []aop.InterceptorFunc
-	Pipes        []aop.PipeFunc
-	Filters      []aop.ExceptionFilterFunc
+	Middlewares  []aop.Middleware
+	Guards       []aop.Guard
+	Interceptors []aop.Interceptor
+	Pipes        []aop.Pipe
+	Filters      []aop.ExceptionFilter
 	// ScopedMiddlewares 来自模块的 MiddlewareConsumer 声明，按路由范围生效。
 	ScopedMiddlewares []aop.ScopedMiddleware
 }
@@ -190,35 +190,35 @@ func (r *Registry) SnapshotDeclCounts() map[string]map[string]int {
 // UseGlobalMiddlewares 追加全局 middlewares 声明。
 //
 // compiler 会把这些全局 AOP 展开到每个 handler 的 AOP 计划中（或参与运行期合并，视实现而定）。
-func (r *Registry) UseGlobalMiddlewares(items ...aop.MiddlewareFunc) {
+func (r *Registry) UseGlobalMiddlewares(items ...aop.Middleware) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.globalAOP.Middlewares = append(r.globalAOP.Middlewares, items...)
 }
 
 // UseGlobalGuards 追加全局 guards 声明。
-func (r *Registry) UseGlobalGuards(items ...aop.GuardFunc) {
+func (r *Registry) UseGlobalGuards(items ...aop.Guard) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.globalAOP.Guards = append(r.globalAOP.Guards, items...)
 }
 
 // UseGlobalInterceptors 追加全局 interceptors 声明。
-func (r *Registry) UseGlobalInterceptors(items ...aop.InterceptorFunc) {
+func (r *Registry) UseGlobalInterceptors(items ...aop.Interceptor) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.globalAOP.Interceptors = append(r.globalAOP.Interceptors, items...)
 }
 
 // UseGlobalPipes 追加全局 pipes 声明。
-func (r *Registry) UseGlobalPipes(items ...aop.PipeFunc) {
+func (r *Registry) UseGlobalPipes(items ...aop.Pipe) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.globalAOP.Pipes = append(r.globalAOP.Pipes, items...)
 }
 
 // UseGlobalFilters 追加全局 exception filters 声明。
-func (r *Registry) UseGlobalFilters(items ...aop.ExceptionFilterFunc) {
+func (r *Registry) UseGlobalFilters(items ...aop.ExceptionFilter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.globalAOP.Filters = append(r.globalAOP.Filters, items...)
@@ -243,11 +243,11 @@ func (r *Registry) GetGlobalAOP() GlobalAOPRegistration {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return GlobalAOPRegistration{
-		Middlewares:       append([]aop.MiddlewareFunc{}, r.globalAOP.Middlewares...),
-		Guards:            append([]aop.GuardFunc{}, r.globalAOP.Guards...),
-		Interceptors:      append([]aop.InterceptorFunc{}, r.globalAOP.Interceptors...),
-		Pipes:             append([]aop.PipeFunc{}, r.globalAOP.Pipes...),
-		Filters:           append([]aop.ExceptionFilterFunc{}, r.globalAOP.Filters...),
+		Middlewares:       append([]aop.Middleware{}, r.globalAOP.Middlewares...),
+		Guards:            append([]aop.Guard{}, r.globalAOP.Guards...),
+		Interceptors:      append([]aop.Interceptor{}, r.globalAOP.Interceptors...),
+		Pipes:             append([]aop.Pipe{}, r.globalAOP.Pipes...),
+		Filters:           append([]aop.ExceptionFilter{}, r.globalAOP.Filters...),
 		ScopedMiddlewares: append([]aop.ScopedMiddleware{}, r.globalAOP.ScopedMiddlewares...),
 	}
 }

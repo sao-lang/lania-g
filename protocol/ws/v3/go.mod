@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/go-playground/validator/v10 v10.30.2
-	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 	github.com/zishang520/socket.io v1.3.2
 )
 
@@ -17,6 +16,7 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/sao-lang/lania-g/kernel/v3 v3.0.0
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect

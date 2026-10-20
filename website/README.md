@@ -77,6 +77,10 @@ website/
    `layouts/_markup/render-link.html` 会用 `site.GetPage` 解析成正确的 `RelPermalink`
 7. `prev` / `next` 必须写站内绝对路径（如 `/docs/reference/http`），
    否则 `protocols/http` 与 `reference/http` 同名时会触发 `page reference ... is ambiguous`
+8. **文档里的框架符号会被机器校验**：`go run ./tools/cmd/doccheck -dir .` 会检查每个
+   ```` ```go ```` 代码块中的 `alias.Symbol` 是否真实存在于 `api/api.txt`。
+   若片段本身是自洽可编译的（无省略号），把围栏写成 ```` ```go check ```` 可额外获得语法校验。
+   改完文档在 `test/` 下跑 `go test ./docs/` 即可确认。
 
 ## 主题说明
 

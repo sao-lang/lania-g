@@ -158,7 +158,7 @@ func compileHandler(item *handlerOwnership, global registry.GlobalAOPRegistratio
 	}
 
 	prefix := normalizeNamespace(def.Prefix)
-	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{
+	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{
 		Middlewares:  def.Middlewares,
 		Guards:       def.Guards,
 		Interceptors: def.Interceptors,
@@ -167,9 +167,6 @@ func compileHandler(item *handlerOwnership, global registry.GlobalAOPRegistratio
 		Filters:      def.Filters,
 		RoutePath:    wsRoutePath(prefix, def.Event),
 	})
-	if err != nil {
-		return nil, "", err
-	}
 
 	h.Meta.CompiledAOP = &plan
 	h.Meta.ParamPlans = buildParamPlan(h)

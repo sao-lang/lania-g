@@ -124,10 +124,7 @@ func compileSubscription(item *routeOwnership, global registry.GlobalAOPRegistra
 		return nil, "", err
 	}
 
-	plan, err := compiler.CompileAOPPlan(global, compiler.AOPSources{RoutePath: def.Topic})
-	if err != nil {
-		return nil, "", err
-	}
+	plan := compiler.CompileAOPPlan(global, compiler.AOPSources{RoutePath: def.Topic})
 	h.Meta.CompiledAOP = &plan
 
 	// MQ 参数名依赖 DSL 显式绑定，而不是从消息体 schema 自动推断。

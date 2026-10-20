@@ -1,6 +1,8 @@
 // defs.go 定义 HTTP adapter 在 registry 与编译阶段使用的声明结构。
 package http
 
+import "github.com/sao-lang/lania-g/kernel/v3/aop"
+
 // Method 表示 HTTP 方法。
 type Method string
 
@@ -56,12 +58,12 @@ type RouteDefinition struct {
 	Controller any
 	MethodName string
 
-	Guards       []any
-	Interceptors []any
-	Middlewares  []any
-	Pipes        []any
-	ParamPipes   map[int][]any
-	Filters      []any
+	Guards       []aop.Guard
+	Interceptors []aop.Interceptor
+	Middlewares  []aop.Middleware
+	Pipes        []aop.Pipe
+	ParamPipes   map[int][]aop.Pipe
+	Filters      []aop.ExceptionFilter
 
 	// 下面这些字段是 HTTP 特有的响应语义配置：
 	// 状态码、固定响应头、重定向、模板渲染以及文档信息。

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/sao-lang/lania-g/kernel/v3/metadata"
@@ -81,6 +82,12 @@ type Container struct {
 	instancesMu       sync.Mutex
 	parent            *Container
 	constructorFinder ConstructorFinder
+
+	// 注入审计：记录每一次字段注入尝试，供 Diagnostics 暴露。
+	auditMu   sync.Mutex
+	audit     []InjectionRecord
+	strict    bool
+	auditOn   bool
 }
 
 // NewContainer 创建一个新的 DI 容器实例。
@@ -88,12 +95,14 @@ type Container struct {
 // 默认行为：
 // - providers/instances/resolving 都初始化为空 map
 // - constructorFinder 默认 nil，表示只走“默认构造 + Injectable.Inject”路径
+// - 注入审计默认开启（内存开销可忽略），严格模式默认关闭
 func NewContainer() *Container {
 	return &Container{
 		providers:         make(map[interface{}]*Provider),
 		instances:         make(map[interface{}]interface{}),
 		resolving:         make(map[interface{}]bool),
 		constructorFinder: nil,
+		auditOn:           true,
 	}
 }
 
@@ -124,6 +133,9 @@ func (c *Container) NewChild() *Container {
 	child := NewContainer()
 	child.parent = c
 	child.constructorFinder = c.constructorFinder
+	// 严格模式与审计配置随容器树继承，避免"设置了却不生效"。
+	child.strict = c.StrictInjection()
+	child.auditOn = c.injectionAuditEnabled()
 	return child
 }
 
@@ -264,11 +276,11 @@ func (c *Container) get(token interface{}, resolving map[interface{}]bool, reque
 func (c *Container) createInstance(provider *Provider, resolving map[interface{}]bool, requester *Container) (interface{}, error) {
 	switch provider.Type {
 	case ProviderTypeValue:
-		instance := provider.UseValue
-		if err := c.injectFields(instance, resolving, requester); err != nil {
-			return nil, err
-		}
-		return instance, nil
+		// Value provider 的实例由调用方完整构造，容器不再"回头"注入它的字段。
+		//
+		// 这条规则很重要：否则像 Store{mu sync.Mutex} 这类含基础类型字段的实例
+		// 会被当成"缺 string/provider"，在严格模式下产生误报。
+		return provider.UseValue, nil
 
 	case ProviderTypeExisting:
 		if resolving[provider.UseExisting] {
@@ -334,8 +346,10 @@ func (c *Container) construct(typ reflect.Type, resolving map[interface{}]bool, 
 // 规则：
 // - 只注入 exported（首字母大写）字段
 // - 只注入零值字段（已有值的字段不覆盖）
-// - 容器中不存在的类型静默跳过（不报错）
+// - 标签 `di:"-"` 跳过；`di:"optional"` 允许缺失
+// - 容器中不存在的类型默认静默跳过（StrictInjection 开启时改为报错）
 // - 支持 parent 链回溯（child container 可注入 parent 的 provider）
+// - 每次尝试都会记录进 InjectionReport，便于诊断
 func (c *Container) injectFields(instance interface{}, resolving map[interface{}]bool, requester *Container) error {
 	rv := reflect.ValueOf(instance)
 	if rv.Kind() == reflect.Ptr {
@@ -348,29 +362,111 @@ func (c *Container) injectFields(instance interface{}, resolving map[interface{}
 		return nil
 	}
 
+	targetType := rv.Type()
+	strict := c.StrictInjection()
+
 	for i := 0; i < rv.NumField(); i++ {
 		ft := rv.Type().Field(i)
 		fv := rv.Field(i)
 
+		skip, optional := fieldInjectionMode(ft.Tag.Get("di"))
+		if skip {
+			c.recordInjection(InjectionRecord{
+				Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionSkipped,
+			})
+			continue
+		}
+		if !ft.IsExported() {
+			if fv.IsZero() {
+				c.recordInjection(InjectionRecord{
+					Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionUnexported,
+				})
+			}
+			continue
+		}
+		if !fv.IsZero() {
+			c.recordInjection(InjectionRecord{
+				Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionAlreadySet,
+			})
+			continue
+		}
 		// 非指针 struct（例如以值 token 注册的 value provider）不可寻址，
 		// 写入副本没有意义且会 panic，直接跳过。
-		if !ft.IsExported() || !fv.IsZero() || !fv.CanSet() {
+		if !fv.CanSet() {
+			c.recordInjection(InjectionRecord{
+				Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionNotSettable,
+			})
 			continue
 		}
 
 		dep, err := c.get(ft.Type, resolving, requester)
 		if err != nil || dep == nil {
+			c.recordMissing(targetType, ft, optional, err)
+			if strict && !optional {
+				return c.injectionError(targetType, ft, err)
+			}
 			continue
 		}
 
 		depValue := reflect.ValueOf(dep)
 		if !depValue.IsValid() || !depValue.Type().AssignableTo(ft.Type) {
+			c.recordInjection(InjectionRecord{
+				Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionTypeMismatch,
+				Reason:     fmt.Sprintf("resolved %s", typeName(depValue.Type())),
+				Candidates: c.injectionCandidates(ft.Type),
+			})
+			if strict {
+				return c.injectionError(targetType, ft, nil)
+			}
 			continue
 		}
 
 		fv.Set(depValue)
+		c.recordInjection(InjectionRecord{
+			Token: ft.Type, TargetType: targetType, Field: ft.Name, Status: InjectionInjected,
+		})
 	}
 	return nil
+}
+
+// recordMissing 记录一次"没解析到依赖"。
+func (c *Container) recordMissing(targetType reflect.Type, field reflect.StructField, optional bool, cause error) {
+	status := InjectionMissingProvider
+	reason := ""
+	if optional {
+		status = InjectionOptional
+	}
+	if cause != nil {
+		reason = cause.Error()
+	}
+	c.recordInjection(InjectionRecord{
+		Token:      field.Type,
+		TargetType: targetType,
+		Field:      field.Name,
+		Status:     status,
+		Reason:     reason,
+		Candidates: c.injectionCandidates(field.Type),
+	})
+}
+
+// injectionError 构造带可操作提示的严格模式错误。
+func (c *Container) injectionError(targetType reflect.Type, field reflect.StructField, cause error) error {
+	candidates := c.injectionCandidates(field.Type)
+	hint := ""
+	if len(candidates) > 0 {
+		names := make([]string, 0, len(candidates))
+		for _, candidate := range candidates {
+			names = append(names, typeName(candidate))
+		}
+		hint = fmt.Sprintf("; nearest registered tokens: %s", strings.Join(names, ", "))
+	}
+	message := fmt.Sprintf("di: cannot inject %s.%s (%s): provider not found%s",
+		targetName(targetType), field.Name, typeName(field.Type), hint)
+	if cause != nil && !strings.Contains(cause.Error(), "provider not found") {
+		message += ": " + cause.Error()
+	}
+	message += "; mark the field with `di:\"optional\"` if it is allowed to be nil"
+	return fmt.Errorf("%s", message)
 }
 
 // callConstructor 调用构造函数并解析其入参依赖。

@@ -89,11 +89,7 @@ func (l *ModuleLoader) LoadMultiple(roots ...Module) (*LoadResult, error) {
 		}
 	}
 	l.aop = l.collectAOP()
-	scoped, err := l.collectScopedMiddlewares()
-	if err != nil {
-		return nil, err
-	}
-	l.scopedMiddlewares = scoped
+	l.scopedMiddlewares = l.collectScopedMiddlewares()
 
 	return &LoadResult{
 		Modules:     l.getModulesList(),
@@ -251,9 +247,8 @@ func (l *ModuleLoader) GetScopedMiddlewares() []aop.ScopedMiddleware {
 // CollectScopedMiddlewares 遍历给定模块，执行实现了 MiddlewareConfigurable 的 Configure，
 // 并收集其范围化中间件声明。
 //
-// 顺序即传入的模块顺序；Configure 没有返回值，因此配置错误由 consumer 累积后统一返回：
-// 写错类型的中间件应当在启动期失败，而不是静默不生效。
-func CollectScopedMiddlewares(mods []Module) ([]aop.ScopedMiddleware, error) {
+// 顺序即传入的模块顺序。Configure 的签名是类型化的，因此不存在"写错类型被静默丢弃"的路径。
+func CollectScopedMiddlewares(mods []Module) []aop.ScopedMiddleware {
 	var out []aop.ScopedMiddleware
 	for _, mod := range mods {
 		configurable, ok := mod.(aop.MiddlewareConfigurable)
@@ -262,16 +257,13 @@ func CollectScopedMiddlewares(mods []Module) ([]aop.ScopedMiddleware, error) {
 		}
 		consumer := aop.NewMiddlewareConsumer()
 		configurable.Configure(consumer)
-		if err := consumer.Err(); err != nil {
-			return nil, fmt.Errorf("module %T configure middlewares: %w", mod, err)
-		}
 		out = append(out, consumer.Bindings()...)
 	}
-	return out, nil
+	return out
 }
 
 // collectScopedMiddlewares 按模块加载顺序收集范围化中间件。
-func (l *ModuleLoader) collectScopedMiddlewares() ([]aop.ScopedMiddleware, error) {
+func (l *ModuleLoader) collectScopedMiddlewares() []aop.ScopedMiddleware {
 	return CollectScopedMiddlewares(l.orderedModules)
 }
 
