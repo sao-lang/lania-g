@@ -9,7 +9,225 @@
 ```
 
 框架将 **协议差异前移到编译与 Transport 层**，运行期统一复用 `runtime.HandlerContext → Router → Binding → AOP Pipeline → Executor`，保证扩展协议时无需侵入核心执行层。
+# lania-g
 
+`lania-g` 是一个基于 **Go 多模块工作区** 的 Web 应用框架，采用 **声明-编译-执行** 三段式架构，以统一运行时承接 HTTP、gRPC、GraphQL、WebSocket、MQ、Scheduler 等多协议请求，并提供开箱即用的认证、日志、ORM、可观测性、弹性策略等基础设施集成。
+
+## 核心理念
+
+```text
+声明 (DSL)  →  编译 (Compiler)  →  安装 (Runtime)  →  执行 (Handler)
+```
+
+框架将 **协议差异前移到编译与 Transport 层**，运行期统一复用 `runtime.HandlerContext → Router → Binding → AOP Pipeline → Executor`，保证扩展协议时无需侵入核心执行层。
+
+### 三大设计原则
+
+| 原则 | 说明 |
+|------|------|
+| **声明与执行分离** | 协议层 DSL 将路由、服务、AOP 等声明写入 Registry；编译阶段再转为 Runtime 可执行产物 |
+| **协议差异外置** | HTTP、gRPC、GraphQL 等各自保留协议语义，但运行期共用同一套执行引擎 |
+| **能力模块化集成** | 认证、日志、ORM、OTel 等基础设施通过 `integrations/*` 以模块方式装配，不耦合内核 |
+
+### 执行链路
+
+**启动期：**
+```text
+Root Module → Module Loader → Container Tree → Adapter Mount → Protocol Plugins
+→ Compile(Registry) → Install(Runtime) → Listen / Run
+```
+
+**请求期：**
+```text
+Client Request → Protocol Transport → HandlerContext → Route Match
+→ Binding Resolve Args → AOP Pipeline → Invoke Handler → Write Response
+```
+
+## 模块布局
+
+本项目是一个 **Go 多模块工作区**（`go.work`），每个子目录独立演进、独立发布：
+
+```
+lania-g/
+├── application/v3         应用装配、生命周期管理、编译诊断
+├── kernel/v3              内核基础设施（协议无关）
+│   ├── module/            模块定义、导入导出、递归加载
+│   ├── di/                依赖注入容器（支持父子容器、作用域、类型/token 取值）
+│   ├── registry/          声明存储（路由、AOP、Binding 等）
+│   ├── compiler/          声明扫描、编译、冲突检测
+│   ├── runtime/           统一运行期：路由匹配、参数绑定、Pipeline 执行
+│   ├── aop/               Middleware、Guard、Pipe、Interceptor、Filter
+│   ├── errors/            内核错误模型
+│   ├── graph/             依赖图与归属分析
+│   ├── scanner/           声明扫描辅助
+│   ├── integration/       Integration 注入桥接
+│   └── adapter/           Application 与 Adapter 契约
+├── protocol/              协议适配器（DSL + Transport + 编译插件）
+│   ├── http/v3/           HTTP 协议
+│   ├── grpc/v3/           gRPC 协议（含四种流模式）
+│   ├── graphql/v3/        GraphQL 协议
+│   ├── ws/v3/             WebSocket 协议
+│   ├── mq/v3/             消息队列协议
+│   └── scheduler/v3/      定时调度协议
+├── integrations/          基础设施集成（模块化装配）
+│   ├── auth/v3/           认证鉴权
+│   ├── cache/v3/          缓存（内存/Redis）
+│   ├── config/v3/         配置加载
+│   ├── es/v3/             Elasticsearch
+│   ├── events/v3/         事件总线
+│   ├── grpc/v3/           gRPC 客户端
+│   ├── http/v3/           HTTP 客户端
+│   ├── kafka/v3/          Kafka 消息队列
+│   ├── logger/v3/         结构化日志
+│   ├── minio/v3/          MinIO 对象存储
+│   ├── mongodb/v3/        MongoDB（含 Repository 模式）
+│   ├── orm/v3/            ORM（含事务）
+│   ├── otel/v3/           OpenTelemetry 可观测性
+│   ├── outbox/v3/         Outbox 发件箱模式
+│   ├── resilience/v3/     弹性策略（熔断、限流、幂等）
+│   ├── swagger/v3/        Swagger 文档自动生成
+│   └── terminus/v3/       健康检查
+├── cmd/                    示例工程（HTTP/gRPC/GraphQL/WS/MQ/Scheduler Demo，含 all-in-one）
+├── test/                   全量测试（独立模块，与源码目录分离）
+├── tools/                  质量工具链（modgen / modrun / apicheck / doccheck / benchcheck）
+├── api/api.txt             公开 API 快照（由 apicheck 生成，CI 校验）
+├── modules.json            29 个模块的清单与依赖边界策略
+├── website/                Hugo 文档站
+└── docs/                   文档（archive/ 为历史归档）
+```
+
+## 快速开始
+
+### 前置条件
+
+- Go 1.25+
+
+### 最小示例
+
+```go
+package main
+
+import (
+	"log"
+	"os"
+
+	application "github.com/sao-lang/lania-g/application/v3"
+	"github.com/sao-lang/lania-g/kernel/v3/module"
+	httpprotocol "github.com/sao-lang/lania-g/protocol/http/v3"
+)
+
+type UserController struct{}
+
+func (c *UserController) Ping() map[string]string {
+	return map[string]string{"ok": "true"}
+}
+
+// Register 声明控制器路由；控制器在哪个模块，路由就属于哪个模块。
+func (c *UserController) Register(r *httpprotocol.Routes) {
+	r.Prefix("/users").Get("/ping", c.Ping).Summary("Ping").Tags("users")
+}
+
+func main() {
+	root := module.New(module.Metadata{
+		Imports: []module.Module{
+			httpprotocol.Module(httpprotocol.Config{Addr: ":8080"}),
+		},
+		Controllers: []any{&UserController{}},
+	})
+
+	app, err := application.New(root, application.Options{Logger: os.Stdout})
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+### 运行测试
+
+所有测试集中在仓库根目录的 `test/` 模块里（与源码目录分离）：
+
+```bash
+cd test && go test ./...        # 全量（含 api / docs 门禁）
+cd test && go test -short ./... # 跳过耗时的 API 快照对比
+```
+
+多模块构建与质量门禁统一由 `tools/` 里的命令行负责：
+
+```bash
+cd tools
+go run ./cmd/modgen  -check -dir ..   # 校验 go.mod 与 modules.json 一致
+go run ./cmd/modrun  build            # 逐模块 go build
+go run ./cmd/modrun  deps             # 依赖边界检查
+go run ./cmd/apicheck -dir ..         # 公开 API 快照对比
+go run ./cmd/doccheck -dir ..         # 文档符号/示例校验
+```
+
+细节见文档站「深入原理 → 质量工具链」。
+
+## 推荐接入路径
+
+1. 用 `module.New(module.Metadata{...})` 定义根模块（唯一装配入口）
+2. 协议以模块形式放进 `Imports`，如 `http.Module(http.Config{Addr: ":8080"})`
+3. 控制器实现 `Register(*Routes)` / `Subscribe(*Routes)` 在模块内声明路由与订阅
+4. 集成同样以模块形式接入，如 `logger.Module(...)`、`orm.Module(...)`
+5. 启动只需 `application.New(root, opts)` + `app.Run()`；编译与诊断在内部完成
+
+## 文档站
+
+仓库内置一个基于 **Hugo + Hextra** 的文档站（无需 Node.js）：
+
+```bash
+# 首次：拉取主题模块
+hugo mod tidy --source website
+
+# 本地预览（覆盖 baseURL，否则默认 baseURL 带 /lania-g/ 子路径，根路径会 404）
+hugo server --source website --renderToMemory --baseURL http://localhost:1313/
+
+# 构建静态站点（产物在 website/public）
+hugo --source website --minify
+```
+
+文档内容位于 `website/content/docs/`，按「入门 → 核心概念 → 协议指南 → 集成 → 深入原理 → 最佳实践」组织。
+
+## 文档索引
+
+- [文档导航](docs/README.md)
+- [API 文档](docs/API.md)
+- [模块与链路全景说明](docs/archive/模块与链路全景说明.md)
+- [技术方案](docs/archive/技术方案.md)
+- [标准接入模板](docs/标准接入模板.md)
+- [学习路线图](docs/archive/学习路线图.md)
+- [架构收敛文档](docs/archive/架构收敛文档.md)
+- [Runtime 说明](docs/archive/runtime.md)
+- [错误模型约定](docs/archive/错误模型约定.md)
+
+### 专项接入文档
+
+- [Auth 接入](docs/archive/auth接入.md)
+- [MongoDB 接入](docs/archive/mongodb接入.md)
+- [OpenTelemetry 接入](docs/archive/otel接入.md)
+- [Outbox 接入](docs/archive/outbox接入.md)
+- [Resilience 接入](docs/archive/resilience接入.md)
+- [gRPC 四种模式支持方案](docs/archive/grpc四种模式完整支持方案.md)
+
+## 业务接入依赖边界
+
+推荐业务层只依赖以下包族：
+
+- `github.com/sao-lang/lania-g/application/v3`
+- `github.com/sao-lang/lania-g/kernel/v3/module`
+- `github.com/sao-lang/lania-g/kernel/v3/di`
+- `github.com/sao-lang/lania-g/protocol/<proto>/v3`
+- `github.com/sao-lang/lania-g/integrations/<name>/v3`
+
+不建议将 `compiler`、`runtime`、`registry` 等内核包作为常规业务依赖。
+
+## License
+
+[MIT](LICENSE)
 ### 三大设计原则
 
 | 原则 | 说明 |
