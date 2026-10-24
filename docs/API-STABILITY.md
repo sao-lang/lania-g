@@ -47,7 +47,36 @@ CI 会运行 `go test ./test/api`，**任何导出符号的增删改都会失败
 
 `v3` 是本项目的首个 major 版本号，不代表此前存在 v1/v2 用户。
 
-## 5. 弃用流程
+## 5. 发布：每个 module 一个 tag
+
+本仓库是多 module 仓库，`go get` 依赖 **git tag**，不需要额外发包。
+每个子 module 必须打一个**带 module 目录前缀**的 annotated tag：
+
+```text
+<module 目录>/<版本>        例如  kernel/v3.0.0、protocol/http/v3.0.0
+```
+
+⚠️ 两个高频错误：
+
+| 错误写法 | 为什么错 |
+|----------|----------|
+| `kernel/v3/v3.0.0` | 把 `module path` 的 `/v3` 后缀误当成目录层级，多了一层 |
+| 轻量 tag（`git tag x`） | Go 解析依赖 tag 对象，部分场景解析不到，必须用 `git tag -a` |
+
+正确命名由 module 目录**去掉末尾 `/v3`** 后接 `/v3.0.0` 得到：
+
+```bash
+# 为全部 25 个 module 打 tag
+for d in kernel/v3 application/v3 protocol/*/v3 integrations/*/v3; do
+  git tag -a "${d%/v3}/v3.0.0" -m "lania-g $d v3.0.0"
+done
+git push github --tags
+```
+
+发布后仓库内各 `go.mod` 中的内部依赖统一写 `v3.0.0`（`tools/modgen` 保证这一点），
+外部项目因此可以直接 `go get github.com/sao-lang/lania-g/application/v3@v3.0.0`。
+
+## 6. 弃用流程
 
 本项目采用**直接删除**策略，不保留 deprecated 别名：
 
